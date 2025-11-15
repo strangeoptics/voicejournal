@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,6 +36,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,10 +49,16 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import com.example.voicejournal.data.AppDatabase
+import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Calendar
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,13 +69,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private lateinit var speechRecognizer: SpeechRecognizer
-    private val textCategories = mapOf(
-        "journal" to mutableStateOf("journal\n\n"),
-        "todo" to mutableStateOf("todo\n\n"),
-        "kaufen" to mutableStateOf("kaufen\n\n"),
-        "ideen" to mutableStateOf("ideen\n\n")
-    )
-    private val selectedCategory = mutableStateOf("journal")
+    private val db by lazy { AppDatabase.getDatabase(this) }
+    private val dao by lazy { db.journalEntryDao() }
+
+    private val categories = listOf("journal", "todo", "kaufen", "ideen")
+    private val selectedCategory = mutableStateOf(categories.first())
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,15 +84,28 @@ class MainActivity : ComponentActivity() {
         setContent {
             VoicejournalTheme {
                 val category by selectedCategory
-                val texts = textCategories.mapValues { it.value.value }
+
+                val threeDaysAgo = remember {
+                    Calendar.getInstance().apply {
+                        add(Calendar.DAY_OF_YEAR, -3)
+                    }.timeInMillis
+                }
+                val entries by dao.getEntriesSince(threeDaysAgo).collectAsState(initial = emptyList())
+
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Greeting(
                         modifier = Modifier.padding(innerPadding),
-                        textCategories = texts,
+                        entries = entries,
+                        categories = categories,
                         selectedCategory = category,
                         onCategoryChange = { selectedCategory.value = it },
-                        onSpeakClick = ::startListening
+                        onSpeakClick = ::startListening,
+                        onDeleteClick = {
+                            lifecycleScope.launch {
+                                dao.deleteLatestByCategory(selectedCategory.value)
+                            }
+                        }
                     )
                 }
             }
@@ -116,25 +137,32 @@ class MainActivity : ComponentActivity() {
                             (lowerCaseText.length == keyword.length || lowerCaseText.getOrNull(keyword.length)?.isWhitespace() == true)
                 }
 
-                val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm"))
+                val timestamp = System.currentTimeMillis()
 
-                if (foundKeyword != null) {
+                val (targetCategory, contentToAdd) = if (foundKeyword != null) {
                     // Keyword was found
-                    val targetCategory = categoryKeywords[foundKeyword]!!
-                    val contentToAdd = recognizedText.substring(foundKeyword.length).trim()
+                    val category = categoryKeywords[foundKeyword]!!
+                    val content = recognizedText.substring(foundKeyword.length).trim()
 
                     // Switch the selected category in the UI
-                    if (selectedCategory.value != targetCategory) {
-                        selectedCategory.value = targetCategory
+                    if (selectedCategory.value != category) {
+                        selectedCategory.value = category
                     }
-
-                    // Add the content, if there is any
-                    if (contentToAdd.isNotEmpty()) {
-                        textCategories[targetCategory]?.value += "[$timestamp] $contentToAdd\n"
-                    }
+                    category to content
                 } else {
-                    // No keyword found, add the entire text to the currently selected category
-                    textCategories[selectedCategory.value]?.value += "[$timestamp] $recognizedText\n"
+                    // No keyword found, add the entire text to the "journal" category
+                    "journal" to recognizedText
+                }
+
+                if (contentToAdd.isNotEmpty()) {
+                    val entry = JournalEntry(
+                        title = targetCategory,
+                        content = contentToAdd,
+                        timestamp = timestamp
+                    )
+                    lifecycleScope.launch {
+                        dao.insert(entry)
+                    }
                 }
             }
 
@@ -186,10 +214,12 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun Greeting(
     modifier: Modifier = Modifier,
-    textCategories: Map<String, String>,
+    entries: List<JournalEntry>,
+    categories: List<String>,
     selectedCategory: String,
     onCategoryChange: (String) -> Unit,
-    onSpeakClick: () -> Unit
+    onSpeakClick: () -> Unit,
+    onDeleteClick: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -215,6 +245,13 @@ fun Greeting(
             }
         }
     )
+
+    val filteredEntries = entries.filter { it.title == selectedCategory }
+    val textToShow = filteredEntries.joinToString("\n") { entry ->
+        val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault())
+        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+        "[${date.format(formatter)}] ${entry.content}"
+    }
 
     Column(
         modifier = modifier.fillMaxSize(),
@@ -256,11 +293,19 @@ fun Greeting(
             }
             Button(onClick = {
                 val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val clip = ClipData.newPlainText("VoiceJournal", textCategories[selectedCategory] ?: "")
+                val clip = ClipData.newPlainText("VoiceJournal", textToShow)
                 clipboardManager.setPrimaryClip(clip)
                 Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
             }) {
                 Text(text = "Clipboard")
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Button(onClick = onDeleteClick) {
+                Text(text = "Löschen")
             }
         }
 
@@ -282,7 +327,7 @@ fun Greeting(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
             ) {
-                textCategories.keys.forEach { selectionOption ->
+                categories.forEach { selectionOption ->
                     DropdownMenuItem(
                         text = { Text(selectionOption) },
                         onClick = {
@@ -294,12 +339,17 @@ fun Greeting(
             }
         }
 
-        Text(
-            text = textCategories[selectedCategory] ?: "",
+        LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-        )
+        ) {
+            items(filteredEntries) { entry ->
+                val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault())
+                val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                Text(text = "[${date.format(formatter)}] ${entry.content}")
+            }
+        }
     }
 }
 
@@ -341,20 +391,22 @@ fun showNotification(context: Context) {
 @Composable
 fun GreetingPreview() {
     VoicejournalTheme {
-        var selectedCategory by remember { mutableStateOf("journal") }
-        val textCategories = remember {
-            mapOf(
-                "journal" to "journal\n\nPreview Text",
-                "todo" to "todo\n\n",
-                "kaufen" to "kaufen\n\n",
-                "ideen" to "ideen\n\n"
+        val categories = listOf("journal", "todo", "kaufen", "ideen")
+        var selectedCategory by remember { mutableStateOf(categories.first()) }
+        val entries = remember {
+            listOf(
+                JournalEntry(id = 1, title = "journal", content = "This is a preview entry.", timestamp = System.currentTimeMillis()),
+                JournalEntry(id = 2, title = "todo", content = "This is a todo preview.", timestamp = System.currentTimeMillis())
             )
         }
+
         Greeting(
-            textCategories = textCategories,
+            entries = entries,
+            categories = categories,
             selectedCategory = selectedCategory,
             onCategoryChange = { selectedCategory = it },
-            onSpeakClick = {}
+            onSpeakClick = {},
+            onDeleteClick = {}
         )
     }
 }

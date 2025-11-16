@@ -18,4 +18,7 @@ interface JournalEntryDao {
 
     @Query("DELETE FROM journal_entries WHERE id = (SELECT id FROM journal_entries WHERE title = :category ORDER BY timestamp DESC LIMIT 1)")
     suspend fun deleteLatestByCategory(category: String)
+
+    @Query("DELETE FROM journal_entries")
+    suspend fun deleteAll()
 }

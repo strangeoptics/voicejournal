@@ -167,12 +167,25 @@ class MainActivity : ComponentActivity() {
                                 }
                                 IconButton(onClick = {
                                     lifecycleScope.launch {
+                                        dao.deleteAll()
+                                        val now = System.currentTimeMillis()
+                                        val oneDay = 24 * 60 * 60 * 1000
+                                        val yesterday = now - oneDay
+                                        val twoDaysAgo = now - 2 * oneDay
+
                                         val testEntries = listOf(
-                                            JournalEntry(title = "journal", content = "This is a test journal entry.", timestamp = System.currentTimeMillis()),
-                                            JournalEntry(title = "journal", content = "Etwas gegessen.", timestamp = System.currentTimeMillis()+100),
-                                            JournalEntry(title = "todo", content = "This is a test todo item.", timestamp = System.currentTimeMillis()),
-                                            JournalEntry(title = "kaufen", content = "Milk, eggs, bread.", timestamp = System.currentTimeMillis()),
-                                            JournalEntry(title = "ideen", content = "A great new app idea.", timestamp = System.currentTimeMillis())
+                                            JournalEntry(title = "journal", content = "This is a test journal entry from today.", timestamp = now),
+                                            JournalEntry(title = "journal", content = "Etwas gegessen.", timestamp = now + 100),
+                                            JournalEntry(title = "todo", content = "This is a test todo item from today.", timestamp = now),
+                                            JournalEntry(title = "kaufen", content = "Milk, eggs, bread.", timestamp = now),
+                                            JournalEntry(title = "ideen", content = "A great new app idea from today.", timestamp = now),
+
+                                            JournalEntry(title = "journal", content = "Journal entry from yesterday.", timestamp = yesterday),
+                                            JournalEntry(title = "todo", content = "Todo item from yesterday.", timestamp = yesterday),
+                                            JournalEntry(title = "kaufen", content = "Apples, bananas.", timestamp = yesterday),
+
+                                            JournalEntry(title = "journal", content = "Journal entry from two days ago.", timestamp = twoDaysAgo),
+                                            JournalEntry(title = "ideen", content = "Another app idea from two days ago.", timestamp = twoDaysAgo)
                                         )
                                         testEntries.forEach { dao.insert(it) }
                                     }

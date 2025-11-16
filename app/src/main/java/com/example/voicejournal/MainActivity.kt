@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -126,6 +127,20 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }) {
                                     Icon(Icons.Filled.Delete, contentDescription = "Löschen")
+                                }
+                                IconButton(onClick = {
+                                    lifecycleScope.launch {
+                                        val testEntries = listOf(
+                                            JournalEntry(title = "journal", content = "This is a test journal entry.", timestamp = System.currentTimeMillis()),
+                                            JournalEntry(title = "journal", content = "Etwas gegessen.", timestamp = System.currentTimeMillis()+100),
+                                            JournalEntry(title = "todo", content = "This is a test todo item.", timestamp = System.currentTimeMillis()),
+                                            JournalEntry(title = "kaufen", content = "Milk, eggs, bread.", timestamp = System.currentTimeMillis()),
+                                            JournalEntry(title = "ideen", content = "A great new app idea.", timestamp = System.currentTimeMillis())
+                                        )
+                                        testEntries.forEach { dao.insert(it) }
+                                    }
+                                }) {
+                                    Icon(Icons.Filled.PlaylistAdd, contentDescription = "Add test data")
                                 }
                             }
                         )

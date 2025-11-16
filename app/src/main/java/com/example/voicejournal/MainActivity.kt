@@ -27,14 +27,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MenuAnchorType
@@ -105,6 +108,28 @@ class MainActivity : ComponentActivity() {
                     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
                     "[${date.format(formatter)}] ${entry.content}"
                 }
+                val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission(),
+                    onResult = { isGranted ->
+                        if (isGranted) {
+                            startListening()
+                        }
+                    }
+                )
+                val notificationPermissions = arrayOf(
+                    Manifest.permission.POST_NOTIFICATIONS,
+                    Manifest.permission.RECORD_AUDIO
+                )
+                val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestMultiplePermissions(),
+                    onResult = { permissionsMap ->
+                        val allGranted = permissionsMap.values.all { it }
+                        if (allGranted) {
+                            showNotification(context)
+                        }
+                    }
+                )
+                val scope = rememberCoroutineScope()
 
 
                 Scaffold(
@@ -113,6 +138,20 @@ class MainActivity : ComponentActivity() {
                         TopAppBar(
                             title = { Text("Voice Journal") },
                             actions = {
+                                IconButton(onClick = {
+                                    scope.launch {
+                                        val allPermissionsGranted = notificationPermissions.all {
+                                            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                                        }
+                                        if (allPermissionsGranted) {
+                                            showNotification(context)
+                                        } else {
+                                            notificationPermissionLauncher.launch(notificationPermissions)
+                                        }
+                                    }
+                                }) {
+                                    Icon(Icons.Filled.Notifications, contentDescription = "Benachrichtigung anzeigen")
+                                }
                                 IconButton(onClick = {
                                     val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                     val clip = ClipData.newPlainText("VoiceJournal", textToShow)
@@ -144,6 +183,23 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         )
+                    },
+                    floatingActionButton = {
+                        FloatingActionButton(onClick = {
+                            when {
+                                ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.RECORD_AUDIO
+                                ) == PackageManager.PERMISSION_GRANTED -> {
+                                    startListening()
+                                }
+                                else -> {
+                                    recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                }
+                            }
+                        }) {
+                            Icon(Icons.Filled.Add, contentDescription = "Sprechen")
+                        }
                     }
                 ) { innerPadding ->
                     Greeting(
@@ -151,8 +207,7 @@ class MainActivity : ComponentActivity() {
                         entries = filteredEntries,
                         categories = categories,
                         selectedCategory = category,
-                        onCategoryChange = { selectedCategory.value = it },
-                        onSpeakClick = ::startListening
+                        onCategoryChange = { selectedCategory.value = it }
                     )
                 }
             }
@@ -264,73 +319,17 @@ fun Greeting(
     entries: List<JournalEntry>,
     categories: List<String>,
     selectedCategory: String,
-    onCategoryChange: (String) -> Unit,
-    onSpeakClick: () -> Unit
+    onCategoryChange: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val notificationPermissions = arrayOf(
-        Manifest.permission.POST_NOTIFICATIONS,
-        Manifest.permission.RECORD_AUDIO
-    )
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions(),
-        onResult = { permissionsMap ->
-            val allGranted = permissionsMap.values.all { it }
-            if (allGranted) {
-                showNotification(context)
-            }
-        }
-    )
 
-    val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted ->
-            if (isGranted) {
-                onSpeakClick()
-            }
-        }
-    )
 
     Column(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            Button(onClick = {
-                scope.launch {
-                    val allPermissionsGranted = notificationPermissions.all {
-                        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-                    }
-                    if (allPermissionsGranted) {
-                        showNotification(context)
-                    } else {
-                        notificationPermissionLauncher.launch(notificationPermissions)
-                    }
-                }
-            }) {
-                Text(text = "Notification")
-            }
-            Button(onClick = {
-                when {
-                    ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.RECORD_AUDIO
-                    ) == PackageManager.PERMISSION_GRANTED -> {
-                        onSpeakClick()
-                    }
-                    else -> {
-                        recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    }
-                }
-            }) {
-                Text(text = "Sprechen")
-            }
-        }
+
 
         var expanded by remember { mutableStateOf(false) }
 
@@ -428,8 +427,7 @@ fun GreetingPreview() {
             entries = filteredEntries,
             categories = categories,
             selectedCategory = selectedCategory,
-            onCategoryChange = { selectedCategory = it },
-            onSpeakClick = {}
+            onCategoryChange = { selectedCategory = it }
         )
     }
 }

@@ -26,15 +26,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -83,6 +88,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             VoicejournalTheme {
+                val context = LocalContext.current
                 val category by selectedCategory
 
                 val threeDaysAgo = remember {
@@ -91,12 +97,35 @@ class MainActivity : ComponentActivity() {
                     }.timeInMillis
                 }
                 val entries by dao.getEntriesSince(threeDaysAgo).collectAsState(initial = emptyList())
+                val filteredEntries = entries.filter { it.title == category }
+                val textToShow = filteredEntries.joinToString("\n") { entry ->
+                    val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault())
+                    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                    "[${date.format(formatter)}] ${entry.content}"
+                }
 
 
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Scaffold(
+                    modifier = Modifier.fillMaxSize(),
+                    topBar = {
+                        TopAppBar(
+                            title = { Text("Voice Journal") },
+                            actions = {
+                                IconButton(onClick = {
+                                    val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    val clip = ClipData.newPlainText("VoiceJournal", textToShow)
+                                    clipboardManager.setPrimaryClip(clip)
+                                    Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
+                                }) {
+                                    Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopieren")
+                                }
+                            }
+                        )
+                    }
+                ) { innerPadding ->
                     Greeting(
                         modifier = Modifier.padding(innerPadding),
-                        entries = entries,
+                        entries = filteredEntries,
                         categories = categories,
                         selectedCategory = category,
                         onCategoryChange = { selectedCategory.value = it },
@@ -246,13 +275,6 @@ fun Greeting(
         }
     )
 
-    val filteredEntries = entries.filter { it.title == selectedCategory }
-    val textToShow = filteredEntries.joinToString("\n") { entry ->
-        val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault())
-        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-        "[${date.format(formatter)}] ${entry.content}"
-    }
-
     Column(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Top,
@@ -290,14 +312,6 @@ fun Greeting(
                 }
             }) {
                 Text(text = "Sprechen")
-            }
-            Button(onClick = {
-                val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val clip = ClipData.newPlainText("VoiceJournal", textToShow)
-                clipboardManager.setPrimaryClip(clip)
-                Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
-            }) {
-                Text(text = "Clipboard")
             }
         }
         Row(
@@ -344,7 +358,7 @@ fun Greeting(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            items(filteredEntries) { entry ->
+            items(entries) { entry ->
                 val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault())
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
                 Text(text = "[${date.format(formatter)}] ${entry.content}")
@@ -399,9 +413,10 @@ fun GreetingPreview() {
                 JournalEntry(id = 2, title = "todo", content = "This is a todo preview.", timestamp = System.currentTimeMillis())
             )
         }
+        val filteredEntries = entries.filter { it.title == selectedCategory }
 
         Greeting(
-            entries = entries,
+            entries = filteredEntries,
             categories = categories,
             selectedCategory = selectedCategory,
             onCategoryChange = { selectedCategory = it },

@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -119,6 +120,13 @@ class MainActivity : ComponentActivity() {
                                 }) {
                                     Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopieren")
                                 }
+                                IconButton(onClick = {
+                                    lifecycleScope.launch {
+                                        dao.deleteLatestByCategory(selectedCategory.value)
+                                    }
+                                }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Löschen")
+                                }
                             }
                         )
                     }
@@ -129,12 +137,7 @@ class MainActivity : ComponentActivity() {
                         categories = categories,
                         selectedCategory = category,
                         onCategoryChange = { selectedCategory.value = it },
-                        onSpeakClick = ::startListening,
-                        onDeleteClick = {
-                            lifecycleScope.launch {
-                                dao.deleteLatestByCategory(selectedCategory.value)
-                            }
-                        }
+                        onSpeakClick = ::startListening
                     )
                 }
             }
@@ -247,8 +250,7 @@ fun Greeting(
     categories: List<String>,
     selectedCategory: String,
     onCategoryChange: (String) -> Unit,
-    onSpeakClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onSpeakClick: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -312,14 +314,6 @@ fun Greeting(
                 }
             }) {
                 Text(text = "Sprechen")
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Button(onClick = onDeleteClick) {
-                Text(text = "Löschen")
             }
         }
 
@@ -420,8 +414,7 @@ fun GreetingPreview() {
             categories = categories,
             selectedCategory = selectedCategory,
             onCategoryChange = { selectedCategory = it },
-            onSpeakClick = {},
-            onDeleteClick = {}
+            onSpeakClick = {}
         )
     }
 }

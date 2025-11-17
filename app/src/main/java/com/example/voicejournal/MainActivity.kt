@@ -72,6 +72,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
@@ -589,19 +590,20 @@ fun Greeting(
                                 containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
                             )
                         ) {
-                            Column(modifier = Modifier.padding(8.dp)) {
+                            Box(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
                                 val date = LocalDateTime.ofInstant(
                                     Instant.ofEpochMilli(entry.timestamp),
                                     ZoneId.systemDefault()
                                 )
                                 val formatter = DateTimeFormatter.ofPattern("HH:mm")
                                 Text(
-                                    text = date.format(formatter),
-                                    style = MaterialTheme.typography.bodySmall
+                                    text = entry.content,
+                                    modifier = Modifier.align(Alignment.TopStart)
                                 )
                                 Text(
-                                    text = entry.content,
-                                    modifier = Modifier.fillMaxWidth()
+                                    text = date.format(formatter),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.align(Alignment.TopEnd)
                                 )
                             }
                         }

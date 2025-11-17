@@ -35,12 +35,14 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -186,26 +188,10 @@ class MainActivity : ComponentActivity() {
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         topBar = {
+                            var menuExpanded by remember { mutableStateOf(false) }
                             TopAppBar(
                                 title = { Text("Voice Journal") },
                                 actions = {
-                                    IconButton(onClick = { showSettings = true }) {
-                                        Icon(Icons.Filled.Settings, contentDescription = "Einstellungen")
-                                    }
-                                    IconButton(onClick = {
-                                        scope.launch {
-                                            val allPermissionsGranted = notificationPermissions.all {
-                                                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-                                            }
-                                            if (allPermissionsGranted) {
-                                                showNotification(context)
-                                            } else {
-                                                notificationPermissionLauncher.launch(notificationPermissions)
-                                            }
-                                        }
-                                    }) {
-                                        Icon(Icons.Filled.Notifications, contentDescription = "Benachrichtigung anzeigen")
-                                    }
                                     IconButton(onClick = {
                                         val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
                                         val clip = ClipData.newPlainText("VoiceJournal", textToShow)
@@ -214,32 +200,68 @@ class MainActivity : ComponentActivity() {
                                     }) {
                                         Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopieren")
                                     }
-                                    IconButton(onClick = {
-                                        lifecycleScope.launch {
-                                            dao.deleteAll()
-                                            val now = System.currentTimeMillis()
-                                            val oneDay = 24 * 60 * 60 * 1000
-                                            val yesterday = now - oneDay
-                                            val twoDaysAgo = now - 2 * oneDay
+                                    IconButton(onClick = { menuExpanded = true }) {
+                                        Icon(Icons.Filled.MoreVert, contentDescription = "More options")
+                                    }
+                                    DropdownMenu(
+                                        expanded = menuExpanded,
+                                        onDismissRequest = { menuExpanded = false }
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("Settings") },
+                                            onClick = {
+                                                showSettings = true
+                                                menuExpanded = false
+                                            },
+                                            leadingIcon = { Icon(Icons.Filled.Settings, contentDescription = "Einstellungen") }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Show Notification") },
+                                            onClick = {
+                                                scope.launch {
+                                                    val allPermissionsGranted = notificationPermissions.all {
+                                                        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                                                    }
+                                                    if (allPermissionsGranted) {
+                                                        showNotification(context)
+                                                    } else {
+                                                        notificationPermissionLauncher.launch(notificationPermissions)
+                                                    }
+                                                }
+                                                menuExpanded = false
+                                            },
+                                            leadingIcon = { Icon(Icons.Filled.Notifications, contentDescription = "Benachrichtigung anzeigen") }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Add Test Data") },
+                                            onClick = {
+                                                lifecycleScope.launch {
+                                                    dao.deleteAll()
+                                                    val now = System.currentTimeMillis()
+                                                    val oneDay = 24 * 60 * 60 * 1000
+                                                    val yesterday = now - oneDay
+                                                    val twoDaysAgo = now - 2 * oneDay
 
-                                            val testEntries = listOf(
-                                                JournalEntry(title = "journal", content = "This is a test journal entry from today.", timestamp = now),
-                                                JournalEntry(title = "journal", content = "Etwas gegessen.", timestamp = now + 100),
-                                                JournalEntry(title = "todo", content = "This is a test todo item from today.", timestamp = now),
-                                                JournalEntry(title = "kaufen", content = "Milk, eggs, bread.", timestamp = now),
-                                                JournalEntry(title = "baumarkt", content = "A great new app idea from today.", timestamp = now),
+                                                    val testEntries = listOf(
+                                                        JournalEntry(title = "journal", content = "This is a test journal entry from today.", timestamp = now),
+                                                        JournalEntry(title = "journal", content = "Etwas gegessen.", timestamp = now + 100),
+                                                        JournalEntry(title = "todo", content = "This is a test todo item from today.", timestamp = now),
+                                                        JournalEntry(title = "kaufen", content = "Milk, eggs, bread.", timestamp = now),
+                                                        JournalEntry(title = "baumarkt", content = "A great new app idea from today.", timestamp = now),
 
-                                                JournalEntry(title = "journal", content = "Journal entry from yesterday.", timestamp = yesterday),
-                                                JournalEntry(title = "todo", content = "Todo item from yesterday.", timestamp = yesterday),
-                                                JournalEntry(title = "kaufen", content = "Apples, bananas.", timestamp = yesterday),
+                                                        JournalEntry(title = "journal", content = "Journal entry from yesterday.", timestamp = yesterday),
+                                                        JournalEntry(title = "todo", content = "Todo item from yesterday.", timestamp = yesterday),
+                                                        JournalEntry(title = "kaufen", content = "Apples, bananas.", timestamp = yesterday),
 
-                                                JournalEntry(title = "journal", content = "Journal entry from two days ago.", timestamp = twoDaysAgo),
-                                                JournalEntry(title = "eloisa", content = "Another app idea from two days ago.", timestamp = twoDaysAgo)
-                                            )
-                                            testEntries.forEach { dao.insert(it) }
-                                        }
-                                    }) {
-                                        Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add test data")
+                                                        JournalEntry(title = "journal", content = "Journal entry from two days ago.", timestamp = twoDaysAgo),
+                                                        JournalEntry(title = "eloisa", content = "Another app idea from two days ago.", timestamp = twoDaysAgo)
+                                                    )
+                                                    testEntries.forEach { dao.insert(it) }
+                                                }
+                                                menuExpanded = false
+                                            },
+                                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add test data") }
+                                        )
                                     }
                                 }
                             )

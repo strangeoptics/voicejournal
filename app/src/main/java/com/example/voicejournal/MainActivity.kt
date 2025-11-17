@@ -635,7 +635,7 @@ fun Greeting(
                                 val formatter = DateTimeFormatter.ofPattern("HH:mm")
                                 Text(
                                     text = entry.content,
-                                    modifier = Modifier.align(Alignment.TopStart)
+                                    modifier = Modifier.align(Alignment.TopStart).padding(top = 4.dp)
                                 )
                                 Text(
                                     text = date.format(formatter),

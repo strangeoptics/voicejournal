@@ -18,6 +18,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,6 +45,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
@@ -71,13 +73,14 @@ import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 class MainActivity : ComponentActivity() {
 
     companion object {
@@ -109,6 +112,10 @@ class MainActivity : ComponentActivity() {
                 }
                 val entries by dao.getEntriesSince(threeDaysAgo).collectAsState(initial = emptyList())
                 val filteredEntries = entries.filter { it.title == category }
+                val groupedEntries = filteredEntries.groupBy {
+                    Instant.ofEpochMilli(it.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
+                }
+
                 val textToShow = filteredEntries.joinToString("\n") { entry ->
                     val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault())
                     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
@@ -216,7 +223,7 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
                     Greeting(
                         modifier = Modifier.padding(innerPadding),
-                        entries = filteredEntries,
+                        groupedEntries = groupedEntries,
                         categories = categories,
                         selectedCategory = category,
                         onCategoryChange = { selectedCategory.value = it },
@@ -329,11 +336,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun Greeting(
     modifier: Modifier = Modifier,
-    entries: List<JournalEntry>,
+    groupedEntries: Map<LocalDate, List<JournalEntry>>,
     categories: List<String>,
     selectedCategory: String,
     onCategoryChange: (String) -> Unit,
@@ -381,59 +388,73 @@ fun Greeting(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            items(entries, key = { it.id }) { entry ->
-                val dismissState = rememberSwipeToDismissBoxState(
-                    confirmValueChange = {
-                        if (it == SwipeToDismissBoxValue.StartToEnd) {
-                            onDeleteEntry(entry)
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                )
-
-                SwipeToDismissBox(
-                    state = dismissState,
-                    backgroundContent = {
-                        val color = when (dismissState.dismissDirection) {
-                            SwipeToDismissBoxValue.StartToEnd -> Color.Red
-                            else -> Color.Transparent
-                        }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(color)
-                                .padding(horizontal = 20.dp),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = "Delete",
-                                tint = Color.White
-                            )
-                        }
-                    }
-                ) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
+            groupedEntries.forEach { (date, entries) ->
+                stickyHeader {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color.Transparent
                     ) {
-                        Column(modifier = Modifier.padding(8.dp)) {
-                            val date = LocalDateTime.ofInstant(
-                                Instant.ofEpochMilli(entry.timestamp),
-                                ZoneId.systemDefault()
-                            )
-                            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                            Text(
-                                text = date.format(formatter),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Text(
-                                text = entry.content,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                        Text(
+                            text = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                }
+
+                items(entries, key = { it.id }) { entry ->
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = {
+                            if (it == SwipeToDismissBoxValue.StartToEnd) {
+                                onDeleteEntry(entry)
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                    )
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        backgroundContent = {
+                            val color = when (dismissState.dismissDirection) {
+                                SwipeToDismissBoxValue.StartToEnd -> Color.Red
+                                else -> Color.Transparent
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(color)
+                                    .padding(horizontal = 20.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Delete",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    ) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp)) {
+                                val date = LocalDateTime.ofInstant(
+                                    Instant.ofEpochMilli(entry.timestamp),
+                                    ZoneId.systemDefault()
+                                )
+                                val formatter = DateTimeFormatter.ofPattern("HH:mm")
+                                Text(
+                                    text = date.format(formatter),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                Text(
+                                    text = entry.content,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
                 }
@@ -476,7 +497,7 @@ fun showNotification(context: Context) {
     notificationManager.notify(notificationId, notification)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
@@ -499,10 +520,12 @@ fun GreetingPreview() {
                 )
             )
         }
-        val filteredEntries = entries.filter { it.title == selectedCategory }
+        val groupedEntries = entries.filter { it.title == selectedCategory }.groupBy {
+            Instant.ofEpochMilli(it.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
+        }
 
         Greeting(
-            entries = filteredEntries,
+            groupedEntries = groupedEntries,
             categories = categories,
             selectedCategory = selectedCategory,
             onCategoryChange = { selectedCategory = it },

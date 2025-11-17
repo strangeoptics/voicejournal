@@ -29,13 +29,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -59,6 +62,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -67,10 +71,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
 import com.example.voicejournal.data.AppDatabase
 import com.example.voicejournal.data.JournalEntry
@@ -89,6 +95,8 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val NOTIFICATION_ACTION = "com.example.voicejournal.NOTIFICATION_ACTION"
+        const val PREFS_NAME = "voice_journal_prefs"
+        const val KEY_DAYS_TO_SHOW = "days_to_show"
     }
 
     private lateinit var speechRecognizer: SpeechRecognizer
@@ -110,13 +118,23 @@ class MainActivity : ComponentActivity() {
             VoicejournalTheme {
                 val context = LocalContext.current
                 val category by selectedCategory
+                var showSettings by remember { mutableStateOf(false) }
 
-                val threeDaysAgo = remember {
+                val sharedPrefs = remember {
+                    getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                }
+
+                var daysToShow by remember {
+                    mutableIntStateOf(sharedPrefs.getInt(KEY_DAYS_TO_SHOW, 3))
+                }
+
+                val daysAgoMillis = remember(daysToShow) {
                     Calendar.getInstance().apply {
-                        add(Calendar.DAY_OF_YEAR, -3)
+                        add(Calendar.DAY_OF_YEAR, -daysToShow)
                     }.timeInMillis
                 }
-                val entries by dao.getEntriesSince(threeDaysAgo).collectAsState(initial = emptyList())
+
+                val entries by dao.getEntriesSince(daysAgoMillis).collectAsState(initial = emptyList())
                 val filteredEntries = entries.filter { it.title == category }
                 val groupedEntries = filteredEntries.groupBy {
                     Instant.ofEpochMilli(it.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
@@ -151,101 +169,118 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
 
 
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    topBar = {
-                        TopAppBar(
-                            title = { Text("Voice Journal") },
-                            actions = {
-                                IconButton(onClick = {
-                                    scope.launch {
-                                        val allPermissionsGranted = notificationPermissions.all {
-                                            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-                                        }
-                                        if (allPermissionsGranted) {
-                                            showNotification(context)
-                                        } else {
-                                            notificationPermissionLauncher.launch(notificationPermissions)
-                                        }
+                if (showSettings) {
+                    SettingsScreen(
+                        currentDays = daysToShow,
+                        onSave = { newDays ->
+                            sharedPrefs.edit {
+                                putInt(KEY_DAYS_TO_SHOW, newDays)
+                            }
+                            daysToShow = newDays
+                            showSettings = false
+                        },
+                        onDismiss = { showSettings = false }
+                    )
+                } else {
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        topBar = {
+                            TopAppBar(
+                                title = { Text("Voice Journal") },
+                                actions = {
+                                    IconButton(onClick = { showSettings = true }) {
+                                        Icon(Icons.Filled.Settings, contentDescription = "Einstellungen")
                                     }
-                                }) {
-                                    Icon(Icons.Filled.Notifications, contentDescription = "Benachrichtigung anzeigen")
-                                }
-                                IconButton(onClick = {
-                                    val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    val clip = ClipData.newPlainText("VoiceJournal", textToShow)
-                                    clipboardManager.setPrimaryClip(clip)
-                                    Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
-                                }) {
-                                    Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopieren")
-                                }
-                                IconButton(onClick = {
-                                    lifecycleScope.launch {
-                                        dao.deleteAll()
-                                        val now = System.currentTimeMillis()
-                                        val oneDay = 24 * 60 * 60 * 1000
-                                        val yesterday = now - oneDay
-                                        val twoDaysAgo = now - 2 * oneDay
-
-                                        val testEntries = listOf(
-                                            JournalEntry(title = "journal", content = "This is a test journal entry from today.", timestamp = now),
-                                            JournalEntry(title = "journal", content = "Etwas gegessen.", timestamp = now + 100),
-                                            JournalEntry(title = "todo", content = "This is a test todo item from today.", timestamp = now),
-                                            JournalEntry(title = "kaufen", content = "Milk, eggs, bread.", timestamp = now),
-                                            JournalEntry(title = "baumarkt", content = "A great new app idea from today.", timestamp = now),
-
-                                            JournalEntry(title = "journal", content = "Journal entry from yesterday.", timestamp = yesterday),
-                                            JournalEntry(title = "todo", content = "Todo item from yesterday.", timestamp = yesterday),
-                                            JournalEntry(title = "kaufen", content = "Apples, bananas.", timestamp = yesterday),
-
-                                            JournalEntry(title = "journal", content = "Journal entry from two days ago.", timestamp = twoDaysAgo),
-                                            JournalEntry(title = "eloisa", content = "Another app idea from two days ago.", timestamp = twoDaysAgo)
-                                        )
-                                        testEntries.forEach { dao.insert(it) }
+                                    IconButton(onClick = {
+                                        scope.launch {
+                                            val allPermissionsGranted = notificationPermissions.all {
+                                                ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                                            }
+                                            if (allPermissionsGranted) {
+                                                showNotification(context)
+                                            } else {
+                                                notificationPermissionLauncher.launch(notificationPermissions)
+                                            }
+                                        }
+                                    }) {
+                                        Icon(Icons.Filled.Notifications, contentDescription = "Benachrichtigung anzeigen")
                                     }
-                                }) {
-                                    Icon(Icons.Filled.PlaylistAdd, contentDescription = "Add test data")
+                                    IconButton(onClick = {
+                                        val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                                        val clip = ClipData.newPlainText("VoiceJournal", textToShow)
+                                        clipboardManager.setPrimaryClip(clip)
+                                        Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopieren")
+                                    }
+                                    IconButton(onClick = {
+                                        lifecycleScope.launch {
+                                            dao.deleteAll()
+                                            val now = System.currentTimeMillis()
+                                            val oneDay = 24 * 60 * 60 * 1000
+                                            val yesterday = now - oneDay
+                                            val twoDaysAgo = now - 2 * oneDay
+
+                                            val testEntries = listOf(
+                                                JournalEntry(title = "journal", content = "This is a test journal entry from today.", timestamp = now),
+                                                JournalEntry(title = "journal", content = "Etwas gegessen.", timestamp = now + 100),
+                                                JournalEntry(title = "todo", content = "This is a test todo item from today.", timestamp = now),
+                                                JournalEntry(title = "kaufen", content = "Milk, eggs, bread.", timestamp = now),
+                                                JournalEntry(title = "baumarkt", content = "A great new app idea from today.", timestamp = now),
+
+                                                JournalEntry(title = "journal", content = "Journal entry from yesterday.", timestamp = yesterday),
+                                                JournalEntry(title = "todo", content = "Todo item from yesterday.", timestamp = yesterday),
+                                                JournalEntry(title = "kaufen", content = "Apples, bananas.", timestamp = yesterday),
+
+                                                JournalEntry(title = "journal", content = "Journal entry from two days ago.", timestamp = twoDaysAgo),
+                                                JournalEntry(title = "eloisa", content = "Another app idea from two days ago.", timestamp = twoDaysAgo)
+                                            )
+                                            testEntries.forEach { dao.insert(it) }
+                                        }
+                                    }) {
+                                        Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add test data")
+                                    }
                                 }
+                            )
+                        },
+                        floatingActionButton = {
+                            FloatingActionButton(onClick = {
+                                when {
+                                    ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.RECORD_AUDIO
+                                    ) == PackageManager.PERMISSION_GRANTED -> {
+                                        startListening()
+                                    }
+                                    else -> {
+                                        recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                    }
+                                }
+                            }) {
+                                Icon(Icons.Filled.Add, contentDescription = "Sprechen")
+                            }
+                        }
+                    ) { innerPadding ->
+                        Greeting(
+                            modifier = Modifier.padding(innerPadding),
+                            groupedEntries = groupedEntries,
+                            categories = categories,
+                            selectedCategory = category,
+                            onCategoryChange = { selectedCategory.value = it },
+                            onDeleteEntry = { entry ->
+                                lifecycleScope.launch {
+                                    dao.delete(entry)
+                                }
+                            },
+                            selectedEntry = selectedEntry,
+                            onEntrySelected = { entry ->
+                                selectedEntry = if (selectedEntry == entry) null else entry
+                            },
+                            onEditEntry = { entry ->
+                                editingEntry = entry
                             }
                         )
-                    },
-                    floatingActionButton = {
-                        FloatingActionButton(onClick = {
-                            when {
-                                ContextCompat.checkSelfPermission(
-                                    context,
-                                    Manifest.permission.RECORD_AUDIO
-                                ) == PackageManager.PERMISSION_GRANTED -> {
-                                    startListening()
-                                }
-                                else -> {
-                                    recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                }
-                            }
-                        }) {
-                            Icon(Icons.Filled.Add, contentDescription = "Sprechen")
-                        }
                     }
-                ) { innerPadding ->
-                    Greeting(
-                        modifier = Modifier.padding(innerPadding),
-                        groupedEntries = groupedEntries,
-                        categories = categories,
-                        selectedCategory = category,
-                        onCategoryChange = { selectedCategory.value = it },
-                        onDeleteEntry = { entry ->
-                            lifecycleScope.launch {
-                                dao.delete(entry)
-                            }
-                        },
-                        selectedEntry = selectedEntry,
-                        onEntrySelected = { entry ->
-                            selectedEntry = if (selectedEntry == entry) null else entry
-                        },
-                        onEditEntry = { entry ->
-                            editingEntry = entry
-                        }
-                    )
                 }
 
                 editingEntry?.let { entry ->
@@ -372,6 +407,40 @@ class MainActivity : ComponentActivity() {
             startListening()
         }
     }
+}
+
+@Composable
+fun SettingsScreen(
+    currentDays: Int,
+    onSave: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var days by remember { mutableStateOf(currentDays.toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Einstellungen") },
+        text = {
+            Column {
+                Text("Wie viele Tage sollen angezeigt werden?")
+                TextField(
+                    value = days,
+                    onValueChange = { days = it },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onSave(days.toIntOrNull() ?: currentDays) }) {
+                Text("Speichern")
+            }
+        },
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text("Abbrechen")
+            }
+        }
+    )
 }
 
 @Composable

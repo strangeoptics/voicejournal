@@ -91,7 +91,7 @@ class MainActivity : ComponentActivity() {
     private val db by lazy { AppDatabase.getDatabase(this) }
     private val dao by lazy { db.journalEntryDao() }
 
-    private val categories = listOf("journal", "todo", "kaufen", "ideen")
+    private val categories = listOf("journal", "todo", "kaufen", "baumarkt", "eloisa")
     private val selectedCategory = mutableStateOf(categories.first())
 
 
@@ -186,14 +186,14 @@ class MainActivity : ComponentActivity() {
                                             JournalEntry(title = "journal", content = "Etwas gegessen.", timestamp = now + 100),
                                             JournalEntry(title = "todo", content = "This is a test todo item from today.", timestamp = now),
                                             JournalEntry(title = "kaufen", content = "Milk, eggs, bread.", timestamp = now),
-                                            JournalEntry(title = "ideen", content = "A great new app idea from today.", timestamp = now),
+                                            JournalEntry(title = "baumarkt", content = "A great new app idea from today.", timestamp = now),
 
                                             JournalEntry(title = "journal", content = "Journal entry from yesterday.", timestamp = yesterday),
                                             JournalEntry(title = "todo", content = "Todo item from yesterday.", timestamp = yesterday),
                                             JournalEntry(title = "kaufen", content = "Apples, bananas.", timestamp = yesterday),
 
                                             JournalEntry(title = "journal", content = "Journal entry from two days ago.", timestamp = twoDaysAgo),
-                                            JournalEntry(title = "ideen", content = "Another app idea from two days ago.", timestamp = twoDaysAgo)
+                                            JournalEntry(title = "eloisa", content = "Another app idea from two days ago.", timestamp = twoDaysAgo)
                                         )
                                         testEntries.forEach { dao.insert(it) }
                                     }
@@ -254,7 +254,8 @@ class MainActivity : ComponentActivity() {
                     "to-do" to "todo",
                     "todoo" to "todo",
                     "kaufen" to "kaufen",
-                    "ideen" to "ideen"
+                    "baumarkt" to "baumarkt",
+                    "eloisa" to "eloisa"
                 )
 
                 // Find a keyword that matches the start of the recognized text
@@ -502,7 +503,7 @@ fun showNotification(context: Context) {
 @Composable
 fun GreetingPreview() {
     VoicejournalTheme {
-        val categories = listOf("journal", "todo", "kaufen", "ideen")
+        val categories = listOf("journal", "todo", "kaufen", "baumarkt", "eloisa")
         var selectedCategory by remember { mutableStateOf(categories.first()) }
         val entries = remember {
             listOf(

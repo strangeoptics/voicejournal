@@ -18,6 +18,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -64,7 +65,6 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -74,13 +74,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import androidx.core.content.edit
-import androidx.lifecycle.lifecycleScope
 import com.example.voicejournal.data.AppDatabase
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.ui.theme.VoicejournalTheme
@@ -90,7 +87,6 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Calendar
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -98,18 +94,14 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val NOTIFICATION_ACTION = "com.example.voicejournal.NOTIFICATION_ACTION"
-        const val PREFS_NAME = "voice_journal_prefs"
-        const val KEY_DAYS_TO_SHOW = "days_to_show"
     }
 
     private lateinit var speechRecognizer: SpeechRecognizer
     private val db by lazy { AppDatabase.getDatabase(this) }
-    private val dao by lazy { db.journalEntryDao() }
 
-    private val categories = listOf("journal", "todo", "kaufen", "baumarkt", "eloisa")
-    private val selectedCategory = mutableStateOf(categories.first())
-    private var selectedEntry by mutableStateOf<JournalEntry?>(null)
-    private var editingEntry by mutableStateOf<JournalEntry?>(null)
+    private val viewModel: MainViewModel by viewModels {
+        MainViewModelFactory(db.journalEntryDao(), getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE))
+    }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -120,28 +112,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             VoicejournalTheme {
                 val context = LocalContext.current
-                val category by selectedCategory
+                val category by viewModel.selectedCategory.collectAsState()
+                val groupedEntries by viewModel.groupedEntries.collectAsState()
+                val selectedEntry by viewModel.selectedEntry.collectAsState()
+                val editingEntry by viewModel.editingEntry.collectAsState()
+                val daysToShow by viewModel.daysToShow.collectAsState()
+                val filteredEntries by viewModel.filteredEntries.collectAsState()
+
                 var showSettings by remember { mutableStateOf(false) }
-
-                val sharedPrefs = remember {
-                    getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                }
-
-                var daysToShow by remember {
-                    mutableIntStateOf(sharedPrefs.getInt(KEY_DAYS_TO_SHOW, 3))
-                }
-
-                val daysAgoMillis = remember(daysToShow) {
-                    Calendar.getInstance().apply {
-                        add(Calendar.DAY_OF_YEAR, -daysToShow)
-                    }.timeInMillis
-                }
-
-                val entries by dao.getEntriesSince(daysAgoMillis).collectAsState(initial = emptyList())
-                val filteredEntries = entries.filter { it.title == category }
-                val groupedEntries = filteredEntries.groupBy {
-                    Instant.ofEpochMilli(it.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
-                }
 
                 val textToShow = filteredEntries.joinToString("\n") { entry ->
                     val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault())
@@ -176,10 +154,7 @@ class MainActivity : ComponentActivity() {
                     SettingsScreen(
                         currentDays = daysToShow,
                         onSave = { newDays ->
-                            sharedPrefs.edit {
-                                putInt(KEY_DAYS_TO_SHOW, newDays)
-                            }
-                            daysToShow = newDays
+                            viewModel.saveDaysToShow(newDays)
                             showSettings = false
                         },
                         onDismiss = { showSettings = false }
@@ -235,40 +210,7 @@ class MainActivity : ComponentActivity() {
                                         DropdownMenuItem(
                                             text = { Text("Add Test Data") },
                                             onClick = {
-                                                lifecycleScope.launch {
-                                                    dao.deleteAll()
-
-                                                    fun timestampFromString(dateTimeString: String): Long {
-                                                        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
-                                                        val localDateTime = LocalDateTime.parse(dateTimeString, formatter)
-                                                        return localDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                                                    }
-
-                                                    val today = LocalDate.now().toString()
-                                                    val yesterday = LocalDate.now().minusDays(1).toString()
-                                                    val twoDaysAgo = LocalDate.now().minusDays(2).toString()
-                                                    val threeDaysAgo = LocalDate.now().minusDays(3).toString()
-                                                    val fourDaysAgo = LocalDate.now().minusDays(4).toString()
-
-                                                    val testEntries = listOf(
-                                                        JournalEntry(title = "journal", content = "This is a test journal entry from today.", timestamp = timestampFromString("${today}T10:00:00")),
-                                                        JournalEntry(title = "journal", content = "Etwas gegessen.", timestamp = timestampFromString("${today}T11:30:00")),
-                                                        JournalEntry(title = "todo", content = "This is a test todo item from today.", timestamp = timestampFromString("${today}T12:00:00")),
-                                                        JournalEntry(title = "kaufen", content = "Milk, eggs, bread.", timestamp = timestampFromString("${today}T14:00:00")),
-                                                        JournalEntry(title = "baumarkt", content = "A great new app idea from today.", timestamp = timestampFromString("${today}T16:00:00")),
-
-                                                        JournalEntry(title = "journal", content = "Journal entry from yesterday.", timestamp = timestampFromString("${yesterday}T09:00:00")),
-                                                        JournalEntry(title = "todo", content = "Todo item from yesterday.", timestamp = timestampFromString("${yesterday}T15:00:00")),
-                                                        JournalEntry(title = "kaufen", content = "Apples, bananas.", timestamp = timestampFromString("${yesterday}T17:00:00")),
-
-                                                        JournalEntry(title = "journal", content = "Journal entry from two days ago.", timestamp = timestampFromString("${twoDaysAgo}T18:00:00")),
-                                                        JournalEntry(title = "journal", content = "Journal entry from 3 days ago.", timestamp = timestampFromString("${threeDaysAgo}T18:00:00")),
-                                                        JournalEntry(title = "journal", content = "Journal entry from 4 days ago.", timestamp = timestampFromString("${fourDaysAgo}T18:00:00")),
-
-                                                        JournalEntry(title = "eloisa", content = "Another app idea from two days ago.", timestamp = timestampFromString("${twoDaysAgo}T20:00:00"))
-                                                    )
-                                                    testEntries.forEach { dao.insert(it) }
-                                                }
+                                                viewModel.addTestData()
                                                 menuExpanded = false
                                             },
                                             leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add test data") }
@@ -298,24 +240,14 @@ class MainActivity : ComponentActivity() {
                         Greeting(
                             modifier = Modifier.padding(innerPadding),
                             groupedEntries = groupedEntries,
-                            categories = categories,
+                            categories = viewModel.categories,
                             selectedCategory = category,
-                            onCategoryChange = { selectedCategory.value = it },
-                            onDeleteEntry = { entry ->
-                                lifecycleScope.launch {
-                                    dao.delete(entry)
-                                }
-                            },
+                            onCategoryChange = viewModel::onCategoryChange,
+                            onDeleteEntry = viewModel::onDeleteEntry,
                             selectedEntry = selectedEntry,
-                            onEntrySelected = { entry ->
-                                selectedEntry = if (selectedEntry == entry) null else entry
-                            },
-                            onEditEntry = { entry ->
-                                editingEntry = entry
-                            },
-                            onMoreClicked = {
-                                daysToShow += 3
-                            }
+                            onEntrySelected = viewModel::onEntrySelected,
+                            onEditEntry = viewModel::onEditEntry,
+                            onMoreClicked = viewModel::onMoreClicked
                         )
                     }
                 }
@@ -323,13 +255,8 @@ class MainActivity : ComponentActivity() {
                 editingEntry?.let { entry ->
                     EditEntryDialog(
                         entry = entry,
-                        onDismiss = { editingEntry = null },
-                        onSave = { updatedContent ->
-                            lifecycleScope.launch {
-                                dao.update(entry.copy(content = updatedContent))
-                                editingEntry = null
-                            }
-                        }
+                        onDismiss = viewModel::onDismissEditEntry,
+                        onSave = viewModel::onSaveEntry
                     )
                 }
             }
@@ -345,61 +272,7 @@ class MainActivity : ComponentActivity() {
 
                 val recognizedText = matches[0].trim()
                 if (recognizedText.isEmpty()) return
-
-                lifecycleScope.launch {
-                    val entryToUpdate = selectedEntry
-                    if (entryToUpdate != null) {
-                        val updatedEntry = entryToUpdate.copy(
-                            content = entryToUpdate.content + "\n" + recognizedText
-                        )
-                        dao.update(updatedEntry)
-                        selectedEntry = null // Deselect after update
-                    } else {
-                        val lowerCaseText = recognizedText.lowercase(Locale.getDefault())
-
-                        val categoryKeywords = mapOf(
-                            "journal" to "journal",
-                            "todo" to "todo",
-                            "to-do" to "todo",
-                            "todoo" to "todo",
-                            "kaufen" to "kaufen",
-                            "baumarkt" to "baumarkt",
-                            "eloisa" to "eloisa"
-                        )
-
-                        // Find a keyword that matches the start of the recognized text
-                        val foundKeyword = categoryKeywords.keys.find { keyword ->
-                            lowerCaseText.startsWith(keyword) &&
-                                    (lowerCaseText.length == keyword.length || lowerCaseText.getOrNull(keyword.length)?.isWhitespace() == true)
-                        }
-
-                        val timestamp = System.currentTimeMillis()
-
-                        val (targetCategory, contentToAdd) = if (foundKeyword != null) {
-                            // Keyword was found
-                            val category = categoryKeywords[foundKeyword]!!
-                            val content = recognizedText.substring(foundKeyword.length).trim()
-
-                            // Switch the selected category in the UI
-                            if (selectedCategory.value != category) {
-                                selectedCategory.value = category
-                            }
-                            category to content
-                        } else {
-                            // No keyword found, add the entire text to the "journal" category
-                            "journal" to recognizedText
-                        }
-
-                        if (contentToAdd.isNotEmpty()) {
-                            val entry = JournalEntry(
-                                title = targetCategory,
-                                content = contentToAdd,
-                                timestamp = timestamp
-                            )
-                            dao.insert(entry)
-                        }
-                    }
-                }
+                viewModel.processRecognizedText(recognizedText)
             }
 
             override fun onError(error: Int) {

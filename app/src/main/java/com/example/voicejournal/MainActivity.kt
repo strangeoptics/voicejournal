@@ -20,6 +20,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -93,6 +95,7 @@ class MainActivity : ComponentActivity() {
 
     private val categories = listOf("journal", "todo", "kaufen", "baumarkt", "eloisa")
     private val selectedCategory = mutableStateOf(categories.first())
+    private var selectedEntry by mutableStateOf<JournalEntry?>(null)
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -231,6 +234,10 @@ class MainActivity : ComponentActivity() {
                             lifecycleScope.launch {
                                 dao.delete(entry)
                             }
+                        },
+                        selectedEntry = selectedEntry,
+                        onEntrySelected = { entry ->
+                            selectedEntry = if (selectedEntry == entry) null else entry
                         }
                     )
                 }
@@ -246,49 +253,60 @@ class MainActivity : ComponentActivity() {
                 if (matches.isNullOrEmpty()) return
 
                 val recognizedText = matches[0].trim()
-                val lowerCaseText = recognizedText.lowercase(Locale.getDefault())
+                if (recognizedText.isEmpty()) return
 
-                val categoryKeywords = mapOf(
-                    "journal" to "journal",
-                    "todo" to "todo",
-                    "to-do" to "todo",
-                    "todoo" to "todo",
-                    "kaufen" to "kaufen",
-                    "baumarkt" to "baumarkt",
-                    "eloisa" to "eloisa"
-                )
+                lifecycleScope.launch {
+                    val entryToUpdate = selectedEntry
+                    if (entryToUpdate != null) {
+                        val updatedEntry = entryToUpdate.copy(
+                            content = entryToUpdate.content + "\n" + recognizedText
+                        )
+                        dao.update(updatedEntry)
+                        selectedEntry = null // Deselect after update
+                    } else {
+                        val lowerCaseText = recognizedText.lowercase(Locale.getDefault())
 
-                // Find a keyword that matches the start of the recognized text
-                val foundKeyword = categoryKeywords.keys.find { keyword ->
-                    lowerCaseText.startsWith(keyword) &&
-                            (lowerCaseText.length == keyword.length || lowerCaseText.getOrNull(keyword.length)?.isWhitespace() == true)
-                }
+                        val categoryKeywords = mapOf(
+                            "journal" to "journal",
+                            "todo" to "todo",
+                            "to-do" to "todo",
+                            "todoo" to "todo",
+                            "kaufen" to "kaufen",
+                            "baumarkt" to "baumarkt",
+                            "eloisa" to "eloisa"
+                        )
 
-                val timestamp = System.currentTimeMillis()
+                        // Find a keyword that matches the start of the recognized text
+                        val foundKeyword = categoryKeywords.keys.find { keyword ->
+                            lowerCaseText.startsWith(keyword) &&
+                                    (lowerCaseText.length == keyword.length || lowerCaseText.getOrNull(keyword.length)?.isWhitespace() == true)
+                        }
 
-                val (targetCategory, contentToAdd) = if (foundKeyword != null) {
-                    // Keyword was found
-                    val category = categoryKeywords[foundKeyword]!!
-                    val content = recognizedText.substring(foundKeyword.length).trim()
+                        val timestamp = System.currentTimeMillis()
 
-                    // Switch the selected category in the UI
-                    if (selectedCategory.value != category) {
-                        selectedCategory.value = category
-                    }
-                    category to content
-                } else {
-                    // No keyword found, add the entire text to the "journal" category
-                    "journal" to recognizedText
-                }
+                        val (targetCategory, contentToAdd) = if (foundKeyword != null) {
+                            // Keyword was found
+                            val category = categoryKeywords[foundKeyword]!!
+                            val content = recognizedText.substring(foundKeyword.length).trim()
 
-                if (contentToAdd.isNotEmpty()) {
-                    val entry = JournalEntry(
-                        title = targetCategory,
-                        content = contentToAdd,
-                        timestamp = timestamp
-                    )
-                    lifecycleScope.launch {
-                        dao.insert(entry)
+                            // Switch the selected category in the UI
+                            if (selectedCategory.value != category) {
+                                selectedCategory.value = category
+                            }
+                            category to content
+                        } else {
+                            // No keyword found, add the entire text to the "journal" category
+                            "journal" to recognizedText
+                        }
+
+                        if (contentToAdd.isNotEmpty()) {
+                            val entry = JournalEntry(
+                                title = targetCategory,
+                                content = contentToAdd,
+                                timestamp = timestamp
+                            )
+                            dao.insert(entry)
+                        }
                     }
                 }
             }
@@ -345,7 +363,9 @@ fun Greeting(
     categories: List<String>,
     selectedCategory: String,
     onCategoryChange: (String) -> Unit,
-    onDeleteEntry: (JournalEntry) -> Unit
+    onDeleteEntry: (JournalEntry) -> Unit,
+    selectedEntry: JournalEntry?,
+    onEntrySelected: (JournalEntry) -> Unit
 ) {
     Column(
         modifier = modifier.fillMaxSize(),
@@ -403,6 +423,7 @@ fun Greeting(
                 }
 
                 items(entries, key = { it.id }) { entry ->
+                    val isSelected = selectedEntry == entry
                     val dismissState = rememberSwipeToDismissBoxState(
                         confirmValueChange = {
                             if (it == SwipeToDismissBoxValue.StartToEnd) {
@@ -440,6 +461,10 @@ fun Greeting(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
+                                .clickable { onEntrySelected(entry) },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                            )
                         ) {
                             Column(modifier = Modifier.padding(8.dp)) {
                                 val date = LocalDateTime.ofInstant(
@@ -530,7 +555,9 @@ fun GreetingPreview() {
             categories = categories,
             selectedCategory = selectedCategory,
             onCategoryChange = { selectedCategory = it },
-            onDeleteEntry = {}
+            onDeleteEntry = {},
+            selectedEntry = null,
+            onEntrySelected = {}
         )
     }
 }

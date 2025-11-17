@@ -18,7 +18,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,9 +44,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -54,6 +59,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -162,13 +168,6 @@ class MainActivity : ComponentActivity() {
                                 }
                                 IconButton(onClick = {
                                     lifecycleScope.launch {
-                                        dao.deleteLatestByCategory(selectedCategory.value)
-                                    }
-                                }) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Löschen")
-                                }
-                                IconButton(onClick = {
-                                    lifecycleScope.launch {
                                         dao.deleteAll()
                                         val now = System.currentTimeMillis()
                                         val oneDay = 24 * 60 * 60 * 1000
@@ -220,7 +219,12 @@ class MainActivity : ComponentActivity() {
                         entries = filteredEntries,
                         categories = categories,
                         selectedCategory = category,
-                        onCategoryChange = { selectedCategory.value = it }
+                        onCategoryChange = { selectedCategory.value = it },
+                        onDeleteEntry = { entry ->
+                            lifecycleScope.launch {
+                                dao.delete(entry)
+                            }
+                        }
                     )
                 }
             }
@@ -332,7 +336,8 @@ fun Greeting(
     entries: List<JournalEntry>,
     categories: List<String>,
     selectedCategory: String,
-    onCategoryChange: (String) -> Unit
+    onCategoryChange: (String) -> Unit,
+    onDeleteEntry: (JournalEntry) -> Unit
 ) {
     Column(
         modifier = modifier.fillMaxSize(),
@@ -376,23 +381,60 @@ fun Greeting(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            items(entries) { entry ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
+            items(entries, key = { it.id }) { entry ->
+                val dismissState = rememberSwipeToDismissBoxState(
+                    confirmValueChange = {
+                        if (it == SwipeToDismissBoxValue.StartToEnd) {
+                            onDeleteEntry(entry)
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                )
+
+                SwipeToDismissBox(
+                    state = dismissState,
+                    backgroundContent = {
+                        val color = when (dismissState.dismissDirection) {
+                            SwipeToDismissBoxValue.StartToEnd -> Color.Red
+                            else -> Color.Transparent
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(color)
+                                .padding(horizontal = 20.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                tint = Color.White
+                            )
+                        }
+                    }
                 ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault())
-                        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                        Text(
-                            text = date.format(formatter),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            text = entry.content,
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            val date = LocalDateTime.ofInstant(
+                                Instant.ofEpochMilli(entry.timestamp),
+                                ZoneId.systemDefault()
+                            )
+                            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                            Text(
+                                text = date.format(formatter),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = entry.content,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }
@@ -414,7 +456,8 @@ fun showNotification(context: Context) {
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
 
-    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    val notificationManager =
+        context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     val channel = NotificationChannel(
         channelId,
@@ -442,8 +485,18 @@ fun GreetingPreview() {
         var selectedCategory by remember { mutableStateOf(categories.first()) }
         val entries = remember {
             listOf(
-                JournalEntry(id = 1, title = "journal", content = "This is a preview entry.", timestamp = System.currentTimeMillis()),
-                JournalEntry(id = 2, title = "todo", content = "This is a todo preview.", timestamp = System.currentTimeMillis())
+                JournalEntry(
+                    id = 1,
+                    title = "journal",
+                    content = "This is a preview entry.",
+                    timestamp = System.currentTimeMillis()
+                ),
+                JournalEntry(
+                    id = 2,
+                    title = "todo",
+                    content = "This is a todo preview.",
+                    timestamp = System.currentTimeMillis()
+                )
             )
         }
         val filteredEntries = entries.filter { it.title == selectedCategory }
@@ -452,7 +505,8 @@ fun GreetingPreview() {
             entries = filteredEntries,
             categories = categories,
             selectedCategory = selectedCategory,
-            onCategoryChange = { selectedCategory = it }
+            onCategoryChange = { selectedCategory = it },
+            onDeleteEntry = {}
         )
     }
 }

@@ -1,6 +1,7 @@
 package com.example.voicejournal.data
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +16,9 @@ interface JournalEntryDao {
 
     @Insert
     suspend fun insert(entry: JournalEntry)
+
+    @Delete
+    suspend fun delete(entry: JournalEntry)
 
     @Query("DELETE FROM journal_entries WHERE id = (SELECT id FROM journal_entries WHERE title = :category ORDER BY timestamp DESC LIMIT 1)")
     suspend fun deleteLatestByCategory(category: String)

@@ -20,7 +20,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -51,6 +52,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -96,6 +98,7 @@ class MainActivity : ComponentActivity() {
     private val categories = listOf("journal", "todo", "kaufen", "baumarkt", "eloisa")
     private val selectedCategory = mutableStateOf(categories.first())
     private var selectedEntry by mutableStateOf<JournalEntry?>(null)
+    private var editingEntry by mutableStateOf<JournalEntry?>(null)
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -238,6 +241,22 @@ class MainActivity : ComponentActivity() {
                         selectedEntry = selectedEntry,
                         onEntrySelected = { entry ->
                             selectedEntry = if (selectedEntry == entry) null else entry
+                        },
+                        onEditEntry = { entry ->
+                            editingEntry = entry
+                        }
+                    )
+                }
+
+                editingEntry?.let { entry ->
+                    EditEntryDialog(
+                        entry = entry,
+                        onDismiss = { editingEntry = null },
+                        onSave = { updatedContent ->
+                            lifecycleScope.launch {
+                                dao.update(entry.copy(content = updatedContent))
+                                editingEntry = null
+                            }
                         }
                     )
                 }
@@ -355,6 +374,37 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@Composable
+fun EditEntryDialog(
+    entry: JournalEntry,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit
+) {
+    var text by remember { mutableStateOf(entry.content) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Entry") },
+        text = {
+            TextField(
+                value = text,
+                onValueChange = { text = it },
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(text) }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun Greeting(
@@ -365,7 +415,8 @@ fun Greeting(
     onCategoryChange: (String) -> Unit,
     onDeleteEntry: (JournalEntry) -> Unit,
     selectedEntry: JournalEntry?,
-    onEntrySelected: (JournalEntry) -> Unit
+    onEntrySelected: (JournalEntry) -> Unit,
+    onEditEntry: (JournalEntry) -> Unit
 ) {
     Column(
         modifier = modifier.fillMaxSize(),
@@ -461,7 +512,10 @@ fun Greeting(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
-                                .clickable { onEntrySelected(entry) },
+                                .combinedClickable(
+                                    onClick = { onEntrySelected(entry) },
+                                    onLongClick = { onEditEntry(entry) }
+                                ),
                             colors = CardDefaults.cardColors(
                                 containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
                             )
@@ -557,7 +611,8 @@ fun GreetingPreview() {
             onCategoryChange = { selectedCategory = it },
             onDeleteEntry = {},
             selectedEntry = null,
-            onEntrySelected = {}
+            onEntrySelected = {},
+            onEditEntry = {}
         )
     }
 }

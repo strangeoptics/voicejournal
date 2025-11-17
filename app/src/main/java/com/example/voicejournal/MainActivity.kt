@@ -237,24 +237,35 @@ class MainActivity : ComponentActivity() {
                                             onClick = {
                                                 lifecycleScope.launch {
                                                     dao.deleteAll()
-                                                    val now = System.currentTimeMillis()
-                                                    val oneDay = 24 * 60 * 60 * 1000
-                                                    val yesterday = now - oneDay
-                                                    val twoDaysAgo = now - 2 * oneDay
+
+                                                    fun timestampFromString(dateTimeString: String): Long {
+                                                        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
+                                                        val localDateTime = LocalDateTime.parse(dateTimeString, formatter)
+                                                        return localDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                                                    }
+
+                                                    val today = LocalDate.now().toString()
+                                                    val yesterday = LocalDate.now().minusDays(1).toString()
+                                                    val twoDaysAgo = LocalDate.now().minusDays(2).toString()
+                                                    val threeDaysAgo = LocalDate.now().minusDays(3).toString()
+                                                    val fourDaysAgo = LocalDate.now().minusDays(4).toString()
 
                                                     val testEntries = listOf(
-                                                        JournalEntry(title = "journal", content = "This is a test journal entry from today.", timestamp = now),
-                                                        JournalEntry(title = "journal", content = "Etwas gegessen.", timestamp = now + 100),
-                                                        JournalEntry(title = "todo", content = "This is a test todo item from today.", timestamp = now),
-                                                        JournalEntry(title = "kaufen", content = "Milk, eggs, bread.", timestamp = now),
-                                                        JournalEntry(title = "baumarkt", content = "A great new app idea from today.", timestamp = now),
+                                                        JournalEntry(title = "journal", content = "This is a test journal entry from today.", timestamp = timestampFromString("${today}T10:00:00")),
+                                                        JournalEntry(title = "journal", content = "Etwas gegessen.", timestamp = timestampFromString("${today}T11:30:00")),
+                                                        JournalEntry(title = "todo", content = "This is a test todo item from today.", timestamp = timestampFromString("${today}T12:00:00")),
+                                                        JournalEntry(title = "kaufen", content = "Milk, eggs, bread.", timestamp = timestampFromString("${today}T14:00:00")),
+                                                        JournalEntry(title = "baumarkt", content = "A great new app idea from today.", timestamp = timestampFromString("${today}T16:00:00")),
 
-                                                        JournalEntry(title = "journal", content = "Journal entry from yesterday.", timestamp = yesterday),
-                                                        JournalEntry(title = "todo", content = "Todo item from yesterday.", timestamp = yesterday),
-                                                        JournalEntry(title = "kaufen", content = "Apples, bananas.", timestamp = yesterday),
+                                                        JournalEntry(title = "journal", content = "Journal entry from yesterday.", timestamp = timestampFromString("${yesterday}T09:00:00")),
+                                                        JournalEntry(title = "todo", content = "Todo item from yesterday.", timestamp = timestampFromString("${yesterday}T15:00:00")),
+                                                        JournalEntry(title = "kaufen", content = "Apples, bananas.", timestamp = timestampFromString("${yesterday}T17:00:00")),
 
-                                                        JournalEntry(title = "journal", content = "Journal entry from two days ago.", timestamp = twoDaysAgo),
-                                                        JournalEntry(title = "eloisa", content = "Another app idea from two days ago.", timestamp = twoDaysAgo)
+                                                        JournalEntry(title = "journal", content = "Journal entry from two days ago.", timestamp = timestampFromString("${twoDaysAgo}T18:00:00")),
+                                                        JournalEntry(title = "journal", content = "Journal entry from 3 days ago.", timestamp = timestampFromString("${threeDaysAgo}T18:00:00")),
+                                                        JournalEntry(title = "journal", content = "Journal entry from 4 days ago.", timestamp = timestampFromString("${fourDaysAgo}T18:00:00")),
+
+                                                        JournalEntry(title = "eloisa", content = "Another app idea from two days ago.", timestamp = timestampFromString("${twoDaysAgo}T20:00:00"))
                                                     )
                                                     testEntries.forEach { dao.insert(it) }
                                                 }

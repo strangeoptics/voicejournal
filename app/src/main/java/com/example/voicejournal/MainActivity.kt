@@ -312,6 +312,9 @@ class MainActivity : ComponentActivity() {
                             },
                             onEditEntry = { entry ->
                                 editingEntry = entry
+                            },
+                            onMoreClicked = {
+                                daysToShow += 3
                             }
                         )
                     }
@@ -519,7 +522,8 @@ fun Greeting(
     onDeleteEntry: (JournalEntry) -> Unit,
     selectedEntry: JournalEntry?,
     onEntrySelected: (JournalEntry) -> Unit,
-    onEditEntry: (JournalEntry) -> Unit
+    onEditEntry: (JournalEntry) -> Unit,
+    onMoreClicked: () -> Unit
 ) {
     Column(
         modifier = modifier.fillMaxSize(),
@@ -643,6 +647,18 @@ fun Greeting(
                     }
                 }
             }
+            if (groupedEntries.isNotEmpty()) {
+                item {
+                    Button(
+                        onClick = onMoreClicked,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                    ) {
+                        Text("more")
+                    }
+                }
+            }
         }
     }
 }
@@ -716,7 +732,8 @@ fun GreetingPreview() {
             onDeleteEntry = {},
             selectedEntry = null,
             onEntrySelected = {},
-            onEditEntry = {}
+            onEditEntry = {},
+            onMoreClicked = {}
         )
     }
 }

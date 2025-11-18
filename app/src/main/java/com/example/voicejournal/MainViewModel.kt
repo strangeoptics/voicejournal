@@ -162,7 +162,8 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
                     "todoo" to "todo",
                     "kaufen" to "kaufen",
                     "baumarkt" to "baumarkt",
-                    "eloisa" to "eloisa"
+                    "eloisa" to "eloisa",
+                    "louisa" to "eloisa"
                 )
 
                 // Find a keyword that matches the start of the recognized text

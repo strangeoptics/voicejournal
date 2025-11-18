@@ -153,8 +153,6 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
                 dao.update(updatedEntry)
                 _selectedEntry.value = null // Deselect after update
             } else {
-                val lowerCaseText = recognizedText.lowercase(Locale.getDefault())
-
                 val categoryKeywords = mapOf(
                     "journal" to "journal",
                     "todo" to "todo",
@@ -163,13 +161,13 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
                     "kaufen" to "kaufen",
                     "baumarkt" to "baumarkt",
                     "eloisa" to "eloisa",
-                    "louisa" to "eloisa"
+                    "luisa" to "eloisa"
                 )
 
                 // Find a keyword that matches the start of the recognized text
                 val foundKeyword = categoryKeywords.keys.find { keyword ->
-                    lowerCaseText.startsWith(keyword) &&
-                            (lowerCaseText.length == keyword.length || lowerCaseText.getOrNull(keyword.length)?.isWhitespace() == true)
+                    recognizedText.startsWith(keyword, ignoreCase = true) &&
+                            (recognizedText.length == keyword.length || recognizedText.getOrNull(keyword.length)?.isWhitespace() == true)
                 }
 
                 val timestamp = System.currentTimeMillis()
@@ -178,11 +176,7 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
                     // Keyword was found
                     val category = categoryKeywords[foundKeyword]!!
                     val content = recognizedText.substring(foundKeyword.length).trim()
-
-                    // Switch the selected category in the UI
-                    if (_selectedCategory.value != category) {
-                        _selectedCategory.value = category
-                    }
+                    _selectedCategory.value = category
                     category to content
                 } else {
                     // No keyword found, add the entire text to the "journal" category

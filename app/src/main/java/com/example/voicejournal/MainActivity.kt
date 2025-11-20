@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -125,6 +126,7 @@ class MainActivity : ComponentActivity() {
                 val editingEntry by viewModel.editingEntry.collectAsState()
                 val daysToShow by viewModel.daysToShow.collectAsState()
                 val filteredEntries by viewModel.filteredEntries.collectAsState()
+                val canUndo by viewModel.canUndo.collectAsState()
 
                 var showSettings by remember { mutableStateOf(false) }
 
@@ -174,6 +176,11 @@ class MainActivity : ComponentActivity() {
                             TopAppBar(
                                 title = { Text("Voice Journal") },
                                 actions = {
+                                    if (canUndo) {
+                                        IconButton(onClick = viewModel::onUndoDelete) {
+                                            Icon(Icons.Filled.Undo, contentDescription = "Undo")
+                                        }
+                                    }
                                     IconButton(onClick = {
                                         val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
                                         val clip = ClipData.newPlainText("VoiceJournal", textToShow)
@@ -523,7 +530,7 @@ fun Greeting(
                                 false
                             }
                         },
-                        positionalThreshold = { it * 0.80f }
+                        positionalThreshold = { it * 0.75f }
                     )
 
                     SwipeToDismissBox(

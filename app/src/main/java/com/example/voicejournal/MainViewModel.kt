@@ -47,6 +47,10 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
     private val _daysToShow = MutableStateFlow(sharedPreferences.getInt(KEY_DAYS_TO_SHOW, 3))
     val daysToShow: StateFlow<Int> = _daysToShow.asStateFlow()
 
+    private val _recentlyDeleted = MutableStateFlow<List<JournalEntry>>(emptyList())
+    val canUndo: StateFlow<Boolean> = combine(_recentlyDeleted) { it.isNotEmpty() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val entries: StateFlow<List<JournalEntry>> =
         daysToShow.flatMapLatest { days ->
@@ -99,7 +103,23 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
 
     fun onDeleteEntry(entry: JournalEntry) {
         viewModelScope.launch {
+            val currentDeleted = _recentlyDeleted.value.toMutableList()
+            currentDeleted.add(entry)
+            if (currentDeleted.size > 3) {
+                currentDeleted.removeAt(0)
+            }
+            _recentlyDeleted.value = currentDeleted
             dao.delete(entry)
+        }
+    }
+
+    fun onUndoDelete() {
+        viewModelScope.launch {
+            val lastDeleted = _recentlyDeleted.value.lastOrNull()
+            if (lastDeleted != null) {
+                dao.insert(lastDeleted)
+                _recentlyDeleted.value = _recentlyDeleted.value.dropLast(1)
+            }
         }
     }
 

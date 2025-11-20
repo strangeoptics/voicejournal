@@ -38,6 +38,9 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
     private val _selectedEntry = MutableStateFlow<JournalEntry?>(null)
     val selectedEntry: StateFlow<JournalEntry?> = _selectedEntry.asStateFlow()
 
+    private val _selectedDate = MutableStateFlow<LocalDate?>(null)
+    val selectedDate: StateFlow<LocalDate?> = _selectedDate.asStateFlow()
+
     private val _editingEntry = MutableStateFlow<JournalEntry?>(null)
     val editingEntry: StateFlow<JournalEntry?> = _editingEntry.asStateFlow()
 
@@ -70,7 +73,9 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
     fun onCategoryChange(category: String) {
         _selectedCategory.value = category
     }
-
+    fun onDateSelected(date: LocalDate) {
+        _selectedDate.value = if (_selectedDate.value == date) null else date
+    }
     fun onEntrySelected(entry: JournalEntry) {
         _selectedEntry.value = if (_selectedEntry.value == entry) null else entry
     }
@@ -174,8 +179,11 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
                     recognizedText.startsWith(keyword, ignoreCase = true) &&
                             (recognizedText.length == keyword.length || recognizedText.getOrNull(keyword.length)?.isWhitespace() == true)
                 }
+                val now = LocalDateTime.now()
+                val timestamp = _selectedDate.value?.atTime(now.toLocalTime())?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+                    ?: System.currentTimeMillis()
+                _selectedDate.value = null
 
-                val timestamp = System.currentTimeMillis()
 
                 val (targetCategory, contentToAdd) = if (foundKeyword != null) {
                     // Keyword was found

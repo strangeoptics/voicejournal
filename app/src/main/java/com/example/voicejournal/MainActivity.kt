@@ -21,6 +21,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -119,6 +120,7 @@ class MainActivity : ComponentActivity() {
                 val category by viewModel.selectedCategory.collectAsState()
                 val groupedEntries by viewModel.groupedEntries.collectAsState()
                 val selectedEntry by viewModel.selectedEntry.collectAsState()
+                val selectedDate by viewModel.selectedDate.collectAsState()
                 val editingEntry by viewModel.editingEntry.collectAsState()
                 val daysToShow by viewModel.daysToShow.collectAsState()
                 val filteredEntries by viewModel.filteredEntries.collectAsState()
@@ -249,6 +251,8 @@ class MainActivity : ComponentActivity() {
                             onCategoryChange = viewModel::onCategoryChange,
                             onDeleteEntry = viewModel::onDeleteEntry,
                             selectedEntry = selectedEntry,
+                            selectedDate = selectedDate,
+                            onDateSelected = viewModel::onDateSelected,
                             onEntrySelected = viewModel::onEntrySelected,
                             onEditEntry = viewModel::onEditEntry,
                             onMoreClicked = viewModel::onMoreClicked
@@ -443,6 +447,8 @@ fun Greeting(
     onCategoryChange: (String) -> Unit,
     onDeleteEntry: (JournalEntry) -> Unit,
     selectedEntry: JournalEntry?,
+    selectedDate: LocalDate?,
+    onDateSelected: (LocalDate) -> Unit,
     onEntrySelected: (JournalEntry) -> Unit,
     onEditEntry: (JournalEntry) -> Unit,
     onMoreClicked: () -> Unit
@@ -491,9 +497,12 @@ fun Greeting(
         ) {
             groupedEntries.forEach { (date, entries) ->
                 stickyHeader {
+                    val isDateSelected = selectedDate == date
                     Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = Color.Transparent
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onDateSelected(date) },
+                        color = if (isDateSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                     ) {
                         Text(
                             text = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
@@ -653,6 +662,8 @@ fun GreetingPreview() {
             onCategoryChange = { selectedCategory = it },
             onDeleteEntry = {},
             selectedEntry = null,
+            selectedDate = null,
+            onDateSelected = {},
             onEntrySelected = {},
             onEditEntry = {},
             onMoreClicked = {}

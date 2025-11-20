@@ -61,6 +61,7 @@ import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxDefaults
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -521,7 +522,8 @@ fun Greeting(
                             } else {
                                 false
                             }
-                        }
+                        },
+                        positionalThreshold = { it * 0.80f }
                     )
 
                     SwipeToDismissBox(

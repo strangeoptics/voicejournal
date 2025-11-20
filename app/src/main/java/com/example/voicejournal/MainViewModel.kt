@@ -192,8 +192,8 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
                     _selectedCategory.value = category
                     category to content
                 } else {
-                    // No keyword found, add the entire text to the "journal" category
-                    "journal" to recognizedText
+                    // No keyword found, add the entire text to the currently selected category
+                    _selectedCategory.value to recognizedText
                 }
 
                 if (contentToAdd.isNotEmpty()) {

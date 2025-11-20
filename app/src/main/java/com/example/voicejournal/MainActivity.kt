@@ -513,7 +513,7 @@ fun Greeting(
                         color = if (isDateSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                     ) {
                         Text(
-                            text = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+                            text = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd, EE", Locale.GERMAN)),
                             modifier = Modifier.padding(8.dp)
                         )
                     }

@@ -9,6 +9,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -264,7 +265,18 @@ class MainActivity : ComponentActivity() {
                             onDateSelected = viewModel::onDateSelected,
                             onEntrySelected = viewModel::onEntrySelected,
                             onEditEntry = viewModel::onEditEntry,
-                            onMoreClicked = viewModel::onMoreClicked
+                            onMoreClicked = viewModel::onMoreClicked,
+                            onDateLongClicked = { date ->
+                                val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                                val formattedDate = date.format(formatter)
+                                val url = "https://photos.google.com/search/_d$formattedDate"
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                try {
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Could not open browser.", Toast.LENGTH_SHORT).show()
+                                }
+                            }
                         )
                     }
                 }
@@ -460,7 +472,8 @@ fun Greeting(
     onDateSelected: (LocalDate) -> Unit,
     onEntrySelected: (JournalEntry) -> Unit,
     onEditEntry: (JournalEntry) -> Unit,
-    onMoreClicked: () -> Unit
+    onMoreClicked: () -> Unit,
+    onDateLongClicked: (LocalDate) -> Unit
 ) {
     Column(
         modifier = modifier.fillMaxSize(),
@@ -510,7 +523,10 @@ fun Greeting(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onDateSelected(date) },
+                            .combinedClickable(
+                                onClick = { onDateSelected(date) },
+                                onLongClick = { onDateLongClicked(date) }
+                            ),
                         color = if (isDateSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                     ) {
                         Text(
@@ -680,7 +696,8 @@ fun GreetingPreview() {
             onDateSelected = {},
             onEntrySelected = {},
             onEditEntry = {},
-            onMoreClicked = {}
+            onMoreClicked = {},
+            onDateLongClicked = {}
         )
     }
 }

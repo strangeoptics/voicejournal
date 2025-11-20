@@ -267,9 +267,9 @@ class MainActivity : ComponentActivity() {
                             onEditEntry = viewModel::onEditEntry,
                             onMoreClicked = viewModel::onMoreClicked,
                             onDateLongClicked = { date ->
-                                val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                                val formatter = DateTimeFormatter.ofPattern("d. MMMM yyyy", Locale.GERMAN)
                                 val formattedDate = date.format(formatter)
-                                val url = "https://photos.google.com/search/_d$formattedDate"
+                                val url = "https://photos.google.com/search/$formattedDate"
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                                 try {
                                     context.startActivity(intent)

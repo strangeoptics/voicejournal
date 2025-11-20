@@ -25,9 +25,13 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -357,22 +361,66 @@ fun SettingsScreen(
 fun EditEntryDialog(
     entry: JournalEntry,
     onDismiss: () -> Unit,
-    onSave: (String) -> Unit
+    onSave: (String, Long) -> Unit
 ) {
     var text by remember { mutableStateOf(entry.content) }
+    val context = LocalContext.current
+    var currentDateTime by remember {
+        mutableStateOf(
+            LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(entry.timestamp),
+                ZoneId.systemDefault()
+            )
+        )
+    }
+
+    val timePickerDialog = android.app.TimePickerDialog(
+        context,
+        { _, hourOfDay, minute ->
+            currentDateTime = currentDateTime.withHour(hourOfDay).withMinute(minute)
+        },
+        currentDateTime.hour,
+        currentDateTime.minute,
+        true
+    )
+
+    val datePickerDialog = android.app.DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth ->
+            currentDateTime = currentDateTime.withYear(year).withMonth(month + 1).withDayOfMonth(dayOfMonth)
+        },
+        currentDateTime.year,
+        currentDateTime.monthValue - 1,
+        currentDateTime.dayOfMonth
+    )
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Edit Entry") },
         text = {
-            TextField(
-                value = text,
-                onValueChange = { text = it },
-                modifier = Modifier.fillMaxWidth()
-            )
+            Column {
+                TextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = "Current: ${currentDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))}")
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Button(onClick = { datePickerDialog.show() }) {
+                        Text("Change Date")
+                    }
+                    Button(onClick = { timePickerDialog.show() }) {
+                        Text("Change Time")
+                    }
+                }
+            }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(text) }) {
+            TextButton(onClick = {
+                val newTimestamp = currentDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                onSave(text, newTimestamp)
+            }) {
                 Text("Save")
             }
         },
@@ -383,6 +431,7 @@ fun EditEntryDialog(
         }
     )
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable

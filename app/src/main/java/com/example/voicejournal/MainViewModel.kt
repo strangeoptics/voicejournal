@@ -83,10 +83,10 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
         _editingEntry.value = null
     }
 
-    fun onSaveEntry(updatedContent: String) {
+    fun onSaveEntry(updatedContent: String, updatedTimestamp: Long) {
         viewModelScope.launch {
             _editingEntry.value?.let {
-                dao.update(it.copy(content = updatedContent))
+                dao.update(it.copy(content = updatedContent, timestamp = updatedTimestamp))
                 _editingEntry.value = null
             }
         }

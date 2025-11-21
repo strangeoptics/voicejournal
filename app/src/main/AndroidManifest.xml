@@ -25,6 +25,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".CategoryManagerActivity"
+            android:exported="false"
+            android:label="Manage Categories"
+            android:theme="@style/Theme.Voicejournal">
+        </activity>
     </application>
 
 </manifest>

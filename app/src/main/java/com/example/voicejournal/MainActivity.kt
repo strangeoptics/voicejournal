@@ -38,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
@@ -172,13 +173,23 @@ class MainActivity : ComponentActivity() {
                                 icon = { Icon(Icons.Filled.Settings, contentDescription = "Einstellungen") },
                                 label = { Text("Settings") },
                                 selected = false,
-                                onClick = { 
+                                onClick = {
                                     scope.launch { drawerState.close() }
                                     showSettings = true
                                 },
                                 modifier = Modifier.padding(12.dp)
                             )
-                             NavigationDrawerItem(
+                            NavigationDrawerItem(
+                                icon = { Icon(Icons.Filled.Category, contentDescription = "Manage Categories") },
+                                label = { Text("Manage Categories") },
+                                selected = false,
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    context.startActivity(Intent(context, CategoryManagerActivity::class.java))
+                                },
+                                modifier = Modifier.padding(12.dp)
+                            )
+                            NavigationDrawerItem(
                                 icon = { Icon(Icons.Filled.Notifications, contentDescription = "Benachrichtigung anzeigen") },
                                 label = { Text("Show Notification") },
                                 selected = false,
@@ -209,7 +220,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     },
-                    content = { 
+                    content = {
                         Scaffold(
                             modifier = Modifier.fillMaxSize(),
                             topBar = {
@@ -289,7 +300,7 @@ class MainActivity : ComponentActivity() {
                                         } catch (_: Exception) { // Changed 'e: Exception' to '_: Exception'
                                             // Log the exception for debugging purposes if needed.
                                             // Log.e("MainActivity", "Could not open browser.", e)
-                                            Toast.makeText(context, "Could not open browser.", Toast.LENGTH_SHORT).show() 
+                                            Toast.makeText(context, "Could not open browser.", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 )

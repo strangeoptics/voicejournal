@@ -30,6 +30,7 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
     companion object {
         const val PREFS_NAME = "voice_journal_prefs"
         const val KEY_DAYS_TO_SHOW = "days_to_show"
+        const val KEY_DEFAULT_CATEGORIES_ADDED = "default_categories_added"
     }
 
     // Removed hardcoded categories
@@ -66,9 +67,10 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
 
     init {
         viewModelScope.launch {
-            // Initialize default categories if the database is empty
-            if (categoryAliases.value.isEmpty()) {
+            val areDefaultCategoriesAdded = sharedPreferences.getBoolean(KEY_DEFAULT_CATEGORIES_ADDED, false)
+            if (!areDefaultCategoriesAdded) {
                 addDefaultCategories()
+                sharedPreferences.edit { putBoolean(KEY_DEFAULT_CATEGORIES_ADDED, true) }
             }
             // Set the selected category to the first one available after loading
             categories.collect {
@@ -176,18 +178,19 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
         sharedPreferences.edit { putInt(KEY_DAYS_TO_SHOW, days) }
     }
 
-    // New functions to manage categories and aliases
-    fun addCategoryAlias(category: String, alias: String) {
+    fun updateAliasesForCategory(category: String, aliasesString: String) {
         viewModelScope.launch {
-            dao.insertCategoryAlias(CategoryAlias(category = category, alias = alias))
+            val newAliases = aliasesString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            dao.updateAliasesForCategory(category, newAliases)
         }
     }
 
-    fun deleteCategoryAlias(categoryAlias: CategoryAlias) {
+    fun deleteCategory(category: String) {
         viewModelScope.launch {
-            dao.deleteCategoryAlias(categoryAlias)
+            dao.deleteCategory(category)
         }
     }
+
 
     fun addTestData() {
         viewModelScope.launch {

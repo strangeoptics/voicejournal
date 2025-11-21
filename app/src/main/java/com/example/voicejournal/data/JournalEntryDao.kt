@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
@@ -37,6 +38,30 @@ interface JournalEntryDao {
     @Delete
     suspend fun deleteCategoryAlias(categoryAlias: CategoryAlias)
 
+    @Query("DELETE FROM category_aliases WHERE category = :category AND alias = :alias")
+    suspend fun deleteAlias(category: String, alias: String)
+
+
     @Query("SELECT * FROM category_aliases")
     fun getAllCategoryAliases(): Flow<List<CategoryAlias>>
+
+    @Query("SELECT * FROM category_aliases WHERE category = :category")
+    suspend fun getAliasesForCategory(category: String): List<CategoryAlias>
+
+    @Transaction
+    suspend fun updateAliasesForCategory(category: String, newAliases: List<String>) {
+        val oldAliases = getAliasesForCategory(category).map { it.alias }
+        val aliasesToDelete = oldAliases.filter { it !in newAliases }
+        val aliasesToAdd = newAliases.filter { it !in oldAliases }
+
+        aliasesToDelete.forEach { alias ->
+            deleteAlias(category, alias)
+        }
+        aliasesToAdd.forEach { alias ->
+            insertCategoryAlias(CategoryAlias(category = category, alias = alias))
+        }
+    }
+
+    @Query("DELETE FROM category_aliases WHERE category = :category")
+    suspend fun deleteCategory(category: String)
 }

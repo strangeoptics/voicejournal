@@ -84,6 +84,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.example.voicejournal.data.AppDatabase
+import com.example.voicejournal.data.CategoryAlias
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import kotlinx.coroutines.launch
@@ -285,7 +286,7 @@ class MainActivity : ComponentActivity() {
                                         val intent = Intent(Intent.ACTION_VIEW, url.toUri())
                                         try {
                                             context.startActivity(intent)
-                                        } catch (e: Exception) {
+                                        } catch (_: Exception) { // Changed 'e: Exception' to '_: Exception'
                                             // Log the exception for debugging purposes if needed.
                                             // Log.e("MainActivity", "Could not open browser.", e)
                                             Toast.makeText(context, "Could not open browser.", Toast.LENGTH_SHORT).show() 
@@ -360,6 +361,40 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "Starting speech recognition...", Toast.LENGTH_SHORT).show()
             startListening()
         }
+    }
+
+    private fun showNotification(context: Context) {
+        val channelId = "channel_id"
+        val notificationId = 1
+        val intent = Intent(context, MainActivity::class.java).apply {
+            action = NOTIFICATION_ACTION
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notificationManager =
+            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        val channel = NotificationChannel(
+            channelId,
+            "Channel Name",
+            NotificationManager.IMPORTANCE_DEFAULT
+        )
+        notificationManager.createNotificationChannel(channel)
+
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("Notification Title")
+            .setContentText("Ready to listen!")
+            .addAction(R.drawable.ic_launcher_foreground, "Start Listening", pendingIntent)
+            .build()
+
+        notificationManager.notify(notificationId, notification)
     }
 }
 
@@ -477,18 +512,18 @@ fun EditEntryDialog(
 @Composable
 fun Greeting(
     modifier: Modifier = Modifier,
-    groupedEntries: Map<LocalDate, List<JournalEntry>>,
-    categories: List<String>,
-    selectedCategory: String,
-    onCategoryChange: (String) -> Unit,
-    onDeleteEntry: (JournalEntry) -> Unit,
-    selectedEntry: JournalEntry?,
-    selectedDate: LocalDate?,
-    onDateSelected: (LocalDate) -> Unit,
-    onEntrySelected: (JournalEntry) -> Unit,
-    onEditEntry: (JournalEntry) -> Unit,
-    onMoreClicked: () -> Unit,
-    onDateLongClicked: (LocalDate) -> Unit
+    groupedEntries: Map<LocalDate, List<JournalEntry>> = emptyMap(),
+    categories: List<String> = emptyList(),
+    selectedCategory: String = "",
+    onCategoryChange: (String) -> Unit = {},
+    onDeleteEntry: (JournalEntry) -> Unit = {},
+    selectedEntry: JournalEntry? = null,
+    selectedDate: LocalDate? = null,
+    onDateSelected: (LocalDate) -> Unit = {},
+    onEntrySelected: (JournalEntry) -> Unit = {},
+    onEditEntry: (JournalEntry) -> Unit = {},
+    onMoreClicked: () -> Unit = {},
+    onDateLongClicked: (LocalDate) -> Unit = {}
 ) {
     Column(
         modifier = modifier.fillMaxSize(),
@@ -639,47 +674,27 @@ fun Greeting(
     }
 }
 
-fun showNotification(context: Context) {
-    val channelId = "channel_id"
-    val notificationId = 1
-    val intent = Intent(context, MainActivity::class.java).apply {
-        action = MainActivity.NOTIFICATION_ACTION
-        flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-    }
-    val pendingIntent = PendingIntent.getActivity(
-        context,
-        0,
-        intent,
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    )
-
-    val notificationManager =
-        context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-    val channel = NotificationChannel(
-        channelId,
-        "Channel Name",
-        NotificationManager.IMPORTANCE_DEFAULT
-    )
-    notificationManager.createNotificationChannel(channel)
-
-    val notification = NotificationCompat.Builder(context, channelId)
-        .setSmallIcon(R.drawable.ic_launcher_foreground)
-        .setContentTitle("Notification Title")
-        .setContentText("Ready to listen!")
-        .addAction(R.drawable.ic_launcher_foreground, "Start Listening", pendingIntent)
-        .build()
-
-    notificationManager.notify(notificationId, notification)
-}
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
     VoicejournalTheme {
-        val categories = listOf("journal", "todo", "kaufen", "baumarkt", "eloisa")
-        var selectedCategory by remember { mutableStateOf(categories.first()) }
+        // Simulate categories from the database for the preview
+        val sampleCategoryAliases = remember {
+            listOf(
+                CategoryAlias(category = "journal", alias = "journal"),
+                CategoryAlias(category = "journal", alias = "tagebuch"),
+                CategoryAlias(category = "todo", alias = "todo"),
+                CategoryAlias(category = "todo", alias = "to-do"),
+                CategoryAlias(category = "kaufen", alias = "kaufen"),
+                CategoryAlias(category = "baumarkt", alias = "baumarkt"),
+                CategoryAlias(category = "eloisa", alias = "eloisa")
+            )
+        }
+        val sampleCategories = remember(sampleCategoryAliases) {
+            sampleCategoryAliases.map { it.category }.distinct()
+        }
+        var selectedCategory by remember { mutableStateOf(sampleCategories.first()) }
         val entries = remember {
             listOf(
                 JournalEntry(
@@ -702,7 +717,7 @@ fun GreetingPreview() {
 
         Greeting(
             groupedEntries = groupedEntries,
-            categories = categories,
+            categories = sampleCategories, // Pass the sample categories
             selectedCategory = selectedCategory,
             onCategoryChange = { selectedCategory = it },
             onDeleteEntry = {},

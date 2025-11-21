@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -105,6 +106,7 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.rememberDrawerState
+import java.io.FileOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 class MainActivity : ComponentActivity() {
@@ -157,6 +159,27 @@ class MainActivity : ComponentActivity() {
                                 }
                             } catch (e: Exception) {
                                 Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                )
+
+                val exportLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.CreateDocument("application/json"),
+                    onResult = { uri ->
+                        uri?.let {
+                            scope.launch {
+                                try {
+                                    val jsonString = viewModel.exportJournalToJson()
+                                    context.contentResolver.openFileDescriptor(uri, "w")?.use {
+                                        FileOutputStream(it.fileDescriptor).use { fos ->
+                                            fos.write(jsonString.toByteArray())
+                                        }
+                                    }
+                                    Toast.makeText(context, "Export successful", Toast.LENGTH_SHORT).show()
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
                             }
                         }
                     }
@@ -220,6 +243,18 @@ class MainActivity : ComponentActivity() {
                                 onClick = {
                                     scope.launch { drawerState.close() }
                                     filePickerLauncher.launch(arrayOf("text/plain", "*/*"))
+                                },
+                                modifier = Modifier.padding(12.dp)
+                            )
+                             NavigationDrawerItem(
+                                icon = { Icon(Icons.Filled.Upload, contentDescription = "Export Journal") },
+                                label = { Text("Export Journal") },
+                                selected = false,
+                                onClick = {
+                                     scope.launch { drawerState.close() }
+                                     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                                     val fileName = "journal_${LocalDate.now().format(formatter)}.jrn"
+                                     exportLauncher.launch(fileName)
                                 },
                                 modifier = Modifier.padding(12.dp)
                             )

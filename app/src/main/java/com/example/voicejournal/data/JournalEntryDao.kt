@@ -11,7 +11,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface JournalEntryDao {
     @Query("SELECT * FROM journal_entries ORDER BY timestamp DESC")
-    fun getAllEntries(): Flow<List<JournalEntry>>
+    fun getAllEntriesFlow(): Flow<List<JournalEntry>>
+
+    @Query("SELECT * FROM journal_entries")
+    suspend fun getAllEntries(): List<JournalEntry>
 
     @Query("SELECT * FROM journal_entries WHERE timestamp >= :since ORDER BY timestamp DESC")
     fun getEntriesSince(since: Long): Flow<List<JournalEntry>>

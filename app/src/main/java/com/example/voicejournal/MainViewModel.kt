@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -190,6 +192,11 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
         viewModelScope.launch {
             dao.deleteCategory(category)
         }
+    }
+
+    suspend fun exportJournalToJson(): String {
+        val entries = dao.getAllEntries()
+        return Json.encodeToString(entries)
     }
 
     fun importJournalEntries(content: String) {

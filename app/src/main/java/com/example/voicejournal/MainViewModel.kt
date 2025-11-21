@@ -5,6 +5,7 @@ import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.voicejournal.data.CategoryAlias
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalEntryDao
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -30,9 +32,9 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
         const val KEY_DAYS_TO_SHOW = "days_to_show"
     }
 
-    val categories = listOf("journal", "todo", "kaufen", "baumarkt", "eloisa")
+    // Removed hardcoded categories
 
-    private val _selectedCategory = MutableStateFlow(categories.first())
+    private val _selectedCategory = MutableStateFlow("") // Initialize with empty string, will be set after categories are loaded
     val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
 
     private val _selectedEntry = MutableStateFlow<JournalEntry?>(null)
@@ -50,6 +52,48 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
     private val _recentlyDeleted = MutableStateFlow<List<JournalEntry>>(emptyList())
     val canUndo: StateFlow<Boolean> = combine(_recentlyDeleted) { it.isNotEmpty() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    // New StateFlows for categories and aliases from Room
+    val categoryAliases: StateFlow<List<CategoryAlias>> = dao.getAllCategoryAliases()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val categories: StateFlow<List<String>> = categoryAliases.map { aliases ->
+        aliases.map { it.category }.distinct()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val categoryKeywordsMap: StateFlow<Map<String, String>> = categoryAliases.map { aliases ->
+        aliases.associate { it.alias.lowercase(Locale.ROOT) to it.category.lowercase(Locale.ROOT) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    init {
+        viewModelScope.launch {
+            // Initialize default categories if the database is empty
+            if (categoryAliases.value.isEmpty()) {
+                addDefaultCategories()
+            }
+            // Set the selected category to the first one available after loading
+            categories.collect {
+                if (it.isNotEmpty() && _selectedCategory.value.isEmpty()) {
+                    _selectedCategory.value = it.first()
+                }
+            }
+        }
+    }
+
+    private suspend fun addDefaultCategories() {
+        val defaultCategories = listOf(
+            CategoryAlias(category = "journal", alias = "journal"),
+            CategoryAlias(category = "journal", alias = "tagebuch"),
+            CategoryAlias(category = "todo", alias = "todo"),
+            CategoryAlias(category = "todo", alias = "to-do"),
+            CategoryAlias(category = "todo", alias = "todoo"),
+            CategoryAlias(category = "kaufen", alias = "kaufen"),
+            CategoryAlias(category = "kaufen", alias = "einkaufen"),
+            CategoryAlias(category = "baumarkt", alias = "baumarkt"),
+            CategoryAlias(category = "eloisa", alias = "eloisa"),
+            CategoryAlias(category = "eloisa", alias = "luisa")
+        )
+        defaultCategories.forEach { dao.insertCategoryAlias(it) }
+    }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val entries: StateFlow<List<JournalEntry>> =
@@ -132,6 +176,19 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
         sharedPreferences.edit { putInt(KEY_DAYS_TO_SHOW, days) }
     }
 
+    // New functions to manage categories and aliases
+    fun addCategoryAlias(category: String, alias: String) {
+        viewModelScope.launch {
+            dao.insertCategoryAlias(CategoryAlias(category = category, alias = alias))
+        }
+    }
+
+    fun deleteCategoryAlias(categoryAlias: CategoryAlias) {
+        viewModelScope.launch {
+            dao.deleteCategoryAlias(categoryAlias)
+        }
+    }
+
     fun addTestData() {
         viewModelScope.launch {
             dao.deleteAll()
@@ -183,19 +240,11 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
                 dao.update(updatedEntry)
                 _selectedEntry.value = null // Deselect after update
             } else {
-                val categoryKeywords = mapOf(
-                    "journal" to "journal",
-                    "todo" to "todo",
-                    "to-do" to "todo",
-                    "todoo" to "todo",
-                    "kaufen" to "kaufen",
-                    "baumarkt" to "baumarkt",
-                    "eloisa" to "eloisa",
-                    "luisa" to "eloisa"
-                )
+                // Use categoryKeywordsMap from StateFlow
+                val currentCategoryKeywords = categoryKeywordsMap.value
 
                 // Find a keyword that matches the start of the recognized text
-                val foundKeyword = categoryKeywords.keys.find { keyword ->
+                val foundKeyword = currentCategoryKeywords.keys.find { keyword ->
                     recognizedText.startsWith(keyword, ignoreCase = true) &&
                             (recognizedText.length == keyword.length || recognizedText.getOrNull(keyword.length)?.isWhitespace() == true)
                 }
@@ -207,7 +256,7 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
 
                 val (targetCategory, contentToAdd) = if (foundKeyword != null) {
                     // Keyword was found
-                    val category = categoryKeywords[foundKeyword]!!
+                    val category = currentCategoryKeywords[foundKeyword]!!
                     val content = recognizedText.substring(foundKeyword.length).trim()
                     _selectedCategory.value = category
                     category to content

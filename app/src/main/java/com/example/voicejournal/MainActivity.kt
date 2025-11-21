@@ -130,6 +130,7 @@ class MainActivity : ComponentActivity() {
                 val daysToShow by viewModel.daysToShow.collectAsState()
                 val filteredEntries by viewModel.filteredEntries.collectAsState()
                 val canUndo by viewModel.canUndo.collectAsState()
+                val categories by viewModel.categories.collectAsState() // Collect categories as State
 
                 var showSettings by remember { mutableStateOf(false) }
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -268,7 +269,7 @@ class MainActivity : ComponentActivity() {
                                 Greeting(
                                     modifier = Modifier.padding(innerPadding),
                                     groupedEntries = groupedEntries,
-                                    categories = viewModel.categories,
+                                    categories = categories, // Pass the collected state
                                     selectedCategory = category,
                                     onCategoryChange = viewModel::onCategoryChange,
                                     onDeleteEntry = viewModel::onDeleteEntry,

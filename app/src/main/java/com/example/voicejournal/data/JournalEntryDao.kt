@@ -29,4 +29,14 @@ interface JournalEntryDao {
 
     @Query("DELETE FROM journal_entries")
     suspend fun deleteAll()
+
+    // CategoryAlias DAO methods
+    @Insert
+    suspend fun insertCategoryAlias(categoryAlias: CategoryAlias)
+
+    @Delete
+    suspend fun deleteCategoryAlias(categoryAlias: CategoryAlias)
+
+    @Query("SELECT * FROM category_aliases")
+    fun getAllCategoryAliases(): Flow<List<CategoryAlias>>
 }

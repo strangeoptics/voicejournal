@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -91,6 +92,8 @@ import com.example.voicejournal.data.CategoryAlias
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import kotlinx.coroutines.launch
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -140,6 +143,25 @@ class MainActivity : ComponentActivity() {
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
 
+                val filePickerLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.OpenDocument(),
+                    onResult = { uri ->
+                        uri?.let {
+                            try {
+                                context.contentResolver.openInputStream(it)?.use { inputStream ->
+                                    BufferedReader(InputStreamReader(inputStream)).use { reader ->
+                                        val content = reader.readText()
+                                        viewModel.importJournalEntries(content)
+                                        Toast.makeText(context, "Import successful", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                )
+
                 val textToShow = filteredEntries.joinToString("\n") { entry ->
                     val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault())
                     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
@@ -188,6 +210,16 @@ class MainActivity : ComponentActivity() {
                                 onClick = {
                                     scope.launch { drawerState.close() }
                                     context.startActivity(Intent(context, CategoryManagerActivity::class.java))
+                                },
+                                modifier = Modifier.padding(12.dp)
+                            )
+                             NavigationDrawerItem(
+                                icon = { Icon(Icons.Filled.Download, contentDescription = "Import Journal") },
+                                label = { Text("Import Journal") },
+                                selected = false,
+                                onClick = {
+                                    scope.launch { drawerState.close() }
+                                    filePickerLauncher.launch(arrayOf("text/plain", "*/*"))
                                 },
                                 modifier = Modifier.padding(12.dp)
                             )
@@ -299,9 +331,18 @@ class MainActivity : ComponentActivity() {
                                         val intent = Intent(Intent.ACTION_VIEW, url.toUri())
                                         try {
                                             context.startActivity(intent)
-                                        } catch (_: Exception) { // Changed 'e: Exception' to '_: Exception'
-                                            // Log the exception for debugging purposes if needed.
-                                            // Log.e("MainActivity", "Could not open browser.", e)
+                                        } catch (_: Exception) { 
+                                            Toast.makeText(context, "Could not open browser.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    onPhotoIconClicked = { entry ->
+                                        val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault()).toLocalDate()
+                                        val formatter = DateTimeFormatter.ofPattern("d. MMMM yyyy", Locale.GERMAN)
+                                        val url = "https://photos.google.com/search/${date.format(formatter)}"
+                                        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+                                        try {
+                                            context.startActivity(intent)
+                                        } catch (_: Exception) {
                                             Toast.makeText(context, "Could not open browser.", Toast.LENGTH_SHORT).show()
                                         }
                                     }
@@ -546,7 +587,8 @@ fun Greeting(
     onEntrySelected: (JournalEntry) -> Unit = {},
     onEditEntry: (JournalEntry) -> Unit = {},
     onMoreClicked: () -> Unit = {},
-    onDateLongClicked: (LocalDate) -> Unit = {}
+    onDateLongClicked: (LocalDate) -> Unit = {},
+    onPhotoIconClicked: (JournalEntry) -> Unit = {}
 ) {
     Column(
         modifier = modifier.fillMaxSize(),
@@ -673,12 +715,16 @@ fun Greeting(
                                     modifier = Modifier.align(Alignment.TopEnd)
                                 )
                                 if (entry.hasImage) {
-                                    Icon(
-                                        imageVector = Icons.Default.PhotoCamera,
-                                        contentDescription = "Has Photo",
-                                        modifier = Modifier.align(Alignment.BottomEnd),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    IconButton(
+                                        onClick = { onPhotoIconClicked(entry) },
+                                        modifier = Modifier.align(Alignment.BottomEnd)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PhotoCamera,
+                                            contentDescription = "Open Photo",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
                         }

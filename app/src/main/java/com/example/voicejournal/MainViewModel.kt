@@ -201,24 +201,30 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
 
     fun importJournalEntries(content: String) {
         viewModelScope.launch {
-            val pattern = Pattern.compile("\\[(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})\\] (.*)")
-            content.lines().forEach { line ->
-                val matcher = pattern.matcher(line)
-                if (matcher.matches()) {
-                    val dateTimeString = matcher.group(1)
-                    val contentString = matcher.group(2)
-                    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                    val timestamp = LocalDateTime.parse(dateTimeString, formatter)
-                        .atZone(ZoneId.systemDefault())
-                        .toInstant()
-                        .toEpochMilli()
+            try {
+                val entries = Json.decodeFromString<List<JournalEntry>>(content)
+                entries.forEach { dao.insert(it) }
+            } catch (e: Exception) {
+                // Fallback to old format
+                val pattern = Pattern.compile("\\[(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})\\] (.*)")
+                content.lines().forEach { line ->
+                    val matcher = pattern.matcher(line)
+                    if (matcher.matches()) {
+                        val dateTimeString = matcher.group(1)
+                        val contentString = matcher.group(2)
+                        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                        val timestamp = LocalDateTime.parse(dateTimeString, formatter)
+                            .atZone(ZoneId.systemDefault())
+                            .toInstant()
+                            .toEpochMilli()
 
-                    val entry = JournalEntry(
-                        title = "journal",
-                        content = contentString,
-                        timestamp = timestamp
-                    )
-                    dao.insert(entry)
+                        val entry = JournalEntry(
+                            title = "journal",
+                            content = contentString,
+                            timestamp = timestamp
+                        )
+                        dao.insert(entry)
+                    }
                 }
             }
         }

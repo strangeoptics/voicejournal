@@ -242,7 +242,7 @@ class MainActivity : ComponentActivity() {
                                 selected = false,
                                 onClick = {
                                     scope.launch { drawerState.close() }
-                                    filePickerLauncher.launch(arrayOf("text/plain", "*/*"))
+                                    filePickerLauncher.launch(arrayOf("application/json", "*/*"))
                                 },
                                 modifier = Modifier.padding(12.dp)
                             )

@@ -9,7 +9,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -22,7 +21,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,25 +31,23 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -64,7 +60,6 @@ import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxDefaults
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -87,6 +82,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import com.example.voicejournal.data.AppDatabase
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.ui.theme.VoicejournalTheme
@@ -97,6 +93,11 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.rememberDrawerState
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 class MainActivity : ComponentActivity() {
@@ -131,6 +132,8 @@ class MainActivity : ComponentActivity() {
                 val canUndo by viewModel.canUndo.collectAsState()
 
                 var showSettings by remember { mutableStateOf(false) }
+                val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+                val scope = rememberCoroutineScope()
 
                 val textToShow = filteredEntries.joinToString("\n") { entry ->
                     val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault())
@@ -158,128 +161,140 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 )
-                val scope = rememberCoroutineScope()
 
-
-                if (showSettings) {
-                    SettingsScreen(
-                        currentDays = daysToShow,
-                        onSave = { newDays ->
-                            viewModel.saveDaysToShow(newDays)
-                            showSettings = false
-                        },
-                        onDismiss = { showSettings = false }
-                    )
-                } else {
-                    Scaffold(
-                        modifier = Modifier.fillMaxSize(),
-                        topBar = {
-                            var menuExpanded by remember { mutableStateOf(false) }
-                            TopAppBar(
-                                title = { Text("Voice Journal") },
-                                actions = {
-                                    if (canUndo) {
-                                        IconButton(onClick = viewModel::onUndoDelete) {
-                                            Icon(Icons.Filled.Undo, contentDescription = "Undo")
+                ModalNavigationDrawer(
+                    drawerState = drawerState,
+                    drawerContent = {
+                        ModalDrawerSheet {
+                            NavigationDrawerItem(
+                                icon = { Icon(Icons.Filled.Settings, contentDescription = "Einstellungen") },
+                                label = { Text("Settings") },
+                                selected = false,
+                                onClick = { 
+                                    scope.launch { drawerState.close() }
+                                    showSettings = true
+                                },
+                                modifier = Modifier.padding(12.dp)
+                            )
+                             NavigationDrawerItem(
+                                icon = { Icon(Icons.Filled.Notifications, contentDescription = "Benachrichtigung anzeigen") },
+                                label = { Text("Show Notification") },
+                                selected = false,
+                                onClick = {
+                                    scope.launch {
+                                        val allPermissionsGranted = notificationPermissions.all {
+                                            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+                                        }
+                                        if (allPermissionsGranted) {
+                                            showNotification(context)
+                                        } else {
+                                            notificationPermissionLauncher.launch(notificationPermissions)
                                         }
                                     }
-                                    IconButton(onClick = {
-                                        val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                                        val clip = ClipData.newPlainText("VoiceJournal", textToShow)
-                                        clipboardManager.setPrimaryClip(clip)
-                                        Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
-                                    }) {
-                                        Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopieren")
-                                    }
-                                    IconButton(onClick = { menuExpanded = true }) {
-                                        Icon(Icons.Filled.MoreVert, contentDescription = "More options")
-                                    }
-                                    DropdownMenu(
-                                        expanded = menuExpanded,
-                                        onDismissRequest = { menuExpanded = false }
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text("Settings") },
-                                            onClick = {
-                                                showSettings = true
-                                                menuExpanded = false
-                                            },
-                                            leadingIcon = { Icon(Icons.Filled.Settings, contentDescription = "Einstellungen") }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Show Notification") },
-                                            onClick = {
-                                                scope.launch {
-                                                    val allPermissionsGranted = notificationPermissions.all {
-                                                        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-                                                    }
-                                                    if (allPermissionsGranted) {
-                                                        showNotification(context)
-                                                    } else {
-                                                        notificationPermissionLauncher.launch(notificationPermissions)
-                                                    }
-                                                }
-                                                menuExpanded = false
-                                            },
-                                            leadingIcon = { Icon(Icons.Filled.Notifications, contentDescription = "Benachrichtigung anzeigen") }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Add Test Data") },
-                                            onClick = {
-                                                viewModel.addTestData()
-                                                menuExpanded = false
-                                            },
-                                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add test data") }
-                                        )
-                                    }
-                                }
+                                    scope.launch { drawerState.close() }
+                                },
+                                modifier = Modifier.padding(12.dp)
                             )
-                        },
-                        floatingActionButton = {
-                            FloatingActionButton(onClick = {
-                                when {
-                                    ContextCompat.checkSelfPermission(
-                                        context,
-                                        Manifest.permission.RECORD_AUDIO
-                                    ) == PackageManager.PERMISSION_GRANTED -> {
-                                        startListening()
+                            NavigationDrawerItem(
+                                icon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add test data") },
+                                label = { Text("Add Test Data") },
+                                selected = false,
+                                onClick = {
+                                    viewModel.addTestData()
+                                    scope.launch { drawerState.close() }
+                                },
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    },
+                    content = { 
+                        Scaffold(
+                            modifier = Modifier.fillMaxSize(),
+                            topBar = {
+                                TopAppBar(
+                                    title = { Text("Voice Journal") },
+                                    navigationIcon = {
+                                        IconButton(onClick = {
+                                            scope.launch { drawerState.open() }
+                                        }) {
+                                            Icon(Icons.Filled.MoreVert, contentDescription = "Navigation Menu")
+                                        }
+                                    },
+                                    actions = {
+                                        if (canUndo) {
+                                            IconButton(onClick = viewModel::onUndoDelete) {
+                                                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
+                                            }
+                                        }
+                                        IconButton(onClick = {
+                                            val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                                            val clip = ClipData.newPlainText("VoiceJournal", textToShow)
+                                            clipboardManager.setPrimaryClip(clip)
+                                            Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
+                                        }) {
+                                            Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopieren")
+                                        }
                                     }
-                                    else -> {
-                                        recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                )
+                            },
+                            floatingActionButton = {
+                                FloatingActionButton(onClick = {
+                                    when {
+                                        ContextCompat.checkSelfPermission(
+                                            context,
+                                            Manifest.permission.RECORD_AUDIO
+                                        ) == PackageManager.PERMISSION_GRANTED -> {
+                                            startListening()
+                                        }
+                                        else -> {
+                                            recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                        }
                                     }
+                                }) {
+                                    Icon(Icons.Filled.Add, contentDescription = "Sprechen")
                                 }
-                            }) {
-                                Icon(Icons.Filled.Add, contentDescription = "Sprechen")
+                            }
+                        ) { innerPadding ->
+                            if (showSettings) {
+                                SettingsScreen(
+                                    currentDays = daysToShow,
+                                    onSave = {
+                                        viewModel.saveDaysToShow(it)
+                                        showSettings = false
+                                    },
+                                    onDismiss = { showSettings = false }
+                                )
+                            } else {
+                                Greeting(
+                                    modifier = Modifier.padding(innerPadding),
+                                    groupedEntries = groupedEntries,
+                                    categories = viewModel.categories,
+                                    selectedCategory = category,
+                                    onCategoryChange = viewModel::onCategoryChange,
+                                    onDeleteEntry = viewModel::onDeleteEntry,
+                                    selectedEntry = selectedEntry,
+                                    selectedDate = selectedDate,
+                                    onDateSelected = viewModel::onDateSelected,
+                                    onEntrySelected = viewModel::onEntrySelected,
+                                    onEditEntry = viewModel::onEditEntry,
+                                    onMoreClicked = viewModel::onMoreClicked,
+                                    onDateLongClicked = { date ->
+                                        val formatter = DateTimeFormatter.ofPattern("d. MMMM yyyy", Locale.GERMAN)
+                                        val url = "https://photos.google.com/search/${date.format(formatter)}"
+                                        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+                                        try {
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            // Log the exception for debugging purposes if needed.
+                                            // Log.e("MainActivity", "Could not open browser.", e)
+                                            Toast.makeText(context, "Could not open browser.", Toast.LENGTH_SHORT).show() 
+                                        }
+                                    }
+                                )
                             }
                         }
-                    ) { innerPadding ->
-                        Greeting(
-                            modifier = Modifier.padding(innerPadding),
-                            groupedEntries = groupedEntries,
-                            categories = viewModel.categories,
-                            selectedCategory = category,
-                            onCategoryChange = viewModel::onCategoryChange,
-                            onDeleteEntry = viewModel::onDeleteEntry,
-                            selectedEntry = selectedEntry,
-                            selectedDate = selectedDate,
-                            onDateSelected = viewModel::onDateSelected,
-                            onEntrySelected = viewModel::onEntrySelected,
-                            onEditEntry = viewModel::onEditEntry,
-                            onMoreClicked = viewModel::onMoreClicked,
-                            onDateLongClicked = { date ->
-                                val formatter = DateTimeFormatter.ofPattern("d. MMMM yyyy", Locale.GERMAN)
-                                val formattedDate = date.format(formatter)
-                                val url = "https://photos.google.com/search/$formattedDate"
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                try {
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Could not open browser.", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        )
                     }
-                }
+                )
 
                 editingEntry?.let { entry ->
                     EditEntryDialog(
@@ -308,7 +323,6 @@ class MainActivity : ComponentActivity() {
                 // Handle error
             }
 
-            // Other listener methods...
             override fun onReadyForSpeech(params: Bundle?) {}
             override fun onBeginningOfSpeech() {}
             override fun onRmsChanged(rmsdB: Float) {}

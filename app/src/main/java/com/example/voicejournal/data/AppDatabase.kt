@@ -4,14 +4,35 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [JournalEntry::class, CategoryAlias::class], version = 2, exportSchema = false)
+@Database(entities = [JournalEntry::class, CategoryAlias::class], version = 4, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun journalEntryDao(): JournalEntryDao
 
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE journal_entries ADD COLUMN imageUri TEXT")
+            }
+        }
+        
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Create new table with the new schema
+                database.execSQL("CREATE TABLE `journal_entries_new` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `content` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `hasImage` INTEGER NOT NULL DEFAULT 0)")
+                // Copy the data from the old table to the new table, converting imageUri to hasImage boolean
+                database.execSQL("INSERT INTO journal_entries_new (id, title, content, timestamp, hasImage) SELECT id, title, content, timestamp, CASE WHEN imageUri IS NOT NULL AND imageUri != '' THEN 1 ELSE 0 END FROM journal_entries")
+                // Remove the old table
+                database.execSQL("DROP TABLE `journal_entries`")
+                // Rename the new table to the original table name
+                database.execSQL("ALTER TABLE `journal_entries_new` RENAME TO `journal_entries`")
+            }
+        }
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -20,7 +41,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "journal_database"
                 )
-                    .fallbackToDestructiveMigration() // This will clear the database on version upgrade
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance

@@ -9,5 +9,6 @@ data class JournalEntry(
     val id: Int = 0,
     val title: String,
     val content: String,
-    val timestamp: Long
+    val timestamp: Long,
+    val hasImage: Boolean = false
 )

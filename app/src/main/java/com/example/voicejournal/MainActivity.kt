@@ -43,12 +43,14 @@ import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -313,7 +315,9 @@ class MainActivity : ComponentActivity() {
                     EditEntryDialog(
                         entry = entry,
                         onDismiss = viewModel::onDismissEditEntry,
-                        onSave = viewModel::onSaveEntry
+                        onSave = { content, timestamp, hasImage ->
+                            viewModel.onSaveEntry(content, timestamp, hasImage)
+                        }
                     )
                 }
             }
@@ -447,9 +451,10 @@ fun SettingsScreen(
 fun EditEntryDialog(
     entry: JournalEntry,
     onDismiss: () -> Unit,
-    onSave: (String, Long) -> Unit
+    onSave: (String, Long, Boolean) -> Unit
 ) {
     var text by remember { mutableStateOf(entry.content) }
+    var hasImage by remember { mutableStateOf(entry.hasImage) }
     val context = LocalContext.current
     var currentDateTime by remember {
         mutableStateOf(
@@ -500,12 +505,19 @@ fun EditEntryDialog(
                         Text("Change Time")
                     }
                 }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = hasImage,
+                        onCheckedChange = { hasImage = it }
+                    )
+                    Text("Has Image")
+                }
             }
         },
         confirmButton = {
             TextButton(onClick = {
                 val newTimestamp = currentDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                onSave(text, newTimestamp)
+                onSave(text, newTimestamp, hasImage)
             }) {
                 Text("Save")
             }
@@ -653,13 +665,21 @@ fun Greeting(
                                 val formatter = DateTimeFormatter.ofPattern("HH:mm")
                                 Text(
                                     text = entry.content,
-                                    modifier = Modifier.align(Alignment.TopStart).padding(top = 4.dp)
+                                    modifier = Modifier.align(Alignment.TopStart).padding(top = 4.dp, end = 48.dp)
                                 )
                                 Text(
                                     text = date.format(formatter),
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.align(Alignment.TopEnd)
                                 )
+                                if (entry.hasImage) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoCamera,
+                                        contentDescription = "Has Photo",
+                                        modifier = Modifier.align(Alignment.BottomEnd),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
@@ -718,7 +738,8 @@ fun GreetingPreview() {
                     id = 2,
                     title = "todo",
                     content = "This is a todo preview.",
-                    timestamp = System.currentTimeMillis()
+                    timestamp = System.currentTimeMillis(),
+                    hasImage = true
                 )
             )
         }

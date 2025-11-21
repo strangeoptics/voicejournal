@@ -138,10 +138,10 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
         _editingEntry.value = null
     }
 
-    fun onSaveEntry(updatedContent: String, updatedTimestamp: Long) {
+    fun onSaveEntry(updatedContent: String, updatedTimestamp: Long, hasImage: Boolean) {
         viewModelScope.launch {
             _editingEntry.value?.let {
-                dao.update(it.copy(content = updatedContent, timestamp = updatedTimestamp))
+                dao.update(it.copy(content = updatedContent, timestamp = updatedTimestamp, hasImage = hasImage))
                 _editingEntry.value = null
             }
         }
@@ -211,7 +211,7 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
             val testEntries = listOf(
                 JournalEntry(title = "journal", content = "Habe beim Ausschalten versehentlich den dritten Wecker diesen Monat zerdrückt; mein Rücken erinnert mich schmerzhaft an den gestrigen Kampf.", timestamp = timestampFromString("${today}T06:15:00")),
                 JournalEntry(title = "journal", content = "Nach drei Tassen schwarzem Kaffee ignoriere ich die Online-Kritik an meinem Kostüm und starte vom Balkon in die kalte Morgenluft.", timestamp = timestampFromString("${today}T07:00:00")),
-                JournalEntry(title = "journal", content = "Die Verfolgungsjagd auf der Autobahn war erfolgreich, aber meine Landung auf der Motorhaube des Fluchtwagens wird wieder Probleme mit der Versicherung geben.", timestamp = timestampFromString("${today}T09:30:00")),
+                JournalEntry(title = "journal", content = "Die Verfolgungsjagd auf der Autobahn war erfolgreich, aber meine Landung auf der Motorhaube des Fluchtwagens wird wieder Probleme mit der Versicherung geben.", timestamp = timestampFromString("${today}T09:30:00"), hasImage = true),
 
                 JournalEntry(title = "journal", content = "Während im Fernsehen Berichte über meine Heldentaten laufen, sitze ich in Jogginghose da, esse Nudeln mit Ketchup und nähe den Riss in meinem Kostüm.", timestamp = timestampFromString("${today}T21:00:00")),
 
@@ -219,7 +219,7 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
                 JournalEntry(title = "kaufen", content = "Milk, eggs, bread.", timestamp = timestampFromString("${today}T14:00:00")),
                 JournalEntry(title = "baumarkt", content = "A great new app idea from today.", timestamp = timestampFromString("${today}T16:00:00")),
 
-                JournalEntry(title = "journal", content = "Mittagspause mit zwei Dönern auf einem Wasserspeier über der Stadt; habe dabei leider Knoblauchsoße auf meinen Umhang getropft.", timestamp = timestampFromString("${yesterday}T12:30:00")),
+                JournalEntry(title = "journal", content = "Mittagspause mit zwei Dönern auf einem Wasserspeier über der Stadt; habe dabei leider Knoblauchsoße auf meinen Umhang getropft.", timestamp = timestampFromString("${yesterday}T12:30:00"), hasImage = true),
                 JournalEntry(title = "journal", content = "Ein kleinerer Schurke wollte die U-Bahn sabotieren, aber sein Monolog über den \"Masterplan\" dauerte länger als der eigentliche Kampf.", timestamp = timestampFromString("${yesterday}T10:00:00")),
                 JournalEntry(title = "todo", content = "Todo item from yesterday.", timestamp = timestampFromString("${yesterday}T15:00:00")),
                 JournalEntry(title = "kaufen", content = "Apples, bananas.", timestamp = timestampFromString("${yesterday}T17:00:00")),

@@ -136,9 +136,10 @@ class MainViewModel(private val repository: JournalRepository, private val share
     }
 
     fun onSaveEntry(updatedContent: String, updatedTimestamp: Long, hasImage: Boolean) {
+        val sanitizedContent = updatedContent.replace("luisa", "Eloisa", ignoreCase = true)
         viewModelScope.launch {
             _editingEntry.value?.let {
-                repository.update(it.copy(content = updatedContent, timestamp = updatedTimestamp, hasImage = hasImage))
+                repository.update(it.copy(content = sanitizedContent, timestamp = updatedTimestamp, hasImage = hasImage))
                 _editingEntry.value = null
             }
         }
@@ -242,8 +243,9 @@ class MainViewModel(private val repository: JournalRepository, private val share
         viewModelScope.launch {
             val entryToUpdate = _selectedEntry.value
             if (entryToUpdate != null) {
+                val sanitizedText = recognizedText.replace("luisa", "Eloisa", ignoreCase = true)
                 val updatedEntry = entryToUpdate.copy(
-                    content = entryToUpdate.content + "\n" + recognizedText
+                    content = entryToUpdate.content + "\n" + sanitizedText
                 )
                 repository.update(updatedEntry)
                 _selectedEntry.value = null // Deselect after update
@@ -268,9 +270,10 @@ class MainViewModel(private val repository: JournalRepository, private val share
                 }
 
                 if (contentToAdd.isNotEmpty()) {
+                    val sanitizedContent = contentToAdd.replace("luisa", "Eloisa", ignoreCase = true)
                     val entry = JournalEntry(
                         title = targetCategory,
-                        content = contentToAdd,
+                        content = sanitizedContent,
                         timestamp = timestamp
                     )
                     repository.insert(entry)

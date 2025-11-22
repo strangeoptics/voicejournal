@@ -1,0 +1,83 @@
+package com.example.voicejournal.data
+
+import android.content.Context
+import android.net.Uri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.io.BufferedReader
+import java.io.FileOutputStream
+import java.io.InputStreamReader
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.regex.Pattern
+
+class JournalRepository(private val dao: JournalEntryDao, private val context: Context) {
+
+    val allCategoryAliases = dao.getAllCategoryAliases()
+
+    suspend fun importJournal(uri: Uri) = withContext(Dispatchers.IO) {
+        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            BufferedReader(InputStreamReader(inputStream)).use { reader ->
+                val content = reader.readText()
+                try {
+                    val entries = Json.decodeFromString<List<JournalEntry>>(content)
+                    entries.forEach { dao.insert(it) }
+                } catch (e: Exception) {
+                    parseLegacyFormat(content)
+                }
+            }
+        }
+    }
+
+    private suspend fun parseLegacyFormat(content: String) {
+        val pattern = Pattern.compile("\\[(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})\\] (.*)")
+        content.lines().forEach { line ->
+            val matcher = pattern.matcher(line)
+            if (matcher.matches()) {
+                val dateTimeString = matcher.group(1)
+                val contentString = matcher.group(2)
+                val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                val timestamp = LocalDateTime.parse(dateTimeString, formatter)
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
+
+                val entry = JournalEntry(
+                    title = "journal",
+                    content = contentString,
+                    timestamp = timestamp
+                )
+                dao.insert(entry)
+            }
+        }
+    }
+
+    suspend fun exportJournal(uri: Uri) = withContext(Dispatchers.IO) {
+        val entries = dao.getAllEntries()
+        val jsonString = Json.encodeToString(entries)
+        context.contentResolver.openFileDescriptor(uri, "w")?.use {
+            FileOutputStream(it.fileDescriptor).use { fos ->
+                fos.write(jsonString.toByteArray())
+            }
+        }
+    }
+
+    fun getEntriesSince(timestamp: Long) = dao.getEntriesSince(timestamp)
+    
+    suspend fun insertCategoryAlias(categoryAlias: CategoryAlias) = dao.insertCategoryAlias(categoryAlias)
+    
+    suspend fun insert(entry: JournalEntry) = dao.insert(entry)
+    
+    suspend fun update(entry: JournalEntry) = dao.update(entry)
+    
+    suspend fun delete(entry: JournalEntry) = dao.delete(entry)
+    
+    suspend fun updateAliasesForCategory(category: String, aliases: List<String>) = dao.updateAliasesForCategory(category, aliases)
+    
+    suspend fun deleteCategory(category: String) = dao.deleteCategory(category)
+    
+    suspend fun deleteAll() = dao.deleteAll()
+}

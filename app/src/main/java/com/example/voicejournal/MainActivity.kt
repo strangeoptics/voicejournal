@@ -21,9 +21,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -46,6 +46,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.example.voicejournal.data.AppDatabase
+import com.example.voicejournal.data.JournalRepository
 import com.example.voicejournal.ui.components.AppDrawer
 import com.example.voicejournal.ui.screens.HomeScreen
 import com.example.voicejournal.ui.dialogs.SettingsScreen
@@ -53,9 +54,6 @@ import com.example.voicejournal.ui.dialogs.EditEntryDialog
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.SpeechRecognitionManager
 import kotlinx.coroutines.launch
-import java.io.BufferedReader
-import java.io.FileOutputStream
-import java.io.InputStreamReader
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -74,7 +72,8 @@ class MainActivity : ComponentActivity() {
     private val db by lazy { AppDatabase.getDatabase(this) }
 
     private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory(db.journalEntryDao(), getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE))
+        val repository = JournalRepository(db.journalEntryDao(), applicationContext)
+        MainViewModelFactory(repository, getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE))
     }
 
 
@@ -107,16 +106,13 @@ class MainActivity : ComponentActivity() {
                     contract = ActivityResultContracts.OpenDocument(),
                     onResult = { uri ->
                         uri?.let {
-                            try {
-                                context.contentResolver.openInputStream(it)?.use { inputStream ->
-                                    BufferedReader(InputStreamReader(inputStream)).use { reader ->
-                                        val content = reader.readText()
-                                        viewModel.importJournalEntries(content)
-                                        Toast.makeText(context, "Import successful", Toast.LENGTH_SHORT).show()
-                                    }
+                            scope.launch {
+                                try {
+                                    viewModel.importJournal(it)
+                                    Toast.makeText(context, "Import successful", Toast.LENGTH_SHORT).show()
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
                                 }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
                             }
                         }
                     }
@@ -128,12 +124,7 @@ class MainActivity : ComponentActivity() {
                         uri?.let {
                             scope.launch {
                                 try {
-                                    val jsonString = viewModel.exportJournalToJson()
-                                    context.contentResolver.openFileDescriptor(uri, "w")?.use {
-                                        FileOutputStream(it.fileDescriptor).use { fos ->
-                                            fos.write(jsonString.toByteArray())
-                                        }
-                                    }
+                                    viewModel.exportJournal(it)
                                     Toast.makeText(context, "Export successful", Toast.LENGTH_SHORT).show()
                                 } catch (e: Exception) {
                                     Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()

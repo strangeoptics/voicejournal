@@ -46,13 +46,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.voicejournal.data.AppDatabase
 import com.example.voicejournal.data.CategoryAlias
+import com.example.voicejournal.data.JournalRepository
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 
 class CategoryManagerActivity : ComponentActivity() {
 
     private val db by lazy { AppDatabase.getDatabase(this) }
     private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory(db.journalEntryDao(), getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE))
+        val repository = JournalRepository(db.journalEntryDao(), applicationContext)
+        MainViewModelFactory(repository, getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE))
     }
 
     @OptIn(ExperimentalMaterial3Api::class)

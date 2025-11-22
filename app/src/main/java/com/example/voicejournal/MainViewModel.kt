@@ -1,13 +1,14 @@
 package com.example.voicejournal
 
 import android.content.SharedPreferences
+import android.net.Uri
 import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.voicejournal.data.CategoryAlias
 import com.example.voicejournal.data.JournalEntry
-import com.example.voicejournal.data.JournalEntryDao
+import com.example.voicejournal.data.JournalRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,8 +18,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -26,9 +25,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Locale
-import java.util.regex.Pattern
 
-class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferences: SharedPreferences) : ViewModel() {
+class MainViewModel(private val repository: JournalRepository, private val sharedPreferences: SharedPreferences) : ViewModel() {
 
     companion object {
         const val PREFS_NAME = "voice_journal_prefs"
@@ -36,9 +34,7 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
         const val KEY_DEFAULT_CATEGORIES_ADDED = "default_categories_added"
     }
 
-    // Removed hardcoded categories
-
-    private val _selectedCategory = MutableStateFlow("") // Initialize with empty string, will be set after categories are loaded
+    private val _selectedCategory = MutableStateFlow("")
     val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
 
     private val _selectedEntry = MutableStateFlow<JournalEntry?>(null)
@@ -56,8 +52,7 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
     private val _recentlyDeleted = MutableStateFlow<List<JournalEntry>>(emptyList())
     val canUndo: StateFlow<Boolean> = combine(_recentlyDeleted) { it.isNotEmpty() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-    // New StateFlows for categories and aliases from Room
-    val categoryAliases: StateFlow<List<CategoryAlias>> = dao.getAllCategoryAliases()
+    val categoryAliases: StateFlow<List<CategoryAlias>> = repository.allCategoryAliases
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val categories: StateFlow<List<String>> = categoryAliases.map { aliases ->
@@ -75,7 +70,6 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
                 addDefaultCategories()
                 sharedPreferences.edit { putBoolean(KEY_DEFAULT_CATEGORIES_ADDED, true) }
             }
-            // Set the selected category to the first one available after loading
             categories.collect {
                 if (it.isNotEmpty() && _selectedCategory.value.isEmpty()) {
                     _selectedCategory.value = it.first()
@@ -97,7 +91,7 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
             CategoryAlias(category = "eloisa", alias = "eloisa"),
             CategoryAlias(category = "eloisa", alias = "luisa")
         )
-        defaultCategories.forEach { dao.insertCategoryAlias(it) }
+        defaultCategories.forEach { repository.insertCategoryAlias(it) }
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -106,7 +100,7 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
             val daysAgoMillis = Calendar.getInstance().apply {
                 add(Calendar.DAY_OF_YEAR, -days)
             }.timeInMillis
-            dao.getEntriesSince(daysAgoMillis)
+            repository.getEntriesSince(daysAgoMillis)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
 
@@ -144,7 +138,7 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
     fun onSaveEntry(updatedContent: String, updatedTimestamp: Long, hasImage: Boolean) {
         viewModelScope.launch {
             _editingEntry.value?.let {
-                dao.update(it.copy(content = updatedContent, timestamp = updatedTimestamp, hasImage = hasImage))
+                repository.update(it.copy(content = updatedContent, timestamp = updatedTimestamp, hasImage = hasImage))
                 _editingEntry.value = null
             }
         }
@@ -158,7 +152,7 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
                 currentDeleted.removeAt(0)
             }
             _recentlyDeleted.value = currentDeleted
-            dao.delete(entry)
+            repository.delete(entry)
         }
     }
 
@@ -166,7 +160,7 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
         viewModelScope.launch {
             val lastDeleted = _recentlyDeleted.value.lastOrNull()
             if (lastDeleted != null) {
-                dao.insert(lastDeleted)
+                repository.insert(lastDeleted)
                 _recentlyDeleted.value = _recentlyDeleted.value.dropLast(1)
             }
         }
@@ -184,56 +178,28 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
     fun updateAliasesForCategory(category: String, aliasesString: String) {
         viewModelScope.launch {
             val newAliases = aliasesString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-            dao.updateAliasesForCategory(category, newAliases)
+            repository.updateAliasesForCategory(category, newAliases)
         }
     }
 
     fun deleteCategory(category: String) {
         viewModelScope.launch {
-            dao.deleteCategory(category)
+            repository.deleteCategory(category)
         }
     }
 
-    suspend fun exportJournalToJson(): String {
-        val entries = dao.getAllEntries()
-        return Json.encodeToString(entries)
+    suspend fun exportJournal(uri: Uri) {
+        repository.exportJournal(uri)
     }
 
-    fun importJournalEntries(content: String) {
-        viewModelScope.launch {
-            try {
-                val entries = Json.decodeFromString<List<JournalEntry>>(content)
-                entries.forEach { dao.insert(it) }
-            } catch (e: Exception) {
-                // Fallback to old format
-                val pattern = Pattern.compile("\\[(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})\\] (.*)")
-                content.lines().forEach { line ->
-                    val matcher = pattern.matcher(line)
-                    if (matcher.matches()) {
-                        val dateTimeString = matcher.group(1)
-                        val contentString = matcher.group(2)
-                        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                        val timestamp = LocalDateTime.parse(dateTimeString, formatter)
-                            .atZone(ZoneId.systemDefault())
-                            .toInstant()
-                            .toEpochMilli()
-
-                        val entry = JournalEntry(
-                            title = "journal",
-                            content = contentString,
-                            timestamp = timestamp
-                        )
-                        dao.insert(entry)
-                    }
-                }
-            }
-        }
+    suspend fun importJournal(uri: Uri) {
+        repository.importJournal(uri)
     }
 
 
     fun addTestData() {
         viewModelScope.launch {
-            dao.deleteAll()
+            repository.deleteAll()
 
             fun timestampFromString(dateTimeString: String): Long {
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
@@ -269,7 +235,7 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
 
                 JournalEntry(title = "eloisa", content = "Another app idea from two days ago.", timestamp = timestampFromString("${twoDaysAgo}T20:00:00"))
             )
-            testEntries.forEach { dao.insert(it) }
+            testEntries.forEach { repository.insert(it) }
         }
     }
     fun processRecognizedText(recognizedText: String) {
@@ -279,13 +245,10 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
                 val updatedEntry = entryToUpdate.copy(
                     content = entryToUpdate.content + "\n" + recognizedText
                 )
-                dao.update(updatedEntry)
+                repository.update(updatedEntry)
                 _selectedEntry.value = null // Deselect after update
             } else {
-                // Use categoryKeywordsMap from StateFlow
                 val currentCategoryKeywords = categoryKeywordsMap.value
-
-                // Find a keyword that matches the start of the recognized text
                 val foundKeyword = currentCategoryKeywords.keys.find { keyword ->
                     recognizedText.startsWith(keyword, ignoreCase = true) &&
                             (recognizedText.length == keyword.length || recognizedText.getOrNull(keyword.length)?.isWhitespace() == true)
@@ -295,15 +258,12 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
                     ?: System.currentTimeMillis()
                 _selectedDate.value = null
 
-
                 val (targetCategory, contentToAdd) = if (foundKeyword != null) {
-                    // Keyword was found
                     val category = currentCategoryKeywords[foundKeyword]!!
                     val content = recognizedText.substring(foundKeyword.length).trim()
                     _selectedCategory.value = category
                     category to content
                 } else {
-                    // No keyword found, add the entire text to the currently selected category
                     _selectedCategory.value to recognizedText
                 }
 
@@ -313,18 +273,18 @@ class MainViewModel(private val dao: JournalEntryDao, private val sharedPreferen
                         content = contentToAdd,
                         timestamp = timestamp
                     )
-                    dao.insert(entry)
+                    repository.insert(entry)
                 }
             }
         }
     }
 }
 
-class MainViewModelFactory(private val dao: JournalEntryDao,  private val sharedPreferences: SharedPreferences) : ViewModelProvider.Factory {
+class MainViewModelFactory(private val repository: JournalRepository,  private val sharedPreferences: SharedPreferences) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return MainViewModel(dao, sharedPreferences) as T
+            return MainViewModel(repository, sharedPreferences) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

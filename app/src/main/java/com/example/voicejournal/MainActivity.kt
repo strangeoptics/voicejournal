@@ -10,9 +10,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -54,6 +51,7 @@ import com.example.voicejournal.ui.screens.HomeScreen
 import com.example.voicejournal.ui.dialogs.SettingsScreen
 import com.example.voicejournal.ui.dialogs.EditEntryDialog
 import com.example.voicejournal.ui.theme.VoicejournalTheme
+import com.example.voicejournal.util.SpeechRecognitionManager
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.FileOutputStream
@@ -72,7 +70,7 @@ class MainActivity : ComponentActivity() {
         const val NOTIFICATION_ACTION = "com.example.voicejournal.NOTIFICATION_ACTION"
     }
 
-    private lateinit var speechRecognizer: SpeechRecognizer
+    private lateinit var speechRecognitionManager: SpeechRecognitionManager
     private val db by lazy { AppDatabase.getDatabase(this) }
 
     private val viewModel: MainViewModel by viewModels {
@@ -83,7 +81,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
-        setupSpeechRecognizer()
+        
+        speechRecognitionManager = SpeechRecognitionManager(this, { recognizedText ->
+            viewModel.processRecognizedText(recognizedText)
+        })
 
         setContent {
             VoicejournalTheme {
@@ -322,41 +323,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun setupSpeechRecognizer() {
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
-        speechRecognizer.setRecognitionListener(object : RecognitionListener {
-            override fun onResults(results: Bundle?) {
-                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                if (matches.isNullOrEmpty()) return
-
-                val recognizedText = matches[0].trim()
-                if (recognizedText.isEmpty()) return
-                viewModel.processRecognizedText(recognizedText)
-            }
-
-            override fun onError(error: Int) {
-                // Handle error
-            }
-
-            override fun onReadyForSpeech(params: Bundle?) {}
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() {}
-            override fun onPartialResults(partialResults: Bundle?) {}
-            override fun onEvent(eventType: Int, params: Bundle?) {}
-        })
-    }
-
     fun startListening() {
-        val speechRecognizerIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L)
-        }
-        speechRecognizer.startListening(speechRecognizerIntent)
+        speechRecognitionManager.startListening()
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        speechRecognitionManager.destroy()
+    }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

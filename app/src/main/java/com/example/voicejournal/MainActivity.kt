@@ -20,80 +20,43 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Upload
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberSwipeToDismissBoxState
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.example.voicejournal.data.AppDatabase
-import com.example.voicejournal.data.CategoryAlias
-import com.example.voicejournal.data.JournalEntry
+import com.example.voicejournal.ui.components.AppDrawer
+import com.example.voicejournal.ui.screens.HomeScreen
+import com.example.voicejournal.ui.dialogs.SettingsScreen
+import com.example.voicejournal.ui.dialogs.EditEntryDialog
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
+import java.io.FileOutputStream
 import java.io.InputStreamReader
 import java.time.Instant
 import java.time.LocalDate
@@ -101,12 +64,6 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.rememberDrawerState
-import java.io.FileOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 class MainActivity : ComponentActivity() {
@@ -215,79 +172,43 @@ class MainActivity : ComponentActivity() {
                 ModalNavigationDrawer(
                     drawerState = drawerState,
                     drawerContent = {
-                        ModalDrawerSheet {
-                            NavigationDrawerItem(
-                                icon = { Icon(Icons.Filled.Settings, contentDescription = "Einstellungen") },
-                                label = { Text("Settings") },
-                                selected = false,
-                                onClick = {
-                                    scope.launch { drawerState.close() }
-                                    showSettings = true
-                                },
-                                modifier = Modifier.padding(12.dp)
-                            )
-                            NavigationDrawerItem(
-                                icon = { Icon(Icons.Filled.Category, contentDescription = "Manage Categories") },
-                                label = { Text("Manage Categories") },
-                                selected = false,
-                                onClick = {
-                                    scope.launch { drawerState.close() }
-                                    context.startActivity(Intent(context, CategoryManagerActivity::class.java))
-                                },
-                                modifier = Modifier.padding(12.dp)
-                            )
-                             NavigationDrawerItem(
-                                icon = { Icon(Icons.Filled.Download, contentDescription = "Import Journal") },
-                                label = { Text("Import Journal") },
-                                selected = false,
-                                onClick = {
-                                    scope.launch { drawerState.close() }
-                                    filePickerLauncher.launch(arrayOf("application/json", "*/*"))
-                                },
-                                modifier = Modifier.padding(12.dp)
-                            )
-                             NavigationDrawerItem(
-                                icon = { Icon(Icons.Filled.Upload, contentDescription = "Export Journal") },
-                                label = { Text("Export Journal") },
-                                selected = false,
-                                onClick = {
-                                     scope.launch { drawerState.close() }
-                                     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-                                     val fileName = "journal_${LocalDate.now().format(formatter)}.jrn"
-                                     exportLauncher.launch(fileName)
-                                },
-                                modifier = Modifier.padding(12.dp)
-                            )
-                            NavigationDrawerItem(
-                                icon = { Icon(Icons.Filled.Notifications, contentDescription = "Benachrichtigung anzeigen") },
-                                label = { Text("Show Notification") },
-                                selected = false,
-                                onClick = {
-                                    scope.launch {
-                                        val allPermissionsGranted = notificationPermissions.all {
-                                            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
-                                        }
-                                        if (allPermissionsGranted) {
-                                            showNotification(context)
-                                        } else {
-                                            notificationPermissionLauncher.launch(notificationPermissions)
-                                        }
+                        AppDrawer(
+                            onSettingsClicked = {
+                                scope.launch { drawerState.close() }
+                                showSettings = true
+                            },
+                            onManageCategoriesClicked = {
+                                scope.launch { drawerState.close() }
+                                context.startActivity(Intent(context, CategoryManagerActivity::class.java))
+                            },
+                            onImportJournalClicked = {
+                                scope.launch { drawerState.close() }
+                                filePickerLauncher.launch(arrayOf("text/plain", "*/*"))
+                            },
+                            onExportJournalClicked = {
+                                scope.launch { drawerState.close() }
+                                val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+                                val fileName = "journal_${LocalDate.now().format(formatter)}.jrn"
+                                exportLauncher.launch(fileName)
+                            },
+                            onShowNotificationClicked = {
+                                scope.launch {
+                                    val allPermissionsGranted = notificationPermissions.all {
+                                        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
                                     }
-                                    scope.launch { drawerState.close() }
-                                },
-                                modifier = Modifier.padding(12.dp)
-                            )
-                            NavigationDrawerItem(
-                                icon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add test data") },
-                                label = { Text("Add Test Data") },
-                                selected = false,
-                                onClick = {
-                                    viewModel.addTestData()
-                                    scope.launch { drawerState.close() }
-                                },
-                                modifier = Modifier.padding(12.dp)
-                            )
-                        }
+                                    if (allPermissionsGranted) {
+                                        showNotification(context)
+                                    } else {
+                                        notificationPermissionLauncher.launch(notificationPermissions)
+                                    }
+                                }
+                                scope.launch { drawerState.close() }
+                            },
+                            onAddTestDataClicked = {
+                                viewModel.addTestData()
+                                scope.launch { drawerState.close() }
+                            }
+                        )
                     },
                     content = {
                         Scaffold(
@@ -347,8 +268,9 @@ class MainActivity : ComponentActivity() {
                                     onDismiss = { showSettings = false }
                                 )
                             } else {
-                                Greeting(
-                                    modifier = Modifier.padding(innerPadding),
+                                HomeScreen(
+                                    modifier = Modifier.
+                                    padding(innerPadding),
                                     groupedEntries = groupedEntries,
                                     categories = categories, // Pass the collected state
                                     selectedCategory = category,
@@ -486,361 +408,5 @@ class MainActivity : ComponentActivity() {
             .build()
 
         notificationManager.notify(notificationId, notification)
-    }
-}
-
-@Composable
-fun SettingsScreen(
-    currentDays: Int,
-    onSave: (Int) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var days by remember { mutableStateOf(currentDays.toString()) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Einstellungen") },
-        text = {
-            Column {
-                Text("Wie viele Tage sollen angezeigt werden?")
-                TextField(
-                    value = days,
-                    onValueChange = { days = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-            }
-        },
-        confirmButton = {
-            Button(onClick = { onSave(days.toIntOrNull() ?: currentDays) }) {
-                Text("Speichern")
-            }
-        },
-        dismissButton = {
-            Button(onClick = onDismiss) {
-                Text("Abbrechen")
-            }
-        }
-    )
-}
-
-@Composable
-fun EditEntryDialog(
-    entry: JournalEntry,
-    onDismiss: () -> Unit,
-    onSave: (String, Long, Boolean) -> Unit
-) {
-    var text by remember { mutableStateOf(entry.content) }
-    var hasImage by remember { mutableStateOf(entry.hasImage) }
-    val context = LocalContext.current
-    var currentDateTime by remember {
-        mutableStateOf(
-            LocalDateTime.ofInstant(
-                Instant.ofEpochMilli(entry.timestamp),
-                ZoneId.systemDefault()
-            )
-        )
-    }
-
-    val timePickerDialog = android.app.TimePickerDialog(
-        context,
-        { _, hourOfDay, minute ->
-            currentDateTime = currentDateTime.withHour(hourOfDay).withMinute(minute)
-        },
-        currentDateTime.hour,
-        currentDateTime.minute,
-        true
-    )
-
-    val datePickerDialog = android.app.DatePickerDialog(
-        context,
-        { _, year, month, dayOfMonth ->
-            currentDateTime = currentDateTime.withYear(year).withMonth(month + 1).withDayOfMonth(dayOfMonth)
-        },
-        currentDateTime.year,
-        currentDateTime.monthValue - 1,
-        currentDateTime.dayOfMonth
-    )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Edit Entry") },
-        text = {
-            Column {
-                TextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "Current: ${currentDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))}")
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    Button(onClick = { datePickerDialog.show() }) {
-                        Text("Change Date")
-                    }
-                    Button(onClick = { timePickerDialog.show() }) {
-                        Text("Change Time")
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = hasImage,
-                        onCheckedChange = { hasImage = it }
-                    )
-                    Text("Has Image")
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val newTimestamp = currentDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                onSave(text, newTimestamp, hasImage)
-            }) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
-@Composable
-fun Greeting(
-    modifier: Modifier = Modifier,
-    groupedEntries: Map<LocalDate, List<JournalEntry>> = emptyMap(),
-    categories: List<String> = emptyList(),
-    selectedCategory: String = "",
-    onCategoryChange: (String) -> Unit = {},
-    onDeleteEntry: (JournalEntry) -> Unit = {},
-    selectedEntry: JournalEntry? = null,
-    selectedDate: LocalDate? = null,
-    onDateSelected: (LocalDate) -> Unit = {},
-    onEntrySelected: (JournalEntry) -> Unit = {},
-    onEditEntry: (JournalEntry) -> Unit = {},
-    onMoreClicked: () -> Unit = {},
-    onDateLongClicked: (LocalDate) -> Unit = {},
-    onPhotoIconClicked: (JournalEntry) -> Unit = {}
-) {
-    Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        var expanded by remember { mutableStateOf(false) }
-
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = !expanded },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            TextField(
-                modifier = Modifier
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                    .fillMaxWidth(),
-                value = selectedCategory,
-                onValueChange = {},
-                readOnly = true,
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
-            )
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-            ) {
-                categories.forEach { selectionOption ->
-                    DropdownMenuItem(
-                        text = { Text(selectionOption) },
-                        onClick = {
-                            onCategoryChange(selectionOption)
-                            expanded = false
-                        }
-                    )
-                }
-            }
-        }
-
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            groupedEntries.forEach { (date, entries) ->
-                stickyHeader {
-                    val isDateSelected = selectedDate == date
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .combinedClickable(
-                                onClick = { onDateSelected(date) },
-                                onLongClick = { onDateLongClicked(date) }
-                            ),
-                        color = if (isDateSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                    ) {
-                        Text(
-                            text = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd, EE", Locale.GERMAN)),
-                            modifier = Modifier.padding(8.dp)
-                        )
-                    }
-                }
-
-                items(entries, key = { it.id }) { entry ->
-                    val isSelected = selectedEntry == entry
-                    val dismissState = rememberSwipeToDismissBoxState(
-                        confirmValueChange = {
-                            if (it == SwipeToDismissBoxValue.StartToEnd) {
-                                onDeleteEntry(entry)
-                                true
-                            } else {
-                                false
-                            }
-                        },
-                        positionalThreshold = { it * 0.75f }
-                    )
-
-                    SwipeToDismissBox(
-                        state = dismissState,
-                        backgroundContent = {
-                            val color = when (dismissState.dismissDirection) {
-                                SwipeToDismissBoxValue.StartToEnd -> Color.Red
-                                else -> Color.Transparent
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(color)
-                                    .padding(horizontal = 20.dp),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Delete",
-                                    tint = Color.White
-                                )
-                            }
-                        }
-                    ) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .combinedClickable(
-                                    onClick = { onEntrySelected(entry) },
-                                    onLongClick = { onEditEntry(entry) }
-                                ),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Box(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
-                                val date = LocalDateTime.ofInstant(
-                                    Instant.ofEpochMilli(entry.timestamp),
-                                    ZoneId.systemDefault()
-                                )
-                                val formatter = DateTimeFormatter.ofPattern("HH:mm")
-                                Text(
-                                    text = entry.content,
-                                    modifier = Modifier.align(Alignment.TopStart).padding(top = 4.dp, end = 48.dp)
-                                )
-                                Text(
-                                    text = date.format(formatter),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.align(Alignment.TopEnd)
-                                )
-                                if (entry.hasImage) {
-                                    IconButton(
-                                        onClick = { onPhotoIconClicked(entry) },
-                                        modifier = Modifier.align(Alignment.BottomEnd)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.PhotoCamera,
-                                            contentDescription = "Open Photo",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            if (groupedEntries.isNotEmpty()) {
-                item {
-                    Button(
-                        onClick = onMoreClicked,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    ) {
-                        Text("more")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    VoicejournalTheme {
-        // Simulate categories from the database for the preview
-        val sampleCategoryAliases = remember {
-            listOf(
-                CategoryAlias(category = "journal", alias = "journal"),
-                CategoryAlias(category = "journal", alias = "tagebuch"),
-                CategoryAlias(category = "todo", alias = "todo"),
-                CategoryAlias(category = "todo", alias = "to-do"),
-                CategoryAlias(category = "kaufen", alias = "kaufen"),
-                CategoryAlias(category = "baumarkt", alias = "baumarkt"),
-                CategoryAlias(category = "eloisa", alias = "eloisa")
-            )
-        }
-        val sampleCategories = remember(sampleCategoryAliases) {
-            sampleCategoryAliases.map { it.category }.distinct()
-        }
-        var selectedCategory by remember { mutableStateOf(sampleCategories.first()) }
-        val entries = remember {
-            listOf(
-                JournalEntry(
-                    id = 1,
-                    title = "journal",
-                    content = "This is a preview entry.",
-                    timestamp = System.currentTimeMillis()
-                ),
-                JournalEntry(
-                    id = 2,
-                    title = "todo",
-                    content = "This is a todo preview.",
-                    timestamp = System.currentTimeMillis(),
-                    hasImage = true
-                )
-            )
-        }
-        val groupedEntries = entries.filter { it.title == selectedCategory }.groupBy {
-            Instant.ofEpochMilli(it.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
-        }
-
-        Greeting(
-            groupedEntries = groupedEntries,
-            categories = sampleCategories, // Pass the sample categories
-            selectedCategory = selectedCategory,
-            onCategoryChange = { selectedCategory = it },
-            onDeleteEntry = {},
-            selectedEntry = null,
-            selectedDate = null,
-            onDateSelected = {},
-            onEntrySelected = {},
-            onEditEntry = {},
-            onMoreClicked = {},
-            onDateLongClicked = {}
-        )
     }
 }

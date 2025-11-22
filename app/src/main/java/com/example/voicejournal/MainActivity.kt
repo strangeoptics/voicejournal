@@ -267,25 +267,11 @@ class MainActivity : ComponentActivity() {
                                     onEditEntry = viewModel::onEditEntry,
                                     onMoreClicked = viewModel::onMoreClicked,
                                     onDateLongClicked = { date ->
-                                        val formatter = DateTimeFormatter.ofPattern("d. MMMM yyyy", Locale.GERMAN)
-                                        val url = "https://photos.google.com/search/${date.format(formatter)}"
-                                        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
-                                        try {
-                                            context.startActivity(intent)
-                                        } catch (_: Exception) { 
-                                            Toast.makeText(context, "Could not open browser.", Toast.LENGTH_SHORT).show()
-                                        }
+                                        openGooglePhotos(date)
                                     },
                                     onPhotoIconClicked = { entry ->
                                         val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault()).toLocalDate()
-                                        val formatter = DateTimeFormatter.ofPattern("d. MMMM yyyy", Locale.GERMAN)
-                                        val url = "https://photos.google.com/search/${date.format(formatter)}"
-                                        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
-                                        try {
-                                            context.startActivity(intent)
-                                        } catch (_: Exception) {
-                                            Toast.makeText(context, "Could not open browser.", Toast.LENGTH_SHORT).show()
-                                        }
+                                        openGooglePhotos(date)
                                     }
                                 )
                             }
@@ -330,6 +316,17 @@ class MainActivity : ComponentActivity() {
         runOnUiThread {
             Toast.makeText(this, "Starting speech recognition...", Toast.LENGTH_SHORT).show()
             startListening()
+        }
+    }
+
+    private fun openGooglePhotos(date: LocalDate) {
+        val formatter = DateTimeFormatter.ofPattern("d. MMMM yyyy", Locale.GERMAN)
+        val url = "https://photos.google.com/search/${date.format(formatter)}"
+        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(this, "Could not open browser.", Toast.LENGTH_SHORT).show()
         }
     }
 }

@@ -18,6 +18,8 @@ class JournalRepository(private val dao: JournalEntryDao, private val context: C
 
     val allCategories = dao.getAllCategories()
 
+    fun getAllEntriesFlow() = dao.getAllEntriesFlow()
+
     suspend fun importJournal(uri: Uri) = withContext(Dispatchers.IO) {
         context.contentResolver.openInputStream(uri)?.use { inputStream ->
             BufferedReader(InputStreamReader(inputStream)).use { reader ->

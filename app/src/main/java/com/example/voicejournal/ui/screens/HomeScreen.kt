@@ -68,7 +68,8 @@ fun HomeScreen(
     onEditEntry: (JournalEntry) -> Unit = {},
     onMoreClicked: () -> Unit = {},
     onDateLongClicked: (LocalDate) -> Unit = {},
-    onPhotoIconClicked: (JournalEntry) -> Unit = {}
+    onPhotoIconClicked: (JournalEntry) -> Unit = {},
+    shouldShowMoreButton: Boolean = true
 ) {
     Column(
         modifier = modifier.fillMaxSize(),
@@ -211,7 +212,7 @@ fun HomeScreen(
                     }
                 }
             }
-            if (groupedEntries.isNotEmpty()) {
+            if (groupedEntries.isNotEmpty() && shouldShowMoreButton) {
                 item {
                     Button(
                         onClick = onMoreClicked,

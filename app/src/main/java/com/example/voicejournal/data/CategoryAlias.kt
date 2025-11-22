@@ -7,5 +7,6 @@ import androidx.room.PrimaryKey
 data class Category(
     @PrimaryKey
     val category: String, // The canonical category name
-    val aliases: String     // A comma-separated list of aliases
+    val aliases: String,     // A comma-separated list of aliases
+    val showAll: Boolean = false
 )

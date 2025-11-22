@@ -90,6 +90,7 @@ class MainActivity : ComponentActivity() {
                 val filteredEntries by viewModel.filteredEntries.collectAsState()
                 val canUndo by viewModel.canUndo.collectAsState()
                 val categories by viewModel.categories.collectAsState() // Collect categories as State
+                val shouldShowMoreButton by viewModel.shouldShowMoreButton.collectAsState()
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
@@ -222,7 +223,7 @@ class MainActivity : ComponentActivity() {
                                             Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopieren")
                                         }
                                     }
-                                )
+                                 )
                             },
                             floatingActionButton = {
                                 FloatingActionButton(onClick = {
@@ -267,7 +268,8 @@ class MainActivity : ComponentActivity() {
                                         onPhotoIconClicked = { entry ->
                                             val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault()).toLocalDate()
                                             openGooglePhotos(date)
-                                        }
+                                        },
+                                        shouldShowMoreButton = shouldShowMoreButton
                                     )
                                 }
                                 composable("settings") {

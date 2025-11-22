@@ -67,6 +67,12 @@ class MainViewModel(private val repository: JournalRepository, private val share
         }.associate { it }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
+    val shouldShowMoreButton: StateFlow<Boolean> =
+        combine(selectedCategory, categoriesFlow) { selectedCat, categories ->
+            val category = categories.find { it.category == selectedCat }
+            category?.showAll != true
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
     init {
         viewModelScope.launch {
             val areDefaultCategoriesAdded = sharedPreferences.getBoolean(KEY_DEFAULT_CATEGORIES_ADDED, false)
@@ -88,18 +94,25 @@ class MainViewModel(private val repository: JournalRepository, private val share
             Category(category = "todo", aliases = "todo,to-do,todoo"),
             Category(category = "kaufen", aliases = "kaufen,einkaufen"),
             Category(category = "baumarkt", aliases = "baumarkt"),
-            Category(category = "eloisa", aliases = "eloisa,luisa")
+            Category(category = "eloisa", aliases = "eloisa,luisa", showAll = true)
         )
         defaultCategories.forEach { repository.insertCategory(it) }
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val entries: StateFlow<List<JournalEntry>> =
-        daysToShow.flatMapLatest { days ->
-            val daysAgoMillis = Calendar.getInstance().apply {
-                add(Calendar.DAY_OF_YEAR, -days)
-            }.timeInMillis
-            repository.getEntriesSince(daysAgoMillis)
+        combine(daysToShow, selectedCategory, categoriesFlow) { days, selectedCat, categories ->
+            Triple(days, selectedCat, categories)
+        }.flatMapLatest { (days, selectedCat, categories) ->
+            val category = categories.find { it.category == selectedCat }
+            if (category?.showAll == true) {
+                repository.getAllEntriesFlow()
+            } else {
+                val daysAgoMillis = Calendar.getInstance().apply {
+                    add(Calendar.DAY_OF_YEAR, -days)
+                }.timeInMillis
+                repository.getEntriesSince(daysAgoMillis)
+            }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
 
@@ -175,10 +188,14 @@ class MainViewModel(private val repository: JournalRepository, private val share
         sharedPreferences.edit { putInt(KEY_DAYS_TO_SHOW, days) }
     }
 
-    fun updateAliasesForCategory(category: String, aliasesString: String) {
+    fun addOrUpdateCategory(categoryName: String, aliasesString: String, showAll: Boolean) {
         viewModelScope.launch {
-            val newAliases = aliasesString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-            repository.updateAliasesForCategory(category, newAliases)
+            val category = Category(
+                category = categoryName,
+                aliases = aliasesString,
+                showAll = showAll
+            )
+            repository.insertCategory(category)
         }
     }
 

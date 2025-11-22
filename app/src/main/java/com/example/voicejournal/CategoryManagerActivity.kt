@@ -10,6 +10,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -106,8 +108,8 @@ class CategoryManagerActivity : ComponentActivity() {
                             showEditDialog = false
                             categoryToEdit = null
                         },
-                        onSave = { category, aliases ->
-                            viewModel.updateAliasesForCategory(category, aliases)
+                        onSave = { category, aliases, showAll ->
+                            viewModel.addOrUpdateCategory(category, aliases, showAll)
                             showEditDialog = false
                             categoryToEdit = null
                         },
@@ -174,16 +176,26 @@ fun CategoryManagerScreen(
                             onLongClick = { onCategoryLongClick(category) }
                         )
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = category.category,
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        Text(
-                            text = category.aliases,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = category.category,
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Text(
+                                text = category.aliases,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        if (category.showAll) {
+                            Text("All", modifier = Modifier.padding(start = 8.dp))
+                        }
                     }
                 }
             }
@@ -194,11 +206,12 @@ fun CategoryManagerScreen(
 @Composable
 fun EditCategoryDialog(
     onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit,
+    onSave: (String, String, Boolean) -> Unit,
     initialCategory: Category?
 ) {
     var category by remember { mutableStateOf(initialCategory?.category ?: "") }
     var aliases by remember { mutableStateOf(initialCategory?.aliases ?: "") }
+    var showAll by remember { mutableStateOf(initialCategory?.showAll ?: false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card {
@@ -215,9 +228,16 @@ fun EditCategoryDialog(
                     onValueChange = { aliases = it },
                     label = { Text("Aliases (comma-separated)") }
                 )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = showAll,
+                        onCheckedChange = { showAll = it }
+                    )
+                    Text("Show all")
+                }
                 Button(onClick = {
                     if (category.isNotBlank() && aliases.isNotBlank()) {
-                        onSave(category, aliases)
+                        onSave(category, aliases, showAll)
                     }
                 }) {
                     Text("Save")

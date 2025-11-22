@@ -32,14 +32,14 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.example.voicejournal.data.AppDatabase
 import com.example.voicejournal.data.JournalRepository
 import com.example.voicejournal.ui.components.AppDrawer
@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             VoicejournalTheme {
                 val context = LocalContext.current
+                val navController = rememberNavController()
                 val category by viewModel.selectedCategory.collectAsState()
                 val groupedEntries by viewModel.groupedEntries.collectAsState()
                 val selectedEntry by viewModel.selectedEntry.collectAsState()
@@ -90,7 +91,6 @@ class MainActivity : ComponentActivity() {
                 val canUndo by viewModel.canUndo.collectAsState()
                 val categories by viewModel.categories.collectAsState() // Collect categories as State
 
-                var showSettings by remember { mutableStateOf(false) }
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
 
@@ -159,7 +159,7 @@ class MainActivity : ComponentActivity() {
                         AppDrawer(
                             onSettingsClicked = {
                                 scope.launch { drawerState.close() }
-                                showSettings = true
+                                navController.navigate("settings")
                             },
                             onManageCategoriesClicked = {
                                 scope.launch { drawerState.close() }
@@ -242,38 +242,44 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         ) { innerPadding ->
-                            if (showSettings) {
-                                SettingsScreen(
-                                    currentDays = daysToShow,
-                                    onSave = {
-                                        viewModel.saveDaysToShow(it)
-                                        showSettings = false
-                                    },
-                                    onDismiss = { showSettings = false }
-                                )
-                            } else {
-                                HomeScreen(
-                                    modifier = Modifier.
-                                    padding(innerPadding),
-                                    groupedEntries = groupedEntries,
-                                    categories = categories, // Pass the collected state
-                                    selectedCategory = category,
-                                    onCategoryChange = viewModel::onCategoryChange,
-                                    onDeleteEntry = viewModel::onDeleteEntry,
-                                    selectedEntry = selectedEntry,
-                                    selectedDate = selectedDate,
-                                    onDateSelected = viewModel::onDateSelected,
-                                    onEntrySelected = viewModel::onEntrySelected,
-                                    onEditEntry = viewModel::onEditEntry,
-                                    onMoreClicked = viewModel::onMoreClicked,
-                                    onDateLongClicked = { date ->
-                                        openGooglePhotos(date)
-                                    },
-                                    onPhotoIconClicked = { entry ->
-                                        val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault()).toLocalDate()
-                                        openGooglePhotos(date)
-                                    }
-                                )
+                            NavHost(
+                                navController = navController,
+                                startDestination = "home",
+                                modifier = Modifier.padding(innerPadding)
+                            ) {
+                                composable("home") {
+                                    HomeScreen(
+                                        modifier = Modifier,
+                                        groupedEntries = groupedEntries,
+                                        categories = categories,
+                                        selectedCategory = category,
+                                        onCategoryChange = viewModel::onCategoryChange,
+                                        onDeleteEntry = viewModel::onDeleteEntry,
+                                        selectedEntry = selectedEntry,
+                                        selectedDate = selectedDate,
+                                        onDateSelected = viewModel::onDateSelected,
+                                        onEntrySelected = viewModel::onEntrySelected,
+                                        onEditEntry = viewModel::onEditEntry,
+                                        onMoreClicked = viewModel::onMoreClicked,
+                                        onDateLongClicked = { date ->
+                                            openGooglePhotos(date)
+                                        },
+                                        onPhotoIconClicked = { entry ->
+                                            val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault()).toLocalDate()
+                                            openGooglePhotos(date)
+                                        }
+                                    )
+                                }
+                                composable("settings") {
+                                    SettingsScreen(
+                                        currentDays = daysToShow,
+                                        onSave = {
+                                            viewModel.saveDaysToShow(it)
+                                            navController.popBackStack()
+                                        },
+                                        onDismiss = { navController.popBackStack() }
+                                    )
+                                }
                             }
                         }
                     }
@@ -320,7 +326,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openGooglePhotos(date: LocalDate) {
-        val formatter = DateTimeFormatter.ofPattern("d. MMMM yyyy", Locale.GERMAN)
+        val formatter = DateTimeFormatter.ofPattern("d. MMMM yyyy", Locale.getDefault())
         val url = "https://photos.google.com/search/${date.format(formatter)}"
         val intent = Intent(Intent.ACTION_VIEW, url.toUri())
         try {

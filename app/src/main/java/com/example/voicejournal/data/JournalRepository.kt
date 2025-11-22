@@ -16,7 +16,7 @@ import java.util.regex.Pattern
 
 class JournalRepository(private val dao: JournalEntryDao, private val context: Context) {
 
-    val allCategoryAliases = dao.getAllCategoryAliases()
+    val allCategories = dao.getAllCategories()
 
     suspend fun importJournal(uri: Uri) = withContext(Dispatchers.IO) {
         context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -67,7 +67,7 @@ class JournalRepository(private val dao: JournalEntryDao, private val context: C
 
     fun getEntriesSince(timestamp: Long) = dao.getEntriesSince(timestamp)
     
-    suspend fun insertCategoryAlias(categoryAlias: CategoryAlias) = dao.insertCategoryAlias(categoryAlias)
+    suspend fun insertCategory(category: Category) = dao.insertCategory(category)
     
     suspend fun insert(entry: JournalEntry) = dao.insert(entry)
     
@@ -75,8 +75,11 @@ class JournalRepository(private val dao: JournalEntryDao, private val context: C
     
     suspend fun delete(entry: JournalEntry) = dao.delete(entry)
     
-    suspend fun updateAliasesForCategory(category: String, aliases: List<String>) = dao.updateAliasesForCategory(category, aliases)
-    
+    suspend fun updateAliasesForCategory(category: String, aliases: List<String>) {
+        val aliasesString = aliases.joinToString(",")
+        dao.updateAliasesForCategory(category, aliasesString)
+    }
+
     suspend fun deleteCategory(category: String) = dao.deleteCategory(category)
     
     suspend fun deleteAll() = dao.deleteAll()

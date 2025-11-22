@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [JournalEntry::class, CategoryAlias::class], version = 4, exportSchema = false)
+@Database(entities = [JournalEntry::class, Category::class], version = 5, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun journalEntryDao(): JournalEntryDao
 
@@ -34,6 +34,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Create the new table
+                database.execSQL("CREATE TABLE `categories` (`category` TEXT NOT NULL, `aliases` TEXT NOT NULL, PRIMARY KEY(`category`))")
+
+                // Migrate the data
+                database.execSQL("INSERT INTO `categories` (`category`, `aliases`) SELECT `category`, GROUP_CONCAT(`alias`) FROM `category_aliases` GROUP BY `category`")
+
+                // Drop the old table
+                database.execSQL("DROP TABLE `category_aliases`")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -41,7 +54,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "journal_database"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

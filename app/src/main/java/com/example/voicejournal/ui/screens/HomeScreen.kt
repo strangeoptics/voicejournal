@@ -42,7 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.voicejournal.data.CategoryAlias
+import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import java.time.Instant
@@ -237,19 +237,17 @@ fun HomeScreen(
 fun HomeScreenPreview() {
     VoicejournalTheme {
         // Simulate categories from the database for the preview
-        val sampleCategoryAliases = remember {
+        val sampleCategoriesData = remember {
             listOf(
-                CategoryAlias(category = "journal", alias = "journal"),
-                CategoryAlias(category = "journal", alias = "tagebuch"),
-                CategoryAlias(category = "todo", alias = "todo"),
-                CategoryAlias(category = "todo", alias = "to-do"),
-                CategoryAlias(category = "kaufen", alias = "kaufen"),
-                CategoryAlias(category = "baumarkt", alias = "baumarkt"),
-                CategoryAlias(category = "eloisa", alias = "eloisa")
+                Category(category = "journal", aliases = "journal,tagebuch"),
+                Category(category = "todo", aliases = "todo,to-do"),
+                Category(category = "kaufen", aliases = "kaufen"),
+                Category(category = "baumarkt", aliases = "baumarkt"),
+                Category(category = "eloisa", aliases = "eloisa")
             )
         }
-        val sampleCategories = remember(sampleCategoryAliases) {
-            sampleCategoryAliases.map { it.category }.distinct()
+        val sampleCategories = remember(sampleCategoriesData) {
+            sampleCategoriesData.map { it.category }
         }
         var selectedCategory by remember { mutableStateOf(sampleCategories.first()) }
         val entries = remember {

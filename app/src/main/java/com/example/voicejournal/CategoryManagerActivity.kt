@@ -45,7 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.voicejournal.data.AppDatabase
-import com.example.voicejournal.data.CategoryAlias
+import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.JournalRepository
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 
@@ -62,9 +62,9 @@ class CategoryManagerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             VoicejournalTheme {
-                val categoryAliases by viewModel.categoryAliases.collectAsState()
+                val categories by viewModel.categoriesFlow.collectAsState()
                 var showEditDialog by remember { mutableStateOf(false) }
-                var categoryToEdit by remember { mutableStateOf<String?>(null) }
+                var categoryToEdit by remember { mutableStateOf<Category?>(null) }
 
 
                 Scaffold(
@@ -89,7 +89,7 @@ class CategoryManagerActivity : ComponentActivity() {
                 ) { padding ->
                     CategoryManagerScreen(
                         modifier = Modifier.padding(padding),
-                        categoryAliases = categoryAliases,
+                        categories = categories,
                         onCategoryLongClick = { category ->
                             categoryToEdit = category
                             showEditDialog = true
@@ -101,10 +101,6 @@ class CategoryManagerActivity : ComponentActivity() {
                 }
 
                 if (showEditDialog) {
-                    val existingAliases = categoryToEdit?.let { cat ->
-                        categoryAliases.filter { it.category == cat }.map { it.alias }
-                    } ?: emptyList()
-
                     EditCategoryDialog(
                         onDismiss = {
                             showEditDialog = false
@@ -115,8 +111,7 @@ class CategoryManagerActivity : ComponentActivity() {
                             showEditDialog = false
                             categoryToEdit = null
                         },
-                        initialCategory = categoryToEdit ?: "",
-                        existingAliases = existingAliases
+                        initialCategory = categoryToEdit
                     )
                 }
             }
@@ -128,23 +123,21 @@ class CategoryManagerActivity : ComponentActivity() {
 @Composable
 fun CategoryManagerScreen(
     modifier: Modifier = Modifier,
-    categoryAliases: List<CategoryAlias>,
-    onCategoryLongClick: (String) -> Unit,
+    categories: List<Category>,
+    onCategoryLongClick: (Category) -> Unit,
     onDeleteCategory: (String) -> Unit
 ) {
-    val groupedByCategory = categoryAliases.groupBy { it.category }
-
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(groupedByCategory.keys.toList(), key = { it }) { category ->
+        items(categories, key = { it.category }) { category ->
             val dismissState = rememberSwipeToDismissBoxState(
                 confirmValueChange = {
                     if (it == SwipeToDismissBoxValue.StartToEnd) {
-                        onDeleteCategory(category)
+                        onDeleteCategory(category.category)
                         true
                     } else {
                         false
@@ -183,12 +176,12 @@ fun CategoryManagerScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = category,
+                            text = category.category,
                             style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Text(
-                            text = groupedByCategory[category]?.joinToString(", ") { it.alias } ?: "",
+                            text = category.aliases,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -202,21 +195,20 @@ fun CategoryManagerScreen(
 fun EditCategoryDialog(
     onDismiss: () -> Unit,
     onSave: (String, String) -> Unit,
-    initialCategory: String = "",
-    existingAliases: List<String> = emptyList()
+    initialCategory: Category?
 ) {
-    var category by remember { mutableStateOf(initialCategory) }
-    var aliases by remember { mutableStateOf(existingAliases.joinToString(", ")) }
+    var category by remember { mutableStateOf(initialCategory?.category ?: "") }
+    var aliases by remember { mutableStateOf(initialCategory?.aliases ?: "") }
 
     Dialog(onDismissRequest = onDismiss) {
         Card {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(if (initialCategory.isEmpty()) "Add New Category" else "Edit Category")
+                Text(if (initialCategory == null) "Add New Category" else "Edit Category")
                 TextField(
                     value = category,
                     onValueChange = { category = it },
                     label = { Text("Category") },
-                    enabled = initialCategory.isEmpty()
+                    enabled = initialCategory == null
                 )
                 TextField(
                     value = aliases,

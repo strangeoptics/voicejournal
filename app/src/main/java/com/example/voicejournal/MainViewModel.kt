@@ -6,7 +6,7 @@ import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.voicejournal.data.CategoryAlias
+import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,15 +52,19 @@ class MainViewModel(private val repository: JournalRepository, private val share
     private val _recentlyDeleted = MutableStateFlow<List<JournalEntry>>(emptyList())
     val canUndo: StateFlow<Boolean> = combine(_recentlyDeleted) { it.isNotEmpty() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-    val categoryAliases: StateFlow<List<CategoryAlias>> = repository.allCategoryAliases
+    val categoriesFlow: StateFlow<List<Category>> = repository.allCategories
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val categories: StateFlow<List<String>> = categoryAliases.map { aliases ->
-        aliases.map { it.category }.distinct()
+    val categories: StateFlow<List<String>> = categoriesFlow.map { categories ->
+        categories.map { it.category }.distinct()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val categoryKeywordsMap: StateFlow<Map<String, String>> = categoryAliases.map { aliases ->
-        aliases.associate { it.alias.lowercase(Locale.ROOT) to it.category.lowercase(Locale.ROOT) }
+    val categoryKeywordsMap: StateFlow<Map<String, String>> = categoriesFlow.map { categories ->
+        categories.flatMap { category ->
+            category.aliases.split(',').map { alias ->
+                alias.trim().lowercase(Locale.ROOT) to category.category.lowercase(Locale.ROOT)
+            }
+        }.associate { it }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     init {
@@ -80,18 +84,13 @@ class MainViewModel(private val repository: JournalRepository, private val share
 
     private suspend fun addDefaultCategories() {
         val defaultCategories = listOf(
-            CategoryAlias(category = "journal", alias = "journal"),
-            CategoryAlias(category = "journal", alias = "tagebuch"),
-            CategoryAlias(category = "todo", alias = "todo"),
-            CategoryAlias(category = "todo", alias = "to-do"),
-            CategoryAlias(category = "todo", alias = "todoo"),
-            CategoryAlias(category = "kaufen", alias = "kaufen"),
-            CategoryAlias(category = "kaufen", alias = "einkaufen"),
-            CategoryAlias(category = "baumarkt", alias = "baumarkt"),
-            CategoryAlias(category = "eloisa", alias = "eloisa"),
-            CategoryAlias(category = "eloisa", alias = "luisa")
+            Category(category = "journal", aliases = "journal,tagebuch"),
+            Category(category = "todo", aliases = "todo,to-do,todoo"),
+            Category(category = "kaufen", aliases = "kaufen,einkaufen"),
+            Category(category = "baumarkt", aliases = "baumarkt"),
+            Category(category = "eloisa", aliases = "eloisa,luisa")
         )
-        defaultCategories.forEach { repository.insertCategoryAlias(it) }
+        defaultCategories.forEach { repository.insertCategory(it) }
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)

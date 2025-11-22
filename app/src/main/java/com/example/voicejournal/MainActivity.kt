@@ -1,12 +1,8 @@
 package com.example.voicejournal
 
 import android.Manifest
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -21,9 +17,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -42,7 +38,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.example.voicejournal.data.AppDatabase
@@ -52,6 +47,7 @@ import com.example.voicejournal.ui.screens.HomeScreen
 import com.example.voicejournal.ui.dialogs.SettingsScreen
 import com.example.voicejournal.ui.dialogs.EditEntryDialog
 import com.example.voicejournal.ui.theme.VoicejournalTheme
+import com.example.voicejournal.util.NotificationHelper
 import com.example.voicejournal.util.SpeechRecognitionManager
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -63,10 +59,6 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 class MainActivity : ComponentActivity() {
-
-    companion object {
-        const val NOTIFICATION_ACTION = "com.example.voicejournal.NOTIFICATION_ACTION"
-    }
 
     private lateinit var speechRecognitionManager: SpeechRecognitionManager
     private val db by lazy { AppDatabase.getDatabase(this) }
@@ -156,7 +148,7 @@ class MainActivity : ComponentActivity() {
                     onResult = { permissionsMap ->
                         val allGranted = permissionsMap.values.all { it }
                         if (allGranted) {
-                            showNotification(context)
+                            NotificationHelper.showNotification(context)
                         }
                     }
                 )
@@ -189,7 +181,7 @@ class MainActivity : ComponentActivity() {
                                         ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
                                     }
                                     if (allPermissionsGranted) {
-                                        showNotification(context)
+                                        NotificationHelper.showNotification(context)
                                     } else {
                                         notificationPermissionLauncher.launch(notificationPermissions)
                                     }
@@ -329,7 +321,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent) {
-        if (intent.action == NOTIFICATION_ACTION) {
+        if (intent.action == NotificationHelper.NOTIFICATION_ACTION) {
             handleNotificationAction()
         }
     }
@@ -339,39 +331,5 @@ class MainActivity : ComponentActivity() {
             Toast.makeText(this, "Starting speech recognition...", Toast.LENGTH_SHORT).show()
             startListening()
         }
-    }
-
-    private fun showNotification(context: Context) {
-        val channelId = "channel_id"
-        val notificationId = 1
-        val intent = Intent(context, MainActivity::class.java).apply {
-            action = NOTIFICATION_ACTION
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val notificationManager =
-            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        val channel = NotificationChannel(
-            channelId,
-            "Channel Name",
-            NotificationManager.IMPORTANCE_DEFAULT
-        )
-        notificationManager.createNotificationChannel(channel)
-
-        val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Notification Title")
-            .setContentText("Ready to listen!")
-            .addAction(R.drawable.ic_launcher_foreground, "Start Listening", pendingIntent)
-            .build()
-
-        notificationManager.notify(notificationId, notification)
     }
 }

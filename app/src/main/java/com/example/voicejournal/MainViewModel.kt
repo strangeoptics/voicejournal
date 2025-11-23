@@ -30,12 +30,18 @@ import java.util.Calendar
 import java.util.Collections
 import java.util.Locale
 
-class MainViewModel(private val repository: JournalRepository, private val sharedPreferences: SharedPreferences) : ViewModel() {
+class MainViewModel(
+    private val repository: JournalRepository,
+    private val sharedPreferences: SharedPreferences,
+    private val applicationContext: Context
+) : ViewModel() {
 
     companion object {
         const val PREFS_NAME = "voice_journal_prefs"
         const val KEY_DAYS_TO_SHOW = "days_to_show"
         const val KEY_DEFAULT_CATEGORIES_ADDED = "default_categories_added"
+        const val KEY_GPS_TRACKING_ENABLED = "gps_tracking_enabled"
+        const val KEY_GPS_INTERVAL_MINUTES = "gps_interval_minutes"
     }
 
     private val _selectedCategory = MutableStateFlow("")
@@ -52,6 +58,12 @@ class MainViewModel(private val repository: JournalRepository, private val share
 
     private val _daysToShow = MutableStateFlow(sharedPreferences.getInt(KEY_DAYS_TO_SHOW, 3))
     val daysToShow: StateFlow<Int> = _daysToShow.asStateFlow()
+
+    private val _isGpsTrackingEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_GPS_TRACKING_ENABLED, true))
+    val isGpsTrackingEnabled: StateFlow<Boolean> = _isGpsTrackingEnabled.asStateFlow()
+
+    private val _gpsInterval = MutableStateFlow(sharedPreferences.getInt(KEY_GPS_INTERVAL_MINUTES, 20))
+    val gpsInterval: StateFlow<Int> = _gpsInterval.asStateFlow()
 
     private val _recentlyDeleted = MutableStateFlow<List<JournalEntry>>(emptyList())
     val canUndo: StateFlow<Boolean> = combine(_recentlyDeleted) { it.isNotEmpty() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -76,7 +88,7 @@ class MainViewModel(private val repository: JournalRepository, private val share
             val category = categories.find { it.category == selectedCat }
             category?.showAll != true
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-    
+
     val gpsTrackPoints: StateFlow<List<GpsTrackPoint>> = selectedDate
         .flatMapLatest { date ->
             val startOfDay = (date ?: LocalDate.now()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -195,9 +207,17 @@ class MainViewModel(private val repository: JournalRepository, private val share
         _daysToShow.value += 3
         sharedPreferences.edit { putInt(KEY_DAYS_TO_SHOW, _daysToShow.value) }
     }
-    fun saveDaysToShow(days: Int) {
+    fun saveSettings(days: Int, isGpsEnabled: Boolean, interval: Int) {
         _daysToShow.value = days
-        sharedPreferences.edit { putInt(KEY_DAYS_TO_SHOW, days) }
+        _isGpsTrackingEnabled.value = isGpsEnabled
+        _gpsInterval.value = interval
+        sharedPreferences.edit {
+            putInt(KEY_DAYS_TO_SHOW, days)
+            putBoolean(KEY_GPS_TRACKING_ENABLED, isGpsEnabled)
+            putInt(KEY_GPS_INTERVAL_MINUTES, interval)
+        }
+        // This is a bit of a hack, but it triggers the worker to be re-enqueued
+        VoiceJournalApplication.setupLocationWorker(applicationContext)
     }
 
     fun addOrUpdateCategory(categoryName: String, aliasesString: String, showAll: Boolean) {
@@ -218,7 +238,7 @@ class MainViewModel(private val repository: JournalRepository, private val share
             repository.deleteCategory(category)
         }
     }
-    
+
     fun moveCategory(category: Category, moveUp: Boolean) {
         viewModelScope.launch {
             val currentList = categoriesFlow.value.toMutableList()
@@ -336,7 +356,7 @@ class MainViewModelFactory(private val context: Context, private val sharedPrefe
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             val repository = Injector.provideJournalRepository(context)
-            return MainViewModel(repository, sharedPreferences) as T
+            return MainViewModel(repository, sharedPreferences, context.applicationContext) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

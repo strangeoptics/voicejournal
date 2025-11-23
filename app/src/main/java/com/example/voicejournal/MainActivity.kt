@@ -87,6 +87,8 @@ class MainActivity : ComponentActivity() {
                 val selectedDate by viewModel.selectedDate.collectAsState()
                 val editingEntry by viewModel.editingEntry.collectAsState()
                 val daysToShow by viewModel.daysToShow.collectAsState()
+                val isGpsTrackingEnabled by viewModel.isGpsTrackingEnabled.collectAsState()
+                val gpsInterval by viewModel.gpsInterval.collectAsState()
                 val filteredEntries by viewModel.filteredEntries.collectAsState()
                 val canUndo by viewModel.canUndo.collectAsState()
                 val categories by viewModel.categories.collectAsState() // Collect categories as State
@@ -281,8 +283,10 @@ class MainActivity : ComponentActivity() {
                                 composable("settings") {
                                     SettingsScreen(
                                         currentDays = daysToShow,
-                                        onSave = {
-                                            viewModel.saveDaysToShow(it)
+                                        isGpsTrackingEnabled = isGpsTrackingEnabled,
+                                        gpsInterval = gpsInterval,
+                                        onSave = { days, isGpsEnabled, interval ->
+                                            viewModel.saveSettings(days, isGpsEnabled, interval)
                                             navController.popBackStack()
                                         },
                                         onDismiss = { navController.popBackStack() }

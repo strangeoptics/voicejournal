@@ -8,5 +8,6 @@ data class Category(
     @PrimaryKey
     val category: String, // The canonical category name
     val aliases: String,     // A comma-separated list of aliases
-    val showAll: Boolean = false
+    val showAll: Boolean = false,
+    val orderIndex: Int = 0
 )

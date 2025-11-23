@@ -38,7 +38,10 @@ interface JournalEntryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCategory(category: Category)
 
-    @Query("SELECT * FROM categories")
+    @Update
+    suspend fun updateCategories(categories: List<Category>)
+
+    @Query("SELECT * FROM categories ORDER BY orderIndex ASC")
     fun getAllCategories(): Flow<List<Category>>
 
     @Query("UPDATE categories SET aliases = :aliases WHERE category = :categoryName")

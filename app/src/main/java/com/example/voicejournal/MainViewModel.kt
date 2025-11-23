@@ -24,6 +24,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
+import java.util.Collections
 import java.util.Locale
 
 class MainViewModel(private val repository: JournalRepository, private val sharedPreferences: SharedPreferences) : ViewModel() {
@@ -90,11 +91,11 @@ class MainViewModel(private val repository: JournalRepository, private val share
 
     private suspend fun addDefaultCategories() {
         val defaultCategories = listOf(
-            Category(category = "journal", aliases = "journal,tagebuch"),
-            Category(category = "todo", aliases = "todo,to-do,todoo"),
-            Category(category = "kaufen", aliases = "kaufen,einkaufen"),
-            Category(category = "baumarkt", aliases = "baumarkt"),
-            Category(category = "eloisa", aliases = "eloisa,luisa", showAll = true)
+            Category(category = "journal", aliases = "journal,tagebuch", orderIndex = 0),
+            Category(category = "todo", aliases = "todo,to-do,todoo", orderIndex = 1),
+            Category(category = "kaufen", aliases = "kaufen,einkaufen", orderIndex = 2),
+            Category(category = "baumarkt", aliases = "baumarkt", orderIndex = 3),
+            Category(category = "eloisa", aliases = "eloisa,luisa", showAll = true, orderIndex = 4)
         )
         defaultCategories.forEach { repository.insertCategory(it) }
     }
@@ -190,10 +191,12 @@ class MainViewModel(private val repository: JournalRepository, private val share
 
     fun addOrUpdateCategory(categoryName: String, aliasesString: String, showAll: Boolean) {
         viewModelScope.launch {
+            val existingCategory = categoriesFlow.value.find { it.category == categoryName }
             val category = Category(
                 category = categoryName,
                 aliases = aliasesString,
-                showAll = showAll
+                showAll = showAll,
+                orderIndex = existingCategory?.orderIndex ?: categoriesFlow.value.size
             )
             repository.insertCategory(category)
         }
@@ -202,6 +205,24 @@ class MainViewModel(private val repository: JournalRepository, private val share
     fun deleteCategory(category: String) {
         viewModelScope.launch {
             repository.deleteCategory(category)
+        }
+    }
+    
+    fun moveCategory(category: Category, moveUp: Boolean) {
+        viewModelScope.launch {
+            val currentList = categoriesFlow.value.toMutableList()
+            val fromIndex = currentList.indexOf(category)
+            if (fromIndex == -1) return@launch
+
+            val toIndex = if (moveUp) fromIndex - 1 else fromIndex + 1
+
+            if (toIndex >= 0 && toIndex < currentList.size) {
+                Collections.swap(currentList, fromIndex, toIndex)
+                val updatedCategories = currentList.mapIndexed { index, cat ->
+                    cat.copy(orderIndex = index)
+                }
+                repository.updateCategories(updatedCategories)
+            }
         }
     }
 

@@ -70,7 +70,9 @@ class JournalRepository(private val dao: JournalEntryDao, private val context: C
     fun getEntriesSince(timestamp: Long) = dao.getEntriesSince(timestamp)
     
     suspend fun insertCategory(category: Category) = dao.insertCategory(category)
-    
+
+    suspend fun updateCategories(categories: List<Category>) = dao.updateCategories(categories)
+
     suspend fun insert(entry: JournalEntry) = dao.insert(entry)
     
     suspend fun update(entry: JournalEntry) = dao.update(entry)

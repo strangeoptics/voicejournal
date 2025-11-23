@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -98,6 +100,9 @@ class CategoryManagerActivity : ComponentActivity() {
                         },
                         onDeleteCategory = { category ->
                             viewModel.deleteCategory(category)
+                        },
+                        onMoveCategory = { category, moveUp ->
+                            viewModel.moveCategory(category, moveUp)
                         }
                     )
                 }
@@ -127,7 +132,8 @@ fun CategoryManagerScreen(
     modifier: Modifier = Modifier,
     categories: List<Category>,
     onCategoryLongClick: (Category) -> Unit,
-    onDeleteCategory: (String) -> Unit
+    onDeleteCategory: (String) -> Unit,
+    onMoveCategory: (Category, Boolean) -> Unit
 ) {
     LazyColumn(
         modifier = modifier
@@ -195,6 +201,14 @@ fun CategoryManagerScreen(
                         }
                         if (category.showAll) {
                             Text("All", modifier = Modifier.padding(start = 8.dp))
+                        }
+                        Column {
+                            IconButton(onClick = { onMoveCategory(category, true) }, enabled = categories.first() != category) {
+                                Icon(Icons.Default.ArrowUpward, contentDescription = "Move Up")
+                            }
+                            IconButton(onClick = { onMoveCategory(category, false) }, enabled = categories.last() != category) {
+                                Icon(Icons.Default.ArrowDownward, contentDescription = "Move Down")
+                            }
                         }
                     }
                 }

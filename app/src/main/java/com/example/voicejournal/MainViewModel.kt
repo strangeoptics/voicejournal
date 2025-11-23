@@ -1,5 +1,6 @@
 package com.example.voicejournal
 
+import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
 import androidx.core.content.edit
@@ -7,8 +8,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.voicejournal.data.Category
+import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
+import com.example.voicejournal.di.Injector
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +23,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
@@ -73,6 +76,14 @@ class MainViewModel(private val repository: JournalRepository, private val share
             val category = categories.find { it.category == selectedCat }
             category?.showAll != true
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    
+    val gpsTrackPoints: StateFlow<List<GpsTrackPoint>> = selectedDate
+        .flatMapLatest { date ->
+            val startOfDay = (date ?: LocalDate.now()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            val endOfDay = (date ?: LocalDate.now()).atTime(LocalTime.MAX).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            repository.getTrackPointsForDay(startOfDay, endOfDay)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         viewModelScope.launch {
@@ -241,7 +252,7 @@ class MainViewModel(private val repository: JournalRepository, private val share
 
             fun timestampFromString(dateTimeString: String): Long {
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
-                val localDateTime = LocalDateTime.parse(dateTimeString, formatter)
+                val localDateTime = java.time.LocalDateTime.parse(dateTimeString, formatter)
                 return localDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
             }
 
@@ -292,7 +303,7 @@ class MainViewModel(private val repository: JournalRepository, private val share
                     recognizedText.startsWith(keyword, ignoreCase = true) &&
                             (recognizedText.length == keyword.length || recognizedText.getOrNull(keyword.length)?.isWhitespace() == true)
                 }
-                val now = LocalDateTime.now()
+                val now = java.time.LocalDateTime.now()
                 val timestamp = _selectedDate.value?.atTime(now.toLocalTime())?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
                     ?: System.currentTimeMillis()
                 _selectedDate.value = null
@@ -320,10 +331,11 @@ class MainViewModel(private val repository: JournalRepository, private val share
     }
 }
 
-class MainViewModelFactory(private val repository: JournalRepository,  private val sharedPreferences: SharedPreferences) : ViewModelProvider.Factory {
+class MainViewModelFactory(private val context: Context, private val sharedPreferences: SharedPreferences) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
+            val repository = Injector.provideJournalRepository(context)
             return MainViewModel(repository, sharedPreferences) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

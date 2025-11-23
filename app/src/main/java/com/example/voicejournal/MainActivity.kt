@@ -40,12 +40,11 @@ import androidx.core.net.toUri
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.voicejournal.data.AppDatabase
-import com.example.voicejournal.data.JournalRepository
+import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.ui.components.AppDrawer
-import com.example.voicejournal.ui.screens.HomeScreen
-import com.example.voicejournal.ui.dialogs.SettingsScreen
 import com.example.voicejournal.ui.dialogs.EditEntryDialog
+import com.example.voicejournal.ui.dialogs.SettingsScreen
+import com.example.voicejournal.ui.screens.HomeScreen
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.NotificationHelper
 import com.example.voicejournal.util.SpeechRecognitionManager
@@ -61,21 +60,22 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
 
     private lateinit var speechRecognitionManager: SpeechRecognitionManager
-    private val db by lazy { AppDatabase.getDatabase(this) }
 
     private val viewModel: MainViewModel by viewModels {
-        val repository = JournalRepository(db.journalEntryDao(), applicationContext)
-        MainViewModelFactory(repository, getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE))
+        MainViewModelFactory(applicationContext, getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE))
     }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
-        
-        speechRecognitionManager = SpeechRecognitionManager(this, { recognizedText ->
-            viewModel.processRecognizedText(recognizedText)
-        })
+
+        speechRecognitionManager = SpeechRecognitionManager(
+            context = this,
+            onTextRecognized = { recognizedText ->
+                viewModel.processRecognizedText(recognizedText)
+            }
+        )
 
         setContent {
             VoicejournalTheme {
@@ -91,6 +91,7 @@ class MainActivity : ComponentActivity() {
                 val canUndo by viewModel.canUndo.collectAsState()
                 val categories by viewModel.categories.collectAsState() // Collect categories as State
                 val shouldShowMoreButton by viewModel.shouldShowMoreButton.collectAsState()
+                val gpsTrackPoints by viewModel.gpsTrackPoints.collectAsState()
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
@@ -192,6 +193,10 @@ class MainActivity : ComponentActivity() {
                             onAddTestDataClicked = {
                                 viewModel.addTestData()
                                 scope.launch { drawerState.close() }
+                            },
+                            onShowGpsTrackClicked = {
+                                scope.launch { drawerState.close() }
+                                openGoogleMapsWithTrack(gpsTrackPoints)
                             }
                         )
                     },
@@ -223,7 +228,7 @@ class MainActivity : ComponentActivity() {
                                             Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopiert")
                                         }
                                     }
-                                 )
+                                )
                             },
                             floatingActionButton = {
                                 FloatingActionButton(onClick = {
@@ -234,6 +239,7 @@ class MainActivity : ComponentActivity() {
                                         ) == PackageManager.PERMISSION_GRANTED -> {
                                             startListening()
                                         }
+
                                         else -> {
                                             recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                                         }
@@ -316,7 +322,6 @@ class MainActivity : ComponentActivity() {
     }
 
 
-
     private fun handleIntent(intent: Intent) {
         if (intent.action == NotificationHelper.NOTIFICATION_ACTION) {
             handleNotificationAction()
@@ -338,6 +343,26 @@ class MainActivity : ComponentActivity() {
             startActivity(intent)
         } catch (_: Exception) {
             Toast.makeText(this, "Could not open browser.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openGoogleMapsWithTrack(points: List<GpsTrackPoint>) {
+        if (points.size < 2) {
+            Toast.makeText(this, "Not enough GPS points to show a track.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val origin = "${points.first().latitude},${points.first().longitude}"
+        val destination = "${points.last().latitude},${points.last().longitude}"
+        val waypoints = points.subList(1, points.size - 1).joinToString("|") { "${it.latitude},${it.longitude}" }
+
+        val url = "https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination&waypoints=$waypoints&travelmode=driving"
+
+        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(this, "Could not open Google Maps.", Toast.LENGTH_SHORT).show()
         }
     }
 }

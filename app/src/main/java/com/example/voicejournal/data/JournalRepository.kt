@@ -3,6 +3,7 @@ package com.example.voicejournal.data
 import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -14,7 +15,11 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.regex.Pattern
 
-class JournalRepository(private val dao: JournalEntryDao, private val context: Context) {
+class JournalRepository(
+    private val dao: JournalEntryDao,
+    private val gpsTrackPointDao: GpsTrackPointDao,
+    private val context: Context
+) {
 
     val allCategories = dao.getAllCategories()
 
@@ -87,4 +92,13 @@ class JournalRepository(private val dao: JournalEntryDao, private val context: C
     suspend fun deleteCategory(category: String) = dao.deleteCategory(category)
     
     suspend fun deleteAll() = dao.deleteAll()
+
+    // GPS Track Point methods
+    suspend fun insertGpsPoint(point: GpsTrackPoint) {
+        gpsTrackPointDao.insert(point)
+    }
+
+    fun getTrackPointsForDay(dayStartMillis: Long, dayEndMillis: Long): Flow<List<GpsTrackPoint>> {
+        return gpsTrackPointDao.getTrackPointsForDay(dayStartMillis, dayEndMillis)
+    }
 }

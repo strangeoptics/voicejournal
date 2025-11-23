@@ -5,6 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Upload
@@ -23,7 +24,8 @@ fun AppDrawer(
     onImportJournalClicked: () -> Unit,
     onExportJournalClicked: () -> Unit,
     onShowNotificationClicked: () -> Unit,
-    onAddTestDataClicked: () -> Unit
+    onAddTestDataClicked: () -> Unit,
+    onShowGpsTrackClicked: () -> Unit
 ) {
     ModalDrawerSheet {
         NavigationDrawerItem(
@@ -66,6 +68,13 @@ fun AppDrawer(
             label = { Text("Add Test Data") },
             selected = false,
             onClick = onAddTestDataClicked,
+            modifier = Modifier.padding(12.dp)
+        )
+        NavigationDrawerItem(
+            icon = { Icon(Icons.Filled.Map, contentDescription = "Show GPS Track") },
+            label = { Text("Show GPS Track") },
+            selected = false,
+            onClick = onShowGpsTrackClicked,
             modifier = Modifier.padding(12.dp)
         )
     }

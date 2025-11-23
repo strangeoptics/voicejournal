@@ -9,6 +9,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -27,14 +31,17 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditEntryDialog(
     entry: JournalEntry,
+    categories: List<String>,
     onDismiss: () -> Unit,
-    onSave: (String, Long, Boolean) -> Unit
+    onSave: (String, String, Long, Boolean) -> Unit
 ) {
     var text by remember { mutableStateOf(entry.content) }
     var hasImage by remember { mutableStateOf(entry.hasImage) }
+    var selectedCategory by remember { mutableStateOf(entry.title) }
     val context = LocalContext.current
     var currentDateTime by remember {
         mutableStateOf(
@@ -44,6 +51,8 @@ fun EditEntryDialog(
             )
         )
     }
+    var isDropdownExpanded by remember { mutableStateOf(false) }
+
 
     val timePickerDialog = android.app.TimePickerDialog(
         context,
@@ -70,6 +79,35 @@ fun EditEntryDialog(
         title = { Text("Edit Entry") },
         text = {
             Column {
+                ExposedDropdownMenuBox(
+                    expanded = isDropdownExpanded,
+                    onExpandedChange = { isDropdownExpanded = !isDropdownExpanded }
+                ) {
+                    TextField(
+                        modifier = Modifier.menuAnchor(),
+                        readOnly = true,
+                        value = selectedCategory,
+                        onValueChange = {},
+                        label = { Text("Category") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isDropdownExpanded) },
+                        colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = isDropdownExpanded,
+                        onDismissRequest = { isDropdownExpanded = false }
+                    ) {
+                        categories.forEach { selectionOption ->
+                            DropdownMenuItem(
+                                text = { Text(selectionOption) },
+                                onClick = {
+                                    selectedCategory = selectionOption
+                                    isDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
                 TextField(
                     value = text,
                     onValueChange = { text = it },
@@ -97,7 +135,7 @@ fun EditEntryDialog(
         confirmButton = {
             TextButton(onClick = {
                 val newTimestamp = currentDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                onSave(text, newTimestamp, hasImage)
+                onSave(selectedCategory, text, newTimestamp, hasImage)
             }) {
                 Text("Save")
             }

@@ -220,7 +220,7 @@ class MainActivity : ComponentActivity() {
                                             clipboardManager.setPrimaryClip(clip)
                                             Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
                                         }) {
-                                            Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopieren")
+                                            Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopiert")
                                         }
                                     }
                                  )
@@ -290,9 +290,10 @@ class MainActivity : ComponentActivity() {
                 editingEntry?.let { entry ->
                     EditEntryDialog(
                         entry = entry,
+                        categories = categories,
                         onDismiss = viewModel::onDismissEditEntry,
-                        onSave = { content, timestamp, hasImage ->
-                            viewModel.onSaveEntry(content, timestamp, hasImage)
+                        onSave = { title, content, timestamp, hasImage ->
+                            viewModel.onSaveEntry(title, content, timestamp, hasImage)
                         }
                     )
                 }
@@ -313,6 +314,8 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         handleIntent(intent)
     }
+
+
 
     private fun handleIntent(intent: Intent) {
         if (intent.action == NotificationHelper.NOTIFICATION_ACTION) {

@@ -148,11 +148,11 @@ class MainViewModel(private val repository: JournalRepository, private val share
         _editingEntry.value = null
     }
 
-    fun onSaveEntry(updatedContent: String, updatedTimestamp: Long, hasImage: Boolean) {
+    fun onSaveEntry(updatedTitle: String, updatedContent: String, updatedTimestamp: Long, hasImage: Boolean) {
         val sanitizedContent = updatedContent.replace("luisa", "Eloisa", ignoreCase = true)
         viewModelScope.launch {
             _editingEntry.value?.let {
-                repository.update(it.copy(content = sanitizedContent, timestamp = updatedTimestamp, hasImage = hasImage))
+                repository.update(it.copy(title = updatedTitle, content = sanitizedContent, timestamp = updatedTimestamp, hasImage = hasImage))
                 _editingEntry.value = null
             }
         }

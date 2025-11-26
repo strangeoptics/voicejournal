@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -93,9 +94,10 @@ class MainActivity : ComponentActivity() {
                 val gpsInterval by viewModel.gpsInterval.collectAsState()
                 val filteredEntries by viewModel.filteredEntries.collectAsState()
                 val canUndo by viewModel.canUndo.collectAsState()
-                val categories by viewModel.categories.collectAsState() // Collect categories as State
+                val categories by viewModel.categories.collectAsState()
                 val shouldShowMoreButton by viewModel.shouldShowMoreButton.collectAsState()
                 val gpsTrackPoints by viewModel.gpsTrackPoints.collectAsState()
+                val hasGpsTrackForSelectedDate by viewModel.hasGpsTrackForSelectedDate.collectAsState()
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
@@ -262,6 +264,11 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     actions = {
+                                        if (hasGpsTrackForSelectedDate) {
+                                            IconButton(onClick = { openGoogleMapsWithTrack(gpsTrackPoints) }) {
+                                                Icon(Icons.Filled.Map, contentDescription = "Show GPS Track on Map")
+                                            }
+                                        }
                                         if (canUndo) {
                                             IconButton(onClick = viewModel::onUndoDelete) {
                                                 Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")

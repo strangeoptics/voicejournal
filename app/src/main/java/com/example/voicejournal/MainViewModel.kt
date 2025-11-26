@@ -42,6 +42,8 @@ class MainViewModel(
         const val KEY_DEFAULT_CATEGORIES_ADDED = "default_categories_added"
         const val KEY_GPS_TRACKING_ENABLED = "gps_tracking_enabled"
         const val KEY_GPS_INTERVAL_MINUTES = "gps_interval_minutes"
+        const val KEY_SPEECH_SERVICE = "speech_service"
+        const val KEY_GOOGLE_CLOUD_API_KEY = "google_cloud_api_key"
     }
 
     private val _selectedCategory = MutableStateFlow("")
@@ -64,6 +66,12 @@ class MainViewModel(
 
     private val _gpsInterval = MutableStateFlow(sharedPreferences.getInt(KEY_GPS_INTERVAL_MINUTES, 10))
     val gpsInterval: StateFlow<Int> = _gpsInterval.asStateFlow()
+
+    private val _speechService = MutableStateFlow(sharedPreferences.getString(KEY_SPEECH_SERVICE, "ANDROID") ?: "ANDROID")
+    val speechService: StateFlow<String> = _speechService.asStateFlow()
+
+    private val _googleCloudApiKey = MutableStateFlow(sharedPreferences.getString(KEY_GOOGLE_CLOUD_API_KEY, "") ?: "")
+    val googleCloudApiKey: StateFlow<String> = _googleCloudApiKey.asStateFlow()
 
     private val _recentlyDeleted = MutableStateFlow<List<JournalEntry>>(emptyList())
     val canUndo: StateFlow<Boolean> = combine(_recentlyDeleted) { it.isNotEmpty() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -216,14 +224,18 @@ class MainViewModel(
         _daysToShow.value += 3
         sharedPreferences.edit { putInt(KEY_DAYS_TO_SHOW, _daysToShow.value) }
     }
-    fun saveSettings(days: Int, isGpsEnabled: Boolean, interval: Int) {
+    fun saveSettings(days: Int, isGpsEnabled: Boolean, interval: Int, speechService: String, apiKey: String) {
         _daysToShow.value = days
         _isGpsTrackingEnabled.value = isGpsEnabled
         _gpsInterval.value = interval
+        _speechService.value = speechService
+        _googleCloudApiKey.value = apiKey
         sharedPreferences.edit {
             putInt(KEY_DAYS_TO_SHOW, days)
             putBoolean(KEY_GPS_TRACKING_ENABLED, isGpsEnabled)
             putInt(KEY_GPS_INTERVAL_MINUTES, interval)
+            putString(KEY_SPEECH_SERVICE, speechService)
+            putString(KEY_GOOGLE_CLOUD_API_KEY, apiKey)
         }
         // This is a bit of a hack, but it triggers the worker to be re-enqueued
         VoiceJournalApplication.setupLocationWorker(applicationContext)

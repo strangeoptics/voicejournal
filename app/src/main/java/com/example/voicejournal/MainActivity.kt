@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.speech.SpeechRecognizer
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -40,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -77,6 +79,23 @@ class MainActivity : ComponentActivity() {
             context = this,
             onTextRecognized = { recognizedText ->
                 viewModel.processRecognizedText(recognizedText)
+            },
+            scope = lifecycleScope,
+            onError = { error ->
+                runOnUiThread {
+                    val errorMessage = when (error) {
+                        SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions"
+                        SpeechRecognizer.ERROR_NETWORK -> "Network error or invalid API key"
+                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
+                        SpeechRecognizer.ERROR_NO_MATCH -> "No speech was recognized"
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer is busy"
+                        SpeechRecognizer.ERROR_SERVER -> "Server error"
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input"
+                        else -> "An unknown error occurred ($error)"
+                    }
+                    Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
+                }
             }
         )
 
@@ -98,6 +117,8 @@ class MainActivity : ComponentActivity() {
                 val shouldShowMoreButton by viewModel.shouldShowMoreButton.collectAsState()
                 val gpsTrackPoints by viewModel.gpsTrackPoints.collectAsState()
                 val hasGpsTrackForSelectedDate by viewModel.hasGpsTrackForSelectedDate.collectAsState()
+                val speechService by viewModel.speechService.collectAsState()
+                val googleCloudApiKey by viewModel.googleCloudApiKey.collectAsState()
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
@@ -122,11 +143,9 @@ class MainActivity : ComponentActivity() {
                         val isCoarseLocationGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
 
                         if (isFineLocationGranted || isCoarseLocationGranted) {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                                    // Now we launch the correctly registered launcher
-                                    backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                                }
+                            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                                // Now we launch the correctly registered launcher
+                                backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
                             }
                         } else {
                             Toast.makeText(this, "Location permission is required for GPS tracking.", Toast.LENGTH_LONG).show()
@@ -338,8 +357,10 @@ class MainActivity : ComponentActivity() {
                                         currentDays = daysToShow,
                                         isGpsTrackingEnabled = isGpsTrackingEnabled,
                                         gpsInterval = gpsInterval,
-                                        onSave = { days, isGpsEnabled, interval ->
-                                            viewModel.saveSettings(days, isGpsEnabled, interval)
+                                        currentSpeechService = speechService,
+                                        currentApiKey = googleCloudApiKey,
+                                        onSave = { days, isGpsEnabled, interval, service, apiKey ->
+                                            viewModel.saveSettings(days, isGpsEnabled, interval, service, apiKey)
                                             navController.popBackStack()
                                         },
                                         onDismiss = { navController.popBackStack() }
@@ -365,7 +386,9 @@ class MainActivity : ComponentActivity() {
     }
 
     fun startListening() {
-        speechRecognitionManager.startListening()
+        val service = viewModel.speechService.value
+        val apiKey = viewModel.googleCloudApiKey.value
+        speechRecognitionManager.startListening(service, apiKey)
     }
 
     override fun onDestroy() {

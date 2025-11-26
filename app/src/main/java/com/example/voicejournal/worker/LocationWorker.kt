@@ -2,13 +2,20 @@ package com.example.voicejournal.worker
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.os.Build
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import com.example.voicejournal.R
 import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.di.Injector
 import com.google.android.gms.location.LocationServices
@@ -28,6 +35,8 @@ class LocationWorker(
 
     companion object {
         const val WORK_NAME = "LocationWorker"
+        const val NOTIFICATION_ID = 1
+        const val NOTIFICATION_CHANNEL_ID = "LocationTrackingChannel"
     }
 
     @SuppressLint("MissingPermission")
@@ -41,6 +50,9 @@ class LocationWorker(
             Log.e(WORK_NAME, "Location permission not granted. Worker is failing.")
             return Result.failure()
         }
+
+        // Promote to a foreground service
+        setForeground(createForegroundInfo())
 
         return try {
             val location = getCurrentLocation()
@@ -61,6 +73,28 @@ class LocationWorker(
             Log.e(WORK_NAME, "Error getting location, failing.", e)
             Result.failure()
         }
+    }
+
+    private fun createForegroundInfo(): ForegroundInfo {
+        val notification = createNotification()
+        return ForegroundInfo(NOTIFICATION_ID, notification)
+    }
+
+    private fun createNotification(): Notification {
+        val channelId = NOTIFICATION_CHANNEL_ID
+        val channelName = "Location Tracking"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(channelId, channelName, NotificationManager.IMPORTANCE_LOW)
+            val notificationManager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        return NotificationCompat.Builder(appContext, channelId)
+            .setContentTitle("GPS Tracking Aktiv")
+            .setContentText("Standort wird in regelmäßigen Abständen erfasst.")
+            .setSmallIcon(R.drawable.ic_launcher_foreground) // Ensure you have this drawable
+            .setOngoing(true)
+            .build()
     }
 
     @SuppressLint("MissingPermission")

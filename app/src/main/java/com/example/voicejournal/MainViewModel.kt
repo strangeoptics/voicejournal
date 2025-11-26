@@ -97,9 +97,10 @@ class MainViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val hasGpsTrackForSelectedDate: StateFlow<Boolean> = gpsTrackPoints
-        .map { it.size >= 2 }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val hasGpsTrackForSelectedDate: StateFlow<Boolean> = combine(selectedDate, gpsTrackPoints) { date, points ->
+        date != null && points.size >= 2
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
 
     init {
         viewModelScope.launch {
@@ -165,6 +166,10 @@ class MainViewModel(
     }
     fun onEntrySelected(entry: JournalEntry) {
         _selectedEntry.value = if (_selectedEntry.value == entry) null else entry
+        // When an entry is selected, clear the date selection to hide the date-specific action
+        if (_selectedEntry.value != null) {
+            _selectedDate.value = null
+        }
     }
 
     fun onEditEntry(entry: JournalEntry) {

@@ -2,6 +2,8 @@
 
 Voice Journal is a comprehensive Android application designed to capture your thoughts, tasks, and memories effortlessly using voice commands. It combines powerful speech-to-text capabilities with location tracking and smart organization.
 
+![Screenshot of the Voice Journal app](screenshot.png)
+
 ## Features
 
 ### 🎙️ Advanced Speech Recognition

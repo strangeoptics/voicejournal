@@ -21,7 +21,7 @@ class VoiceJournalApplication : Application() {
         fun setupLocationWorker(context: Context) {
             val sharedPreferences = context.getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE)
             val isGpsTrackingEnabled = sharedPreferences.getBoolean(MainViewModel.KEY_GPS_TRACKING_ENABLED, true)
-            val interval = sharedPreferences.getInt(MainViewModel.KEY_GPS_INTERVAL_MINUTES, 20).toLong()
+            val interval = sharedPreferences.getInt(MainViewModel.KEY_GPS_INTERVAL_MINUTES, 10).toLong()
 
             val workManager = WorkManager.getInstance(context)
 

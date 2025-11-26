@@ -1,8 +1,10 @@
 package com.example.voicejournal.worker
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Location
 import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
@@ -11,9 +13,10 @@ import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.di.Injector
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.Tasks
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 class LocationWorker(
     private val appContext: Context,
@@ -27,41 +30,55 @@ class LocationWorker(
         const val WORK_NAME = "LocationWorker"
     }
 
+    @SuppressLint("MissingPermission")
     override suspend fun doWork(): Result {
-        return withContext(Dispatchers.IO) {
-            val hasFineLocationPermission = ContextCompat.checkSelfPermission(
-                appContext,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
+        val hasPermission = ContextCompat.checkSelfPermission(
+            appContext,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
 
-            val hasCoarseLocationPermission = ContextCompat.checkSelfPermission(
-                appContext,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
+        if (!hasPermission) {
+            Log.e(WORK_NAME, "Location permission not granted. Worker is failing.")
+            return Result.failure()
+        }
 
-            if (!hasFineLocationPermission || !hasCoarseLocationPermission) {
-                Log.e(WORK_NAME, "Location permission not granted")
-                return@withContext Result.failure()
+        return try {
+            val location = getCurrentLocation()
+            if (location != null) {
+                val point = GpsTrackPoint(
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    timestamp = System.currentTimeMillis()
+                )
+                repository.insertGpsPoint(point)
+                Log.d(WORK_NAME, "Successfully captured and saved location: $point")
+                Result.success()
+            } else {
+                Log.w(WORK_NAME, "Location was null, retrying later.")
+                Result.retry()
+            }
+        } catch (e: Exception) {
+            Log.e(WORK_NAME, "Error getting location, failing.", e)
+            Result.failure()
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private suspend fun getCurrentLocation(): Location? {
+        return suspendCancellableCoroutine { continuation ->
+            val cancellationTokenSource = CancellationTokenSource()
+
+            fusedLocationClient.getCurrentLocation(
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
+                cancellationTokenSource.token
+            ).addOnSuccessListener { location ->
+                continuation.resume(location) // Simply resume with the location, which can be null
+            }.addOnFailureListener { e ->
+                continuation.resumeWithException(e) // Resume with exception for actual failures
             }
 
-            try {
-                val location = Tasks.await(fusedLocationClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, null))
-                location?.let {
-                    val point = GpsTrackPoint(
-                        latitude = it.latitude,
-                        longitude = it.longitude,
-                        timestamp = System.currentTimeMillis()
-                    )
-                    repository.insertGpsPoint(point)
-                    Log.d(WORK_NAME, "Location captured: $point")
-                    return@withContext Result.success()
-                } ?: run {
-                    Log.e(WORK_NAME, "Failed to get location, it was null.")
-                    return@withContext Result.failure()
-                }
-            } catch (e: Exception) {
-                Log.e(WORK_NAME, "Exception getting location", e)
-                return@withContext Result.failure()
+            continuation.invokeOnCancellation {
+                cancellationTokenSource.cancel()
             }
         }
     }

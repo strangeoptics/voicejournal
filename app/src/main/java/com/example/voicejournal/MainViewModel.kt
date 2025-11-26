@@ -62,7 +62,7 @@ class MainViewModel(
     private val _isGpsTrackingEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_GPS_TRACKING_ENABLED, true))
     val isGpsTrackingEnabled: StateFlow<Boolean> = _isGpsTrackingEnabled.asStateFlow()
 
-    private val _gpsInterval = MutableStateFlow(sharedPreferences.getInt(KEY_GPS_INTERVAL_MINUTES, 20))
+    private val _gpsInterval = MutableStateFlow(sharedPreferences.getInt(KEY_GPS_INTERVAL_MINUTES, 10))
     val gpsInterval: StateFlow<Int> = _gpsInterval.asStateFlow()
 
     private val _recentlyDeleted = MutableStateFlow<List<JournalEntry>>(emptyList())

@@ -56,7 +56,7 @@ class SpeechRecognitionManager(
                         onError?.invoke(SpeechRecognizer.ERROR_NO_MATCH)
                         return
                     }
-                    onTextRecognized(recognizedText)
+                    onTextRecognized(capitalizeFirstLetter(recognizedText))
                 }
 
                 override fun onError(error: Int) {
@@ -215,7 +215,7 @@ class SpeechRecognitionManager(
                 if (results != null && results.length() > 0) {
                     val transcript = results.getJSONObject(0).getJSONArray("alternatives").getJSONObject(0).getString("transcript")
                     withContext(Dispatchers.Main) {
-                        onTextRecognized(transcript)
+                        onTextRecognized(capitalizeFirstLetter(transcript.trim()))
                     }
                 } else {
                     withContext(Dispatchers.Main) {
@@ -233,6 +233,10 @@ class SpeechRecognitionManager(
                 onError?.invoke(SpeechRecognizer.ERROR_NETWORK)
             }
         }
+    }
+
+    private fun capitalizeFirstLetter(text: String): String {
+        return text.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
     }
 
     fun destroy() {

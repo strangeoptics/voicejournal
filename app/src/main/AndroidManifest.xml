@@ -38,6 +38,13 @@
             android:label="Manage Categories"
             android:theme="@style/Theme.Voicejournal">
         </activity>
+
+        <!-- Add Service definition for WorkManager -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="location"
+            tools:node="merge" />
+
     </application>
 
 </manifest>

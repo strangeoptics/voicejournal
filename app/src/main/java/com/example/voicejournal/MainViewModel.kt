@@ -61,7 +61,7 @@ class MainViewModel(
     private val _daysToShow = MutableStateFlow(sharedPreferences.getInt(KEY_DAYS_TO_SHOW, 3))
     val daysToShow: StateFlow<Int> = _daysToShow.asStateFlow()
 
-    private val _isGpsTrackingEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_GPS_TRACKING_ENABLED, true))
+    private val _isGpsTrackingEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_GPS_TRACKING_ENABLED, false))
     val isGpsTrackingEnabled: StateFlow<Boolean> = _isGpsTrackingEnabled.asStateFlow()
 
     private val _gpsInterval = MutableStateFlow(sharedPreferences.getInt(KEY_GPS_INTERVAL_MINUTES, 10))

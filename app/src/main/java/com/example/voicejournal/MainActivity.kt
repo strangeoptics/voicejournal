@@ -119,6 +119,8 @@ class MainActivity : ComponentActivity() {
                 val hasGpsTrackForSelectedDate by viewModel.hasGpsTrackForSelectedDate.collectAsState()
                 val speechService by viewModel.speechService.collectAsState()
                 val googleCloudApiKey by viewModel.googleCloudApiKey.collectAsState()
+                val maxRecordingTime by viewModel.maxRecordingTime.collectAsState()
+
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
@@ -359,13 +361,14 @@ class MainActivity : ComponentActivity() {
                                         gpsInterval = gpsInterval,
                                         currentSpeechService = speechService,
                                         currentApiKey = googleCloudApiKey,
-                                        onSave = { days, isGpsEnabled, interval, service, apiKey ->
-                                            viewModel.saveSettings(days, isGpsEnabled, interval, service, apiKey)
+                                        maxRecordingTime = maxRecordingTime,
+                                        onSave = { days, isGpsEnabled, interval, service, apiKey, recordingTime ->
+                                            viewModel.saveSettings(days, isGpsEnabled, interval, service, apiKey, recordingTime)
                                             navController.popBackStack()
                                         },
                                         onDismiss = { navController.popBackStack() }
                                     )
-                                }
+                                 }
                             }
                         }
                     }
@@ -388,7 +391,8 @@ class MainActivity : ComponentActivity() {
     fun startListening() {
         val service = viewModel.speechService.value
         val apiKey = viewModel.googleCloudApiKey.value
-        speechRecognitionManager.startListening(service, apiKey)
+        val maxRecordingTime = viewModel.maxRecordingTime.value
+        speechRecognitionManager.startListening(service, apiKey, maxRecordingTime)
     }
 
     override fun onDestroy() {

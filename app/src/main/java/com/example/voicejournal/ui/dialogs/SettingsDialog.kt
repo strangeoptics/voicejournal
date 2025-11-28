@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -37,7 +39,8 @@ fun SettingsScreen(
     gpsInterval: Int,
     currentSpeechService: String,
     currentApiKey: String,
-    onSave: (days: Int, isGpsEnabled: Boolean, interval: Int, speechService: String, apiKey: String) -> Unit,
+    maxRecordingTime: Int,
+    onSave: (days: Int, isGpsEnabled: Boolean, interval: Int, speechService: String, apiKey: String, maxRecordingTime: Int) -> Unit,
     onDismiss: () -> Unit
 ) {
     var days by remember { mutableStateOf(currentDays.toString()) }
@@ -45,12 +48,14 @@ fun SettingsScreen(
     var interval by remember { mutableFloatStateOf(gpsInterval.toFloat()) }
     var speechService by remember { mutableStateOf(currentSpeechService) }
     var apiKey by remember { mutableStateOf(currentApiKey) }
+    var recordingTime by remember { mutableFloatStateOf(maxRecordingTime.toFloat()) }
+
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Einstellungen") },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text("Wie viele Tage sollen angezeigt werden?")
                 TextField(
                     value = days,
@@ -119,6 +124,14 @@ fun SettingsScreen(
                         onValueChange = { apiKey = it },
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Maximale Aufnahmedauer: ${recordingTime.roundToInt()} Sekunden")
+                    Slider(
+                        value = recordingTime,
+                        onValueChange = { recordingTime = it },
+                        valueRange = 5f..60f,
+                        steps = 54
+                    )
                 }
             }
         },
@@ -129,7 +142,8 @@ fun SettingsScreen(
                     gpsEnabled,
                     interval.roundToInt(),
                     speechService,
-                    apiKey
+                    apiKey,
+                    recordingTime.roundToInt()
                 )
             }) {
                 Text("Speichern")

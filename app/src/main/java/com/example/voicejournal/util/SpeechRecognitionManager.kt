@@ -74,9 +74,9 @@ class SpeechRecognitionManager(
         }
     }
 
-    fun startListening(service: String = "ANDROID", apiKey: String? = null) {
+    fun startListening(service: String = "ANDROID", apiKey: String? = null, maxRecordingTimeSeconds: Int = 15) {
         if (service == "GOOGLE_CLOUD" && !apiKey.isNullOrEmpty()) {
-            startGoogleCloudListening(apiKey)
+            startGoogleCloudListening(apiKey, maxRecordingTimeSeconds)
         } else {
             startAndroidListening()
         }
@@ -91,7 +91,7 @@ class SpeechRecognitionManager(
         speechRecognizer?.startListening(speechRecognizerIntent)
     }
 
-    private fun startGoogleCloudListening(apiKey: String) {
+    private fun startGoogleCloudListening(apiKey: String, maxRecordingTimeSeconds: Int) {
         if (ActivityCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             onError?.invoke(SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS)
             return
@@ -114,7 +114,7 @@ class SpeechRecognitionManager(
                 isRecording = true
 
                 val startTime = System.currentTimeMillis()
-                val maxRecordingTime = 60000 // 60 seconds
+                val maxRecordingTime = maxRecordingTimeSeconds * 1000 // Convert to milliseconds
                 val silenceThreshold = 500 // Amplitude threshold for silence
                 val silenceTimeRequired = 2000 // 2 seconds of silence to stop
                 var lastSoundTime = System.currentTimeMillis()

@@ -43,7 +43,9 @@ fun SettingsScreen(
     currentSpeechService: String,
     currentApiKey: String,
     maxRecordingTime: Int,
-    onSave: (days: Int, isGpsEnabled: Boolean, interval: Int, speechService: String, apiKey: String, maxRecordingTime: Int) -> Unit,
+    silenceThreshold: Int,
+    silenceTimeRequired: Int,
+    onSave: (days: Int, isGpsEnabled: Boolean, interval: Int, speechService: String, apiKey: String, maxRecordingTime: Int, silenceThreshold: Int, silenceTimeRequired: Int) -> Unit,
     onDismiss: () -> Unit
 ) {
     var days by remember { mutableStateOf(currentDays.toString()) }
@@ -52,6 +54,8 @@ fun SettingsScreen(
     var speechService by remember { mutableStateOf(currentSpeechService) }
     var apiKey by remember { mutableStateOf(currentApiKey) }
     var recordingTime by remember { mutableFloatStateOf(maxRecordingTime.toFloat()) }
+    var threshold by remember { mutableFloatStateOf(silenceThreshold.toFloat()) }
+    var silenceTime by remember { mutableFloatStateOf(silenceTimeRequired.toFloat()) }
 
     Scaffold(
         topBar = {
@@ -142,6 +146,22 @@ fun SettingsScreen(
                         valueRange = 5f..60f,
                         steps = 54
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Stille-Schwellenwert: ${threshold.roundToInt()}")
+                    Slider(
+                        value = threshold,
+                        onValueChange = { threshold = it },
+                        valueRange = 100f..2000f,
+                        steps = 189
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Benötigte Stille: ${silenceTime.roundToInt()} ms")
+                    Slider(
+                        value = silenceTime,
+                        onValueChange = { silenceTime = it },
+                        valueRange = 500f..5000f,
+                        steps = 89
+                    )
                 }
                 Spacer(modifier = Modifier.height(24.dp))
                 Row {
@@ -152,7 +172,9 @@ fun SettingsScreen(
                             interval.roundToInt(),
                             speechService,
                             apiKey,
-                            recordingTime.roundToInt()
+                            recordingTime.roundToInt(),
+                            threshold.roundToInt(),
+                            silenceTime.roundToInt()
                         )
                     }) {
                         Text("Speichern")

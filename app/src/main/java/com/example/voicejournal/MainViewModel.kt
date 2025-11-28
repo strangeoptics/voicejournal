@@ -45,6 +45,8 @@ class MainViewModel(
         const val KEY_SPEECH_SERVICE = "speech_service"
         const val KEY_GOOGLE_CLOUD_API_KEY = "google_cloud_api_key"
         const val KEY_MAX_RECORDING_TIME = "max_recording_time"
+        const val KEY_SILENCE_THRESHOLD = "silence_threshold"
+        const val KEY_SILENCE_TIME_REQUIRED = "silence_time_required"
     }
 
     private val _selectedCategory = MutableStateFlow("")
@@ -76,6 +78,12 @@ class MainViewModel(
 
     private val _maxRecordingTime = MutableStateFlow(sharedPreferences.getInt(KEY_MAX_RECORDING_TIME, 15))
     val maxRecordingTime: StateFlow<Int> = _maxRecordingTime.asStateFlow()
+
+    private val _silenceThreshold = MutableStateFlow(sharedPreferences.getInt(KEY_SILENCE_THRESHOLD, 500))
+    val silenceThreshold: StateFlow<Int> = _silenceThreshold.asStateFlow()
+
+    private val _silenceTimeRequired = MutableStateFlow(sharedPreferences.getInt(KEY_SILENCE_TIME_REQUIRED, 2000))
+    val silenceTimeRequired: StateFlow<Int> = _silenceTimeRequired.asStateFlow()
 
     private val _recentlyDeleted = MutableStateFlow<List<JournalEntry>>(emptyList())
     val canUndo: StateFlow<Boolean> = combine(_recentlyDeleted) { it.isNotEmpty() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -228,13 +236,24 @@ class MainViewModel(
         _daysToShow.value += 3
         sharedPreferences.edit { putInt(KEY_DAYS_TO_SHOW, _daysToShow.value) }
     }
-    fun saveSettings(days: Int, isGpsEnabled: Boolean, interval: Int, speechService: String, apiKey: String, maxRecordingTime: Int) {
+    fun saveSettings(
+        days: Int,
+        isGpsEnabled: Boolean,
+        interval: Int,
+        speechService: String,
+        apiKey: String,
+        maxRecordingTime: Int,
+        silenceThreshold: Int,
+        silenceTimeRequired: Int
+    ) {
         _daysToShow.value = days
         _isGpsTrackingEnabled.value = isGpsEnabled
         _gpsInterval.value = interval
         _speechService.value = speechService
         _googleCloudApiKey.value = apiKey
         _maxRecordingTime.value = maxRecordingTime
+        _silenceThreshold.value = silenceThreshold
+        _silenceTimeRequired.value = silenceTimeRequired
         sharedPreferences.edit {
             putInt(KEY_DAYS_TO_SHOW, days)
             putBoolean(KEY_GPS_TRACKING_ENABLED, isGpsEnabled)
@@ -242,6 +261,8 @@ class MainViewModel(
             putString(KEY_SPEECH_SERVICE, speechService)
             putString(KEY_GOOGLE_CLOUD_API_KEY, apiKey)
             putInt(KEY_MAX_RECORDING_TIME, maxRecordingTime)
+            putInt(KEY_SILENCE_THRESHOLD, silenceThreshold)
+            putInt(KEY_SILENCE_TIME_REQUIRED, silenceTimeRequired)
         }
         // This is a bit of a hack, but it triggers the worker to be re-enqueued
         VoiceJournalApplication.setupLocationWorker(applicationContext)

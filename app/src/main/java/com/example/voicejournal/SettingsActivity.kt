@@ -25,6 +25,8 @@ class SettingsActivity : ComponentActivity() {
                 val speechService by viewModel.speechService.collectAsState()
                 val googleCloudApiKey by viewModel.googleCloudApiKey.collectAsState()
                 val maxRecordingTime by viewModel.maxRecordingTime.collectAsState()
+                val silenceThreshold by viewModel.silenceThreshold.collectAsState()
+                val silenceTimeRequired by viewModel.silenceTimeRequired.collectAsState()
 
                 SettingsScreen(
                     currentDays = daysToShow,
@@ -33,8 +35,10 @@ class SettingsActivity : ComponentActivity() {
                     currentSpeechService = speechService,
                     currentApiKey = googleCloudApiKey,
                     maxRecordingTime = maxRecordingTime,
-                    onSave = { days, isGpsEnabled, interval, service, apiKey, recordingTime ->
-                        viewModel.saveSettings(days, isGpsEnabled, interval, service, apiKey, recordingTime)
+                    silenceThreshold = silenceThreshold,
+                    silenceTimeRequired = silenceTimeRequired,
+                    onSave = { days, isGpsEnabled, interval, service, apiKey, recordingTime, threshold, silenceTime ->
+                        viewModel.saveSettings(days, isGpsEnabled, interval, service, apiKey, recordingTime, threshold, silenceTime)
                         finish()
                     },
                     onDismiss = {

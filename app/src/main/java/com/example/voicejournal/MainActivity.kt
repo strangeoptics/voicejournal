@@ -370,7 +370,15 @@ class MainActivity : ComponentActivity() {
         val service = viewModel.speechService.value
         val apiKey = viewModel.googleCloudApiKey.value
         val maxRecordingTime = viewModel.maxRecordingTime.value
-        speechRecognitionManager.startListening(service, apiKey, maxRecordingTime)
+        val silenceThreshold = viewModel.silenceThreshold.value
+        val silenceTimeRequired = viewModel.silenceTimeRequired.value
+        speechRecognitionManager.startListening(
+            service = service,
+            apiKey = apiKey,
+            maxRecordingTimeSeconds = maxRecordingTime,
+            silenceThreshold = silenceThreshold,
+            silenceTimeRequired = silenceTimeRequired
+        )
     }
 
     override fun onDestroy() {

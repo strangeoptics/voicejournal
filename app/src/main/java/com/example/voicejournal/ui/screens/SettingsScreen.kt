@@ -1,4 +1,4 @@
-package com.example.voicejournal.ui.dialogs
+package com.example.voicejournal.ui.screens
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,14 +11,16 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -32,6 +34,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     currentDays: Int,
@@ -50,12 +53,19 @@ fun SettingsScreen(
     var apiKey by remember { mutableStateOf(currentApiKey) }
     var recordingTime by remember { mutableFloatStateOf(maxRecordingTime.toFloat()) }
 
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Einstellungen") },
-        text = {
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Einstellungen") }
+            )
+        },
+        content = { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
                 Text("Wie viele Tage sollen angezeigt werden?")
                 TextField(
                     value = days,
@@ -133,25 +143,25 @@ fun SettingsScreen(
                         steps = 54
                     )
                 }
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                onSave(
-                    days.toIntOrNull() ?: currentDays,
-                    gpsEnabled,
-                    interval.roundToInt(),
-                    speechService,
-                    apiKey,
-                    recordingTime.roundToInt()
-                )
-            }) {
-                Text("Speichern")
-            }
-        },
-        dismissButton = {
-            Button(onClick = onDismiss) {
-                Text("Abbrechen")
+                Spacer(modifier = Modifier.height(24.dp))
+                Row {
+                    Button(onClick = {
+                        onSave(
+                            days.toIntOrNull() ?: currentDays,
+                            gpsEnabled,
+                            interval.roundToInt(),
+                            speechService,
+                            apiKey,
+                            recordingTime.roundToInt()
+                        )
+                    }) {
+                        Text("Speichern")
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Button(onClick = onDismiss) {
+                        Text("Abbrechen")
+                    }
+                }
             }
         }
     )

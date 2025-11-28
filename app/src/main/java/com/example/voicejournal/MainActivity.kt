@@ -48,7 +48,6 @@ import androidx.navigation.compose.rememberNavController
 import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.ui.components.AppDrawer
 import com.example.voicejournal.ui.dialogs.EditEntryDialog
-import com.example.voicejournal.ui.dialogs.SettingsScreen
 import com.example.voicejournal.ui.screens.HomeScreen
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.NotificationHelper
@@ -108,19 +107,13 @@ class MainActivity : ComponentActivity() {
                 val selectedEntry by viewModel.selectedEntry.collectAsState()
                 val selectedDate by viewModel.selectedDate.collectAsState()
                 val editingEntry by viewModel.editingEntry.collectAsState()
-                val daysToShow by viewModel.daysToShow.collectAsState()
                 val isGpsTrackingEnabled by viewModel.isGpsTrackingEnabled.collectAsState()
-                val gpsInterval by viewModel.gpsInterval.collectAsState()
                 val filteredEntries by viewModel.filteredEntries.collectAsState()
                 val canUndo by viewModel.canUndo.collectAsState()
                 val categories by viewModel.categories.collectAsState()
                 val shouldShowMoreButton by viewModel.shouldShowMoreButton.collectAsState()
                 val gpsTrackPoints by viewModel.gpsTrackPoints.collectAsState()
                 val hasGpsTrackForSelectedDate by viewModel.hasGpsTrackForSelectedDate.collectAsState()
-                val speechService by viewModel.speechService.collectAsState()
-                val googleCloudApiKey by viewModel.googleCloudApiKey.collectAsState()
-                val maxRecordingTime by viewModel.maxRecordingTime.collectAsState()
-
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
@@ -232,7 +225,7 @@ class MainActivity : ComponentActivity() {
                         AppDrawer(
                             onSettingsClicked = {
                                 scope.launch { drawerState.close() }
-                                navController.navigate("settings")
+                                context.startActivity(Intent(context, SettingsActivity::class.java))
                             },
                             onManageCategoriesClicked = {
                                 scope.launch { drawerState.close() }
@@ -354,21 +347,6 @@ class MainActivity : ComponentActivity() {
                                         shouldShowMoreButton = shouldShowMoreButton
                                     )
                                 }
-                                composable("settings") {
-                                    SettingsScreen(
-                                        currentDays = daysToShow,
-                                        isGpsTrackingEnabled = isGpsTrackingEnabled,
-                                        gpsInterval = gpsInterval,
-                                        currentSpeechService = speechService,
-                                        currentApiKey = googleCloudApiKey,
-                                        maxRecordingTime = maxRecordingTime,
-                                        onSave = { days, isGpsEnabled, interval, service, apiKey, recordingTime ->
-                                            viewModel.saveSettings(days, isGpsEnabled, interval, service, apiKey, recordingTime)
-                                            navController.popBackStack()
-                                        },
-                                        onDismiss = { navController.popBackStack() }
-                                    )
-                                 }
                             }
                         }
                     }

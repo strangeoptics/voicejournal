@@ -38,6 +38,12 @@
             android:label="Manage Categories"
             android:theme="@style/Theme.Voicejournal">
         </activity>
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:label="Settings"
+            android:theme="@style/Theme.Voicejournal">
+        </activity>
 
         <!-- Add Service definition for WorkManager -->
         <service

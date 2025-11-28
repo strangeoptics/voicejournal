@@ -37,13 +37,15 @@ class SettingsActivity : ComponentActivity() {
                     maxRecordingTime = maxRecordingTime,
                     silenceThreshold = silenceThreshold,
                     silenceTimeRequired = silenceTimeRequired,
-                    onSave = { days, isGpsEnabled, interval, service, apiKey, recordingTime, threshold, silenceTime ->
-                        viewModel.saveSettings(days, isGpsEnabled, interval, service, apiKey, recordingTime, threshold, silenceTime)
-                        finish()
-                    },
-                    onDismiss = {
-                        finish()
-                    }
+                    onDaysChanged = viewModel::saveDaysToShow,
+                    onGpsEnableChanged = viewModel::saveGpsTrackingEnabled,
+                    onGpsIntervalChanged = viewModel::saveGpsInterval,
+                    onSpeechServiceChanged = viewModel::saveSpeechService,
+                    onApiKeyChanged = viewModel::saveApiKey,
+                    onMaxRecordingTimeChanged = viewModel::saveMaxRecordingTime,
+                    onSilenceThresholdChanged = viewModel::saveSilenceThreshold,
+                    onSilenceTimeRequiredChanged = viewModel::saveSilenceTimeRequired,
+                    onBackPressed = { finish() }
                 )
             }
         }

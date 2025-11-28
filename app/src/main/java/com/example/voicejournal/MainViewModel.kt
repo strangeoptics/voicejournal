@@ -236,36 +236,47 @@ class MainViewModel(
         _daysToShow.value += 3
         sharedPreferences.edit { putInt(KEY_DAYS_TO_SHOW, _daysToShow.value) }
     }
-    fun saveSettings(
-        days: Int,
-        isGpsEnabled: Boolean,
-        interval: Int,
-        speechService: String,
-        apiKey: String,
-        maxRecordingTime: Int,
-        silenceThreshold: Int,
-        silenceTimeRequired: Int
-    ) {
+    
+    fun saveDaysToShow(days: Int) {
         _daysToShow.value = days
-        _isGpsTrackingEnabled.value = isGpsEnabled
-        _gpsInterval.value = interval
-        _speechService.value = speechService
-        _googleCloudApiKey.value = apiKey
-        _maxRecordingTime.value = maxRecordingTime
-        _silenceThreshold.value = silenceThreshold
-        _silenceTimeRequired.value = silenceTimeRequired
-        sharedPreferences.edit {
-            putInt(KEY_DAYS_TO_SHOW, days)
-            putBoolean(KEY_GPS_TRACKING_ENABLED, isGpsEnabled)
-            putInt(KEY_GPS_INTERVAL_MINUTES, interval)
-            putString(KEY_SPEECH_SERVICE, speechService)
-            putString(KEY_GOOGLE_CLOUD_API_KEY, apiKey)
-            putInt(KEY_MAX_RECORDING_TIME, maxRecordingTime)
-            putInt(KEY_SILENCE_THRESHOLD, silenceThreshold)
-            putInt(KEY_SILENCE_TIME_REQUIRED, silenceTimeRequired)
-        }
-        // This is a bit of a hack, but it triggers the worker to be re-enqueued
+        sharedPreferences.edit { putInt(KEY_DAYS_TO_SHOW, days) }
+    }
+
+    fun saveGpsTrackingEnabled(isEnabled: Boolean) {
+        _isGpsTrackingEnabled.value = isEnabled
+        sharedPreferences.edit { putBoolean(KEY_GPS_TRACKING_ENABLED, isEnabled) }
         VoiceJournalApplication.setupLocationWorker(applicationContext)
+    }
+
+    fun saveGpsInterval(interval: Int) {
+        _gpsInterval.value = interval
+        sharedPreferences.edit { putInt(KEY_GPS_INTERVAL_MINUTES, interval) }
+        VoiceJournalApplication.setupLocationWorker(applicationContext)
+    }
+
+    fun saveSpeechService(service: String) {
+        _speechService.value = service
+        sharedPreferences.edit { putString(KEY_SPEECH_SERVICE, service) }
+    }
+
+    fun saveApiKey(apiKey: String) {
+        _googleCloudApiKey.value = apiKey
+        sharedPreferences.edit { putString(KEY_GOOGLE_CLOUD_API_KEY, apiKey) }
+    }
+
+    fun saveMaxRecordingTime(time: Int) {
+        _maxRecordingTime.value = time
+        sharedPreferences.edit { putInt(KEY_MAX_RECORDING_TIME, time) }
+    }
+
+    fun saveSilenceThreshold(threshold: Int) {
+        _silenceThreshold.value = threshold
+        sharedPreferences.edit { putInt(KEY_SILENCE_THRESHOLD, threshold) }
+    }
+
+    fun saveSilenceTimeRequired(time: Int) {
+        _silenceTimeRequired.value = time
+        sharedPreferences.edit { putInt(KEY_SILENCE_TIME_REQUIRED, time) }
     }
 
     fun addOrUpdateCategory(categoryName: String, aliasesString: String, showAll: Boolean) {

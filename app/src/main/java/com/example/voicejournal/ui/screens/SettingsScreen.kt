@@ -1,18 +1,23 @@
 package com.example.voicejournal.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -23,7 +28,6 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -45,22 +49,28 @@ fun SettingsScreen(
     maxRecordingTime: Int,
     silenceThreshold: Int,
     silenceTimeRequired: Int,
-    onSave: (days: Int, isGpsEnabled: Boolean, interval: Int, speechService: String, apiKey: String, maxRecordingTime: Int, silenceThreshold: Int, silenceTimeRequired: Int) -> Unit,
-    onDismiss: () -> Unit
+    onDaysChanged: (Int) -> Unit,
+    onGpsEnableChanged: (Boolean) -> Unit,
+    onGpsIntervalChanged: (Int) -> Unit,
+    onSpeechServiceChanged: (String) -> Unit,
+    onApiKeyChanged: (String) -> Unit,
+    onMaxRecordingTimeChanged: (Int) -> Unit,
+    onSilenceThresholdChanged: (Int) -> Unit,
+    onSilenceTimeRequiredChanged: (Int) -> Unit,
+    onBackPressed: () -> Unit
 ) {
     var days by remember { mutableStateOf(currentDays.toString()) }
-    var gpsEnabled by remember { mutableStateOf(isGpsTrackingEnabled) }
-    var interval by remember { mutableFloatStateOf(gpsInterval.toFloat()) }
-    var speechService by remember { mutableStateOf(currentSpeechService) }
     var apiKey by remember { mutableStateOf(currentApiKey) }
-    var recordingTime by remember { mutableFloatStateOf(maxRecordingTime.toFloat()) }
-    var threshold by remember { mutableFloatStateOf(silenceThreshold.toFloat()) }
-    var silenceTime by remember { mutableFloatStateOf(silenceTimeRequired.toFloat()) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Einstellungen") }
+                title = { Text("Einstellungen") },
+                navigationIcon = {
+                    IconButton(onClick = onBackPressed) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                }
             )
         },
         content = { paddingValues ->
@@ -70,12 +80,22 @@ fun SettingsScreen(
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                Text("Wie viele Tage sollen angezeigt werden?")
-                TextField(
-                    value = days,
-                    onValueChange = { days = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Anzeigetage")
+                    TextField(
+                        value = days,
+                        onValueChange = {
+                            days = it
+                            it.toIntOrNull()?.let(onDaysChanged)
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.width(80.dp)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -84,20 +104,20 @@ fun SettingsScreen(
                 ) {
                     Text("GPS-Tracking aktivieren", modifier = Modifier.weight(1f))
                     Switch(
-                        checked = gpsEnabled,
-                        onCheckedChange = { gpsEnabled = it }
+                        checked = isGpsTrackingEnabled,
+                        onCheckedChange = onGpsEnableChanged
                     )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text("GPS Abrufintervall: ${interval.roundToInt()} Minuten")
+                Text("GPS Abrufintervall: ${gpsInterval} Minuten")
                 Slider(
-                    value = interval,
-                    onValueChange = { interval = it },
+                    value = gpsInterval.toFloat(),
+                    onValueChange = { onGpsIntervalChanged(it.roundToInt()) },
                     valueRange = 5f..60f,
                     steps = 54, // (60-5) / 1
-                    enabled = gpsEnabled
+                    enabled = isGpsTrackingEnabled
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -110,15 +130,15 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .height(56.dp)
                                 .selectable(
-                                    selected = (speechService == value),
-                                    onClick = { speechService = value },
+                                    selected = (currentSpeechService == value),
+                                    onClick = { onSpeechServiceChanged(value) },
                                     role = Role.RadioButton
                                 )
                                 .padding(horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
-                                selected = (speechService == value),
+                                selected = (currentSpeechService == value),
                                 onClick = null // null recommended for accessibility with selectable
                             )
                             Text(
@@ -130,59 +150,41 @@ fun SettingsScreen(
                     }
                 }
 
-                if (speechService == "GOOGLE_CLOUD") {
+                if (currentSpeechService == "GOOGLE_CLOUD") {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Google Cloud API Key")
                     TextField(
                         value = apiKey,
-                        onValueChange = { apiKey = it },
+                        onValueChange = {
+                            apiKey = it
+                            onApiKeyChanged(it)
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Maximale Aufnahmedauer: ${recordingTime.roundToInt()} Sekunden")
+                    Text("Maximale Aufnahmedauer: $maxRecordingTime Sekunden")
                     Slider(
-                        value = recordingTime,
-                        onValueChange = { recordingTime = it },
+                        value = maxRecordingTime.toFloat(),
+                        onValueChange = { onMaxRecordingTimeChanged(it.roundToInt()) },
                         valueRange = 5f..60f,
                         steps = 54
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Stille-Schwellenwert: ${threshold.roundToInt()}")
+                    Text("Stille-Schwellenwert: $silenceThreshold")
                     Slider(
-                        value = threshold,
-                        onValueChange = { threshold = it },
+                        value = silenceThreshold.toFloat(),
+                        onValueChange = { onSilenceThresholdChanged(it.roundToInt()) },
                         valueRange = 100f..2000f,
                         steps = 189
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Benötigte Stille: ${silenceTime.roundToInt()} ms")
+                    Text("Benötigte Stille: $silenceTimeRequired ms")
                     Slider(
-                        value = silenceTime,
-                        onValueChange = { silenceTime = it },
+                        value = silenceTimeRequired.toFloat(),
+                        onValueChange = { onSilenceTimeRequiredChanged(it.roundToInt()) },
                         valueRange = 500f..5000f,
                         steps = 89
                     )
-                }
-                Spacer(modifier = Modifier.height(24.dp))
-                Row {
-                    Button(onClick = {
-                        onSave(
-                            days.toIntOrNull() ?: currentDays,
-                            gpsEnabled,
-                            interval.roundToInt(),
-                            speechService,
-                            apiKey,
-                            recordingTime.roundToInt(),
-                            threshold.roundToInt(),
-                            silenceTime.roundToInt()
-                        )
-                    }) {
-                        Text("Speichern")
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    Button(onClick = onDismiss) {
-                        Text("Abbrechen")
-                    }
                 }
             }
         }

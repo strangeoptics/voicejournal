@@ -30,17 +30,17 @@ class JournalRepository(
             BufferedReader(InputStreamReader(inputStream)).use { reader ->
                 val content = reader.readText()
                 try {
-                    // Try new format first
+                    // Try parsing as Version 2+ format
                     val journalExport = Json.decodeFromString<JournalExport>(content)
                     journalExport.entries.forEach { dao.insert(it) }
                     journalExport.categories.forEach { dao.insertCategory(it) }
                 } catch (e1: Exception) {
                     try {
-                        // Try old JSON format
+                        // If that fails, try parsing as Version 1 format (List<JournalEntry>)
                         val entries = Json.decodeFromString<List<JournalEntry>>(content)
                         entries.forEach { dao.insert(it) }
                     } catch (e2: Exception) {
-                        // Fallback to legacy text format
+                        // If all JSON parsing fails, fall back to the legacy text format
                         parseLegacyFormat(content)
                     }
                 }
@@ -74,8 +74,11 @@ class JournalRepository(
     suspend fun exportJournal(uri: Uri) = withContext(Dispatchers.IO) {
         val entries = dao.getAllEntries()
         val categories = dao.getAllCategoriesList()
-        val exportData = JournalExport(entries, categories)
-        val jsonString = Json.encodeToString(exportData)
+        val exportData = JournalExport(version = 2, entries = entries, categories = categories)
+        val jsonString = Json {
+            prettyPrint = true
+            encodeDefaults = true // This ensures the 'version' field is always included
+        }.encodeToString(exportData)
         context.contentResolver.openFileDescriptor(uri, "w")?.use {
             FileOutputStream(it.fileDescriptor).use { fos ->
                 fos.write(jsonString.toByteArray())

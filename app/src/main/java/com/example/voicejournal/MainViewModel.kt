@@ -324,6 +324,11 @@ class MainViewModel(
         repository.importJournal(uri)
     }
 
+    fun deleteAllData() {
+        viewModelScope.launch {
+            repository.deleteAll()
+        }
+    }
 
     fun addTestData() {
         viewModelScope.launch {

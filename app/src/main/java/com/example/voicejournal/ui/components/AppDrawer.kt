@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Notifications
@@ -25,7 +26,8 @@ fun AppDrawer(
     onExportJournalClicked: () -> Unit,
     onShowNotificationClicked: () -> Unit,
     onAddTestDataClicked: () -> Unit,
-    onShowGpsTrackClicked: () -> Unit
+    onShowGpsTrackClicked: () -> Unit,
+    onDeleteAllClicked: () -> Unit
 ) {
     ModalDrawerSheet {
         NavigationDrawerItem(
@@ -75,6 +77,13 @@ fun AppDrawer(
             label = { Text("Show GPS Track") },
             selected = false,
             onClick = onShowGpsTrackClicked,
+            modifier = Modifier.padding(12.dp)
+        )
+        NavigationDrawerItem(
+            icon = { Icon(Icons.Filled.DeleteForever, contentDescription = "Delete All Data") },
+            label = { Text("Delete All Data") },
+            selected = false,
+            onClick = onDeleteAllClicked,
             modifier = Modifier.padding(12.dp)
         )
     }

@@ -5,7 +5,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.speech.SpeechRecognizer
 import android.widget.Toast
@@ -23,6 +22,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -31,12 +31,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -117,6 +121,32 @@ class MainActivity : ComponentActivity() {
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
+                var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
+
+
+                if (showDeleteConfirmationDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteConfirmationDialog = false },
+                        title = { Text("Delete All Data") },
+                        text = { Text("Are you sure you want to delete all journal entries and categories? This action cannot be undone.") },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    viewModel.deleteAllData()
+                                    showDeleteConfirmationDialog = false
+                                }
+                            ) {
+                                Text("Delete")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteConfirmationDialog = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
+                }
+
 
                 // Correctly defined launcher for background location permission
                 val backgroundLocationLauncher = rememberLauncherForActivityResult(
@@ -261,6 +291,10 @@ class MainActivity : ComponentActivity() {
                             onShowGpsTrackClicked = {
                                 scope.launch { drawerState.close() }
                                 openGoogleMapsWithTrack(gpsTrackPoints)
+                            },
+                            onDeleteAllClicked = {
+                                scope.launch { drawerState.close() }
+                                showDeleteConfirmationDialog = true
                             }
                         )
                     },

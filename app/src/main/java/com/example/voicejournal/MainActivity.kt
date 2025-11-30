@@ -237,8 +237,8 @@ class MainActivity : ComponentActivity() {
                             },
                             onExportJournalClicked = {
                                 scope.launch { drawerState.close() }
-                                val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-                                val fileName = "journal_${LocalDate.now().format(formatter)}.jrn"
+                                val formatter = DateTimeFormatter.ofPattern("yyyy-MM-ddTHH:mm")
+                                val fileName = "journal_${LocalDate.now().format(formatter)}.json"
                                 exportLauncher.launch(fileName)
                             },
                             onShowNotificationClicked = {

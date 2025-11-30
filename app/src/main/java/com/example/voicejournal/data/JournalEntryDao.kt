@@ -44,6 +44,9 @@ interface JournalEntryDao {
     @Query("SELECT * FROM categories ORDER BY orderIndex ASC")
     fun getAllCategories(): Flow<List<Category>>
 
+    @Query("SELECT * FROM categories ORDER BY orderIndex ASC")
+    suspend fun getAllCategoriesList(): List<Category>
+
     @Query("UPDATE categories SET aliases = :aliases WHERE category = :categoryName")
     suspend fun updateAliasesForCategory(categoryName: String, aliases: String)
 

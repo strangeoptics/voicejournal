@@ -2,14 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".VoiceJournalApplication"
@@ -20,7 +19,8 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Voicejournal">
+        android:theme="@style/Theme.Voicejournal"
+        tools:targetApi="31">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -28,29 +28,25 @@
             android:theme="@style/Theme.Voicejournal">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
         <activity
-            android:name=".CategoryManagerActivity"
-            android:exported="false"
-            android:label="Manage Categories"
-            android:theme="@style/Theme.Voicejournal">
-        </activity>
-        <activity
             android:name=".SettingsActivity"
             android:exported="false"
-            android:label="Settings"
-            android:theme="@style/Theme.Voicejournal">
-        </activity>
+            android:label="@string/title_activity_settings" />
+        <activity
+            android:name=".CategoryManagerActivity"
+            android:exported="false"
+            android:label="@string/title_activity_category_manager" />
+         <activity
+            android:name=".EditEntryActivity"
+            android:exported="false"
+            android:label="@string/title_activity_edit_entry" />
 
-        <!-- Add Service definition for WorkManager -->
         <service
-            android:name="androidx.work.impl.foreground.SystemForegroundService"
-            android:foregroundServiceType="location"
-            tools:node="merge" />
-
+            android:name=".util.TranscriptionService"
+            android:exported="false" />
     </application>
 
 </manifest>

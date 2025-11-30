@@ -51,7 +51,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.ui.components.AppDrawer
-import com.example.voicejournal.ui.dialogs.EditEntryDialog
 import com.example.voicejournal.ui.screens.HomeScreen
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.NotificationHelper
@@ -110,7 +109,6 @@ class MainActivity : ComponentActivity() {
                 val groupedEntries by viewModel.groupedEntries.collectAsState()
                 val selectedEntry by viewModel.selectedEntry.collectAsState()
                 val selectedDate by viewModel.selectedDate.collectAsState()
-                val editingEntry by viewModel.editingEntry.collectAsState()
                 val isGpsTrackingEnabled by viewModel.isGpsTrackingEnabled.collectAsState()
                 val filteredEntries by viewModel.filteredEntries.collectAsState()
                 val canUndo by viewModel.canUndo.collectAsState()
@@ -148,7 +146,7 @@ class MainActivity : ComponentActivity() {
                 }
 
 
-                // Correctly defined launcher for background location permission
+                // Permission launchers...
                 val backgroundLocationLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission(),
                     onResult = { isGranted ->
@@ -159,8 +157,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 )
-
-                // Correctly defined launcher for foreground location permissions
                 val locationPermissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestMultiplePermissions(),
                     onResult = { permissions ->
@@ -169,7 +165,6 @@ class MainActivity : ComponentActivity() {
 
                         if (isFineLocationGranted || isCoarseLocationGranted) {
                             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                                // Now we launch the correctly registered launcher
                                 backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
                             }
                         } else {
@@ -177,8 +172,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 )
-
-                LaunchedEffect(Unit) {
+                 LaunchedEffect(Unit) {
                     if (isGpsTrackingEnabled && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                         locationPermissionLauncher.launch(
                             arrayOf(
@@ -369,7 +363,10 @@ class MainActivity : ComponentActivity() {
                                         selectedDate = selectedDate,
                                         onDateSelected = viewModel::onDateSelected,
                                         onEntrySelected = viewModel::onEntrySelected,
-                                        onEditEntry = viewModel::onEditEntry,
+                                        onEditEntry = { entryToEdit ->
+                                            val intent = EditEntryActivity.newIntent(context, entryToEdit.entry.id)
+                                            context.startActivity(intent)
+                                        },
                                         onMoreClicked = viewModel::onMoreClicked,
                                         onDateLongClicked = { date ->
                                             openGooglePhotos(date)
@@ -385,17 +382,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 )
-
-                editingEntry?.let { entry ->
-                    EditEntryDialog(
-                        entry = entry,
-                        categories = categories,
-                        onDismiss = viewModel::onDismissEditEntry,
-                        onSave = { updatedCategories, content, timestamp, hasImage ->
-                            viewModel.onSaveEntry(updatedCategories, content, timestamp, hasImage)
-                        }
-                    )
-                }
             }
         }
     }

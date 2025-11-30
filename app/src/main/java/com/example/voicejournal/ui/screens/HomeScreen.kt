@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.voicejournal.data.Category
+import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import java.time.Instant
@@ -56,19 +57,19 @@ import java.util.Locale
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    groupedEntries: Map<LocalDate, List<JournalEntry>> = emptyMap(),
+    groupedEntries: Map<LocalDate, List<EntryWithCategories>> = emptyMap(),
     categories: List<String> = emptyList(),
     selectedCategory: String = "",
     onCategoryChange: (String) -> Unit = {},
-    onDeleteEntry: (JournalEntry) -> Unit = {},
-    selectedEntry: JournalEntry? = null,
+    onDeleteEntry: (EntryWithCategories) -> Unit = {},
+    selectedEntry: EntryWithCategories? = null,
     selectedDate: LocalDate? = null,
     onDateSelected: (LocalDate) -> Unit = {},
-    onEntrySelected: (JournalEntry) -> Unit = {},
-    onEditEntry: (JournalEntry) -> Unit = {},
+    onEntrySelected: (EntryWithCategories) -> Unit = {},
+    onEditEntry: (EntryWithCategories) -> Unit = {},
     onMoreClicked: () -> Unit = {},
     onDateLongClicked: (LocalDate) -> Unit = {},
-    onPhotoIconClicked: (JournalEntry) -> Unit = {},
+    onPhotoIconClicked: (EntryWithCategories) -> Unit = {},
     shouldShowMoreButton: Boolean = true
 ) {
     Column(
@@ -132,12 +133,12 @@ fun HomeScreen(
                     }
                 }
 
-                items(entries, key = { it.id }) { entry ->
-                    val isSelected = selectedEntry == entry
+                items(entries, key = { it.entry.id }) { entryWithCategories ->
+                    val isSelected = selectedEntry == entryWithCategories
                     val dismissState = rememberSwipeToDismissBoxState(
                         confirmValueChange = {
                             if (it == SwipeToDismissBoxValue.StartToEnd) {
-                                onDeleteEntry(entry)
+                                onDeleteEntry(entryWithCategories)
                                 true
                             } else {
                                 false
@@ -173,8 +174,8 @@ fun HomeScreen(
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
                                 .combinedClickable(
-                                    onClick = { onEntrySelected(entry) },
-                                    onLongClick = { onEditEntry(entry) }
+                                    onClick = { onEntrySelected(entryWithCategories) },
+                                    onLongClick = { onEditEntry(entryWithCategories) }
                                 ),
                             colors = CardDefaults.cardColors(
                                 containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
@@ -182,12 +183,12 @@ fun HomeScreen(
                         ) {
                             Box(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
                                 val date = LocalDateTime.ofInstant(
-                                    Instant.ofEpochMilli(entry.timestamp),
+                                    Instant.ofEpochMilli(entryWithCategories.entry.timestamp),
                                     ZoneId.systemDefault()
                                 )
                                 val formatter = DateTimeFormatter.ofPattern("HH:mm")
                                 Text(
-                                    text = entry.content,
+                                    text = entryWithCategories.entry.content,
                                     modifier = Modifier.align(Alignment.TopStart).padding(top = 4.dp, end = 48.dp)
                                 )
                                 Text(
@@ -195,9 +196,9 @@ fun HomeScreen(
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.align(Alignment.TopEnd)
                                 )
-                                if (entry.hasImage) {
+                                if (entryWithCategories.entry.hasImage) {
                                     IconButton(
-                                        onClick = { onPhotoIconClicked(entry) },
+                                        onClick = { onPhotoIconClicked(entryWithCategories) },
                                         modifier = Modifier.align(Alignment.BottomEnd)
                                     ) {
                                         Icon(
@@ -237,14 +238,10 @@ fun HomeScreen(
 @Composable
 fun HomeScreenPreview() {
     VoicejournalTheme {
-        // Simulate categories from the database for the preview
         val sampleCategoriesData = remember {
             listOf(
                 Category(category = "journal", aliases = "journal,tagebuch"),
-                Category(category = "todo", aliases = "todo,to-do"),
-                Category(category = "kaufen", aliases = "kaufen"),
-                Category(category = "baumarkt", aliases = "baumarkt"),
-                Category(category = "eloisa", aliases = "eloisa")
+                Category(category = "todo", aliases = "todo,to-do")
             )
         }
         val sampleCategories = remember(sampleCategoriesData) {
@@ -253,38 +250,25 @@ fun HomeScreenPreview() {
         var selectedCategory by remember { mutableStateOf(sampleCategories.first()) }
         val entries = remember {
             listOf(
-                JournalEntry(
-                    id = 1,
-                    title = "journal",
-                    content = "This is a preview entry.",
-                    timestamp = System.currentTimeMillis()
+                EntryWithCategories(
+                    entry = JournalEntry(id = 1, content = "This is a preview entry.", timestamp = System.currentTimeMillis()),
+                    categories = listOf(Category(1, "journal", aliases = "journal"))
                 ),
-                JournalEntry(
-                    id = 2,
-                    title = "todo",
-                    content = "This is a todo preview.",
-                    timestamp = System.currentTimeMillis(),
-                    hasImage = true
+                EntryWithCategories(
+                    entry = JournalEntry(id = 2, content = "This is a todo preview.", timestamp = System.currentTimeMillis(), hasImage = true),
+                    categories = listOf(Category(2, "todo", aliases = "todo"))
                 )
             )
         }
-        val groupedEntries = entries.filter { it.title == selectedCategory }.groupBy {
-            Instant.ofEpochMilli(it.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
+        val groupedEntries = entries.filter { it.categories.any { c -> c.category == selectedCategory } }.groupBy {
+            Instant.ofEpochMilli(it.entry.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
         }
 
         HomeScreen(
             groupedEntries = groupedEntries,
-            categories = sampleCategories, // Pass the sample categories
+            categories = sampleCategories,
             selectedCategory = selectedCategory,
-            onCategoryChange = { selectedCategory = it },
-            onDeleteEntry = {},
-            selectedEntry = null,
-            selectedDate = null,
-            onDateSelected = {},
-            onEntrySelected = {},
-            onEditEntry = {},
-            onMoreClicked = {},
-            onDateLongClicked = {}
+            onCategoryChange = { selectedCategory = it }
         )
     }
 }

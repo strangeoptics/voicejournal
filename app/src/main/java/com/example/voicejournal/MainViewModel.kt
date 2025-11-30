@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.voicejournal.data.Category
+import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
@@ -52,14 +53,14 @@ class MainViewModel(
     private val _selectedCategory = MutableStateFlow("")
     val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
 
-    private val _selectedEntry = MutableStateFlow<JournalEntry?>(null)
-    val selectedEntry: StateFlow<JournalEntry?> = _selectedEntry.asStateFlow()
+    private val _selectedEntry = MutableStateFlow<EntryWithCategories?>(null)
+    val selectedEntry: StateFlow<EntryWithCategories?> = _selectedEntry.asStateFlow()
 
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
     val selectedDate: StateFlow<LocalDate?> = _selectedDate.asStateFlow()
 
-    private val _editingEntry = MutableStateFlow<JournalEntry?>(null)
-    val editingEntry: StateFlow<JournalEntry?> = _editingEntry.asStateFlow()
+    private val _editingEntry = MutableStateFlow<EntryWithCategories?>(null)
+    val editingEntry: StateFlow<EntryWithCategories?> = _editingEntry.asStateFlow()
 
     private val _daysToShow = MutableStateFlow(sharedPreferences.getInt(KEY_DAYS_TO_SHOW, 3))
     val daysToShow: StateFlow<Int> = _daysToShow.asStateFlow()
@@ -85,8 +86,9 @@ class MainViewModel(
     private val _silenceTimeRequired = MutableStateFlow(sharedPreferences.getInt(KEY_SILENCE_TIME_REQUIRED, 2000))
     val silenceTimeRequired: StateFlow<Int> = _silenceTimeRequired.asStateFlow()
 
-    private val _recentlyDeleted = MutableStateFlow<List<JournalEntry>>(emptyList())
-    val canUndo: StateFlow<Boolean> = combine(_recentlyDeleted) { it.isNotEmpty() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    private val _recentlyDeleted = MutableStateFlow<List<EntryWithCategories>>(emptyList())
+    val canUndo: StateFlow<Boolean> = _recentlyDeleted.map { it.isNotEmpty() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
 
     val categoriesFlow: StateFlow<List<Category>> = repository.allCategories
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -149,31 +151,37 @@ class MainViewModel(
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-    val entries: StateFlow<List<JournalEntry>> =
+    val entries: StateFlow<List<EntryWithCategories>> =
         combine(daysToShow, selectedCategory, categoriesFlow) { days, selectedCat, categories ->
             Triple(days, selectedCat, categories)
         }.flatMapLatest { (days, selectedCat, categories) ->
             val category = categories.find { it.category == selectedCat }
             if (category?.showAll == true) {
-                repository.getAllEntriesFlow()
+                repository.getAllEntriesWithCategories()
             } else {
                 val daysAgoMillis = Calendar.getInstance().apply {
                     add(Calendar.DAY_OF_YEAR, -days)
                 }.timeInMillis
-                repository.getEntriesSince(daysAgoMillis)
+                repository.getEntriesWithCategoriesSince(daysAgoMillis)
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
 
-    val filteredEntries: StateFlow<List<JournalEntry>> =
+    val filteredEntries: StateFlow<List<EntryWithCategories>> =
         combine(entries, selectedCategory) { entries, category ->
-            entries.filter { it.title == category }
+            if (category.isEmpty()) {
+                entries
+            } else {
+                entries.filter { entryWithCategories ->
+                    entryWithCategories.categories.any { it.category == category }
+                }
+            }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val groupedEntries: StateFlow<Map<LocalDate, List<JournalEntry>>> =
-        filteredEntries.combine(selectedCategory) { entries, _ ->
+    val groupedEntries: StateFlow<Map<LocalDate, List<EntryWithCategories>>> =
+        filteredEntries.map { entries ->
             entries.groupBy {
-                Instant.ofEpochMilli(it.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
+                Instant.ofEpochMilli(it.entry.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
@@ -184,15 +192,14 @@ class MainViewModel(
     fun onDateSelected(date: LocalDate) {
         _selectedDate.value = if (_selectedDate.value == date) null else date
     }
-    fun onEntrySelected(entry: JournalEntry) {
+    fun onEntrySelected(entry: EntryWithCategories) {
         _selectedEntry.value = if (_selectedEntry.value == entry) null else entry
-        // When an entry is selected, clear the date selection to hide the date-specific action
         if (_selectedEntry.value != null) {
             _selectedDate.value = null
         }
     }
 
-    fun onEditEntry(entry: JournalEntry) {
+    fun onEditEntry(entry: EntryWithCategories) {
         _editingEntry.value = entry
     }
 
@@ -200,17 +207,21 @@ class MainViewModel(
         _editingEntry.value = null
     }
 
-    fun onSaveEntry(updatedTitle: String, updatedContent: String, updatedTimestamp: Long, hasImage: Boolean) {
+    fun onSaveEntry(updatedCategories: List<String>, updatedContent: String, updatedTimestamp: Long, hasImage: Boolean) {
         val sanitizedContent = updatedContent.replace("luisa", "Eloisa", ignoreCase = true)
         viewModelScope.launch {
             _editingEntry.value?.let {
-                repository.update(it.copy(title = updatedTitle, content = sanitizedContent, timestamp = updatedTimestamp, hasImage = hasImage))
+                val updatedEntry = it.entry.copy(content = sanitizedContent, timestamp = updatedTimestamp, hasImage = hasImage)
+                val categories = updatedCategories.map { categoryName ->
+                    categoriesFlow.value.find { c -> c.category == categoryName } ?: Category(category = categoryName, aliases = "")
+                }
+                repository.update(updatedEntry, categories)
                 _editingEntry.value = null
             }
         }
     }
 
-    fun onDeleteEntry(entry: JournalEntry) {
+    fun onDeleteEntry(entry: EntryWithCategories) {
         viewModelScope.launch {
             val currentDeleted = _recentlyDeleted.value.toMutableList()
             currentDeleted.add(entry)
@@ -218,7 +229,7 @@ class MainViewModel(
                 currentDeleted.removeAt(0)
             }
             _recentlyDeleted.value = currentDeleted
-            repository.delete(entry)
+            repository.delete(entry.entry)
         }
     }
 
@@ -226,7 +237,7 @@ class MainViewModel(
         viewModelScope.launch {
             val lastDeleted = _recentlyDeleted.value.lastOrNull()
             if (lastDeleted != null) {
-                repository.insert(lastDeleted)
+                repository.insert(lastDeleted.entry, lastDeleted.categories)
                 _recentlyDeleted.value = _recentlyDeleted.value.dropLast(1)
             }
         }
@@ -283,6 +294,7 @@ class MainViewModel(
         viewModelScope.launch {
             val existingCategory = categoriesFlow.value.find { it.category == categoryName }
             val category = Category(
+                id = existingCategory?.id ?: 0,
                 category = categoryName,
                 aliases = aliasesString,
                 showAll = showAll,
@@ -292,9 +304,9 @@ class MainViewModel(
         }
     }
 
-    fun deleteCategory(category: String) {
+    fun deleteCategory(category: Category) {
         viewModelScope.launch {
-            repository.deleteCategory(category)
+            repository.deleteCategory(category.id)
         }
     }
 
@@ -343,32 +355,29 @@ class MainViewModel(
             val today = LocalDate.now().toString()
             val yesterday = LocalDate.now().minusDays(1).toString()
             val twoDaysAgo = LocalDate.now().minusDays(2).toString()
-            val threeDaysAgo = LocalDate.now().minusDays(3).toString()
-            val fourDaysAgo = LocalDate.now().minusDays(4).toString()
 
-            val testEntries = listOf(
-                JournalEntry(title = "journal", content = "Habe beim Ausschalten versehentlich den dritten Wecker diesen Monat zerdrückt; mein Rücken erinnert mich schmerzhaft an den gestrigen Kampf.", timestamp = timestampFromString("${today}T06:15:00")),
-                JournalEntry(title = "journal", content = "Nach drei Tassen schwarzem Kaffee ignoriere ich die Online-Kritik an meinem Kostüm und starte vom Balkon in die kalte Morgenluft.", timestamp = timestampFromString("${today}T07:00:00")),
-                JournalEntry(title = "journal", content = "Die Verfolgungsjagd auf der Autobahn war erfolgreich, aber meine Landung auf der Motorhaube des Fluchtwagens wird wieder Probleme mit der Versicherung geben.", timestamp = timestampFromString("${today}T09:30:00"), hasImage = true),
+            val journal = Category(category = "journal", aliases = "")
+            val todo = Category(category = "todo", aliases = "")
+            val kaufen = Category(category = "kaufen", aliases = "")
+            val baumarkt = Category(category = "baumarkt", aliases = "")
+            val eloisa = Category(category = "eloisa", aliases = "")
 
-                JournalEntry(title = "journal", content = "Während im Fernsehen Berichte über meine Heldentaten laufen, sitze ich in Jogginghose da, esse Nudeln mit Ketchup und nähe den Riss in meinem Kostüm.", timestamp = timestampFromString("${today}T21:00:00")),
-
-                JournalEntry(title = "todo", content = "This is a test todo item from today.", timestamp = timestampFromString("${today}T12:00:00")),
-                JournalEntry(title = "kaufen", content = "Milk, eggs, bread.", timestamp = timestampFromString("${today}T14:00:00")),
-                JournalEntry(title = "baumarkt", content = "A great new app idea from today.", timestamp = timestampFromString("${today}T16:00:00")),
-
-                JournalEntry(title = "journal", content = "Mittagspause mit zwei Dönern auf einem Wasserspeier über der Stadt; habe dabei leider Knoblauchsoße auf meinen Umhang getropft.", timestamp = timestampFromString("${yesterday}T12:30:00"), hasImage = true),
-                JournalEntry(title = "journal", content = "Ein kleinerer Schurke wollte die U-Bahn sabotieren, aber sein Monolog über den \"Masterplan\" dauerte länger als der eigentliche Kampf.", timestamp = timestampFromString("${yesterday}T10:00:00")),
-                JournalEntry(title = "todo", content = "Todo item from yesterday.", timestamp = timestampFromString("${yesterday}T15:00:00")),
-                JournalEntry(title = "kaufen", content = "Apples, bananas.", timestamp = timestampFromString("${yesterday}T17:00:00")),
-
-                JournalEntry(title = "journal", content = "Journal entry from two days ago.", timestamp = timestampFromString("${twoDaysAgo}T18:00:00")),
-                JournalEntry(title = "journal", content = "Journal entry from 3 days ago.", timestamp = timestampFromString("${threeDaysAgo}T18:00:00")),
-                JournalEntry(title = "journal", content = "Journal entry from 4 days ago.", timestamp = timestampFromString("${fourDaysAgo}T18:00:00")),
-
-                JournalEntry(title = "eloisa", content = "Another app idea from two days ago.", timestamp = timestampFromString("${twoDaysAgo}T20:00:00"))
+            val testEntries: List<Pair<JournalEntry, List<Category>>> = listOf(
+                JournalEntry(content = "Habe beim Ausschalten versehentlich den dritten Wecker diesen Monat zerdrückt...", timestamp = timestampFromString("${today}T06:15:00")) to listOf(journal),
+                JournalEntry(content = "Nach drei Tassen schwarzem Kaffee...", timestamp = timestampFromString("${today}T07:00:00")) to listOf(journal),
+                JournalEntry(content = "Die Verfolgungsjagd auf der Autobahn war erfolgreich...", timestamp = timestampFromString("${today}T09:30:00"), hasImage = true) to listOf(journal),
+                JournalEntry(content = "Während im Fernsehen Berichte über meine Heldentaten laufen...", timestamp = timestampFromString("${today}T21:00:00")) to listOf(journal),
+                JournalEntry(content = "This is a test todo item from today.", timestamp = timestampFromString("${today}T12:00:00")) to listOf(todo),
+                JournalEntry(content = "Milk, eggs, bread.", timestamp = timestampFromString("${today}T14:00:00")) to listOf(kaufen),
+                JournalEntry(content = "A great new app idea from today.", timestamp = timestampFromString("${today}T16:00:00")) to listOf(baumarkt),
+                JournalEntry(content = "Mittagspause mit zwei Dönern...", timestamp = timestampFromString("${yesterday}T12:30:00"), hasImage = true) to listOf(journal),
+                JournalEntry(content = "Ein kleinerer Schurke wollte die U-Bahn sabotieren...", timestamp = timestampFromString("${yesterday}T10:00:00")) to listOf(journal),
+                JournalEntry(content = "Todo item from yesterday.", timestamp = timestampFromString("${yesterday}T15:00:00")) to listOf(todo),
+                JournalEntry(content = "Apples, bananas.", timestamp = timestampFromString("${yesterday}T17:00:00")) to listOf(kaufen),
+                JournalEntry(content = "Journal entry from two days ago.", timestamp = timestampFromString("${twoDaysAgo}T18:00:00")) to listOf(journal),
+                JournalEntry(content = "Another app idea from two days ago.", timestamp = timestampFromString("${twoDaysAgo}T20:00:00")) to listOf(eloisa)
             )
-            testEntries.forEach { repository.insert(it) }
+            testEntries.forEach { (entry, categories) -> repository.insert(entry, categories) }
         }
     }
     fun processRecognizedText(recognizedText: String) {
@@ -376,10 +385,10 @@ class MainViewModel(
             val entryToUpdate = _selectedEntry.value
             if (entryToUpdate != null) {
                 val sanitizedText = recognizedText.replace("luisa", "Eloisa", ignoreCase = true)
-                val updatedEntry = entryToUpdate.copy(
-                    content = entryToUpdate.content + "\n" + sanitizedText
+                val updatedEntry = entryToUpdate.entry.copy(
+                    content = entryToUpdate.entry.content + "\n" + sanitizedText
                 )
-                repository.update(updatedEntry)
+                repository.update(updatedEntry, entryToUpdate.categories)
                 _selectedEntry.value = null // Deselect after update
             } else {
                 val currentCategoryKeywords = categoryKeywordsMap.value
@@ -393,22 +402,23 @@ class MainViewModel(
                 _selectedDate.value = null
 
                 val (targetCategory, contentToAdd) = if (foundKeyword != null) {
-                    val category = currentCategoryKeywords[foundKeyword]!!
+                    val categoryName = currentCategoryKeywords[foundKeyword]!!
                     val content = recognizedText.substring(foundKeyword.length).trim()
-                    _selectedCategory.value = category
+                    _selectedCategory.value = categoryName
+                    val category = categoriesFlow.value.find { it.category == categoryName } ?: Category(category = categoryName, aliases = "")
                     category to content
                 } else {
-                    _selectedCategory.value to recognizedText
+                    val category = categoriesFlow.value.find { it.category == _selectedCategory.value } ?: Category(category = _selectedCategory.value, aliases = "")
+                    category to recognizedText
                 }
 
                 if (contentToAdd.isNotEmpty()) {
                     val sanitizedContent = contentToAdd.replace("luisa", "Eloisa", ignoreCase = true)
                     val entry = JournalEntry(
-                        title = targetCategory,
                         content = sanitizedContent,
                         timestamp = timestamp
                     )
-                    repository.insert(entry)
+                    repository.insert(entry, listOf(targetCategory))
                 }
             }
         }

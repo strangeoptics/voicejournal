@@ -9,7 +9,6 @@ import kotlinx.serialization.Serializable
 data class JournalEntry(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
-    val title: String,
     val content: String,
     val timestamp: Long,
     val hasImage: Boolean = false

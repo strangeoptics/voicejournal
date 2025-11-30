@@ -5,22 +5,26 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface JournalEntryDao {
+    @Transaction
     @Query("SELECT * FROM journal_entries ORDER BY timestamp DESC")
-    fun getAllEntriesFlow(): Flow<List<JournalEntry>>
+    fun getEntriesWithCategories(): Flow<List<EntryWithCategories>>
 
+    @Transaction
     @Query("SELECT * FROM journal_entries")
-    suspend fun getAllEntries(): List<JournalEntry>
+    suspend fun getAllEntriesWithCategories(): List<EntryWithCategories>
 
+    @Transaction
     @Query("SELECT * FROM journal_entries WHERE timestamp >= :since ORDER BY timestamp DESC")
-    fun getEntriesSince(since: Long): Flow<List<JournalEntry>>
+    fun getEntriesWithCategoriesSince(since: Long): Flow<List<EntryWithCategories>>
 
-    @Insert
-    suspend fun insert(entry: JournalEntry)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(entry: JournalEntry): Long
 
     @Update
     suspend fun update(entry: JournalEntry)
@@ -28,15 +32,18 @@ interface JournalEntryDao {
     @Delete
     suspend fun delete(entry: JournalEntry)
 
-    @Query("DELETE FROM journal_entries WHERE id = (SELECT id FROM journal_entries WHERE title = :category ORDER BY timestamp DESC LIMIT 1)")
-    suspend fun deleteLatestByCategory(category: String)
-
     @Query("DELETE FROM journal_entries")
     suspend fun deleteAll()
 
-    // Category DAO methods
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCategory(category: Category)
+    suspend fun insertJournalEntryCategoryCrossRef(crossRef: JournalEntryCategoryCrossRef)
+
+    @Query("DELETE FROM journal_entry_category_cross_ref WHERE entryId = :entryId")
+    suspend fun deleteCrossRefsForEntry(entryId: Int)
+
+    // Category DAO methods
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertCategory(category: Category): Long
 
     @Update
     suspend fun updateCategories(categories: List<Category>)
@@ -46,10 +53,44 @@ interface JournalEntryDao {
 
     @Query("SELECT * FROM categories ORDER BY orderIndex ASC")
     suspend fun getAllCategoriesList(): List<Category>
+    
+    @Query("SELECT * FROM categories WHERE category = :categoryName LIMIT 1")
+    suspend fun getCategoryByName(categoryName: String): Category?
 
-    @Query("UPDATE categories SET aliases = :aliases WHERE category = :categoryName")
-    suspend fun updateAliasesForCategory(categoryName: String, aliases: String)
+    @Query("UPDATE categories SET aliases = :aliases WHERE id = :categoryId")
+    suspend fun updateAliasesForCategory(categoryId: Int, aliases: String)
 
-    @Query("DELETE FROM categories WHERE category = :categoryName")
-    suspend fun deleteCategory(categoryName: String)
+    @Query("DELETE FROM categories WHERE id = :categoryId")
+    suspend fun deleteCategory(categoryId: Int)
+
+    @Transaction
+    suspend fun insertWithCategories(entry: JournalEntry, categories: List<Category>) {
+        val entryId = insert(entry).toInt()
+        categories.forEach { category ->
+            var cat = getCategoryByName(category.category)
+            if (cat == null) {
+                val newId = insertCategory(category)
+                cat = category.copy(id = newId.toInt())
+            }
+            insertJournalEntryCategoryCrossRef(
+                JournalEntryCategoryCrossRef(entryId, cat.id)
+            )
+        }
+    }
+
+    @Transaction
+    suspend fun updateWithCategories(entry: JournalEntry, categories: List<Category>) {
+        update(entry)
+        deleteCrossRefsForEntry(entry.id)
+        categories.forEach { category ->
+             var cat = getCategoryByName(category.category)
+            if (cat == null) {
+                val newId = insertCategory(category)
+                cat = category.copy(id = newId.toInt())
+            }
+            insertJournalEntryCategoryCrossRef(
+                JournalEntryCategoryCrossRef(entry.id, cat.id)
+            )
+        }
+    }
 }

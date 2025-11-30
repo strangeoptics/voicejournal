@@ -128,7 +128,7 @@ fun CategoryManagerScreen(
     modifier: Modifier = Modifier,
     categories: List<Category>,
     onCategoryLongClick: (Category) -> Unit,
-    onDeleteCategory: (String) -> Unit,
+    onDeleteCategory: (Category) -> Unit,
     onMoveCategory: (Category, Boolean) -> Unit
 ) {
     LazyColumn(
@@ -137,11 +137,11 @@ fun CategoryManagerScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(categories, key = { it.category }) { category ->
+        items(categories, key = { it.id }) { category ->
             val dismissState = rememberSwipeToDismissBoxState(
                 confirmValueChange = {
                     if (it == SwipeToDismissBoxValue.StartToEnd) {
-                        onDeleteCategory(category.category)
+                        onDeleteCategory(category)
                         true
                     } else {
                         false
@@ -246,7 +246,7 @@ fun EditCategoryDialog(
                     Text("Show all")
                 }
                 Button(onClick = {
-                    if (category.isNotBlank() && aliases.isNotBlank()) {
+                    if (category.isNotBlank()) { // Aliases can be blank
                         onSave(category, aliases, showAll)
                     }
                 }) {

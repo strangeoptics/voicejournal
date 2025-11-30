@@ -6,13 +6,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -25,7 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.voicejournal.data.JournalEntry
+import com.example.voicejournal.data.EntryWithCategories
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -34,25 +33,23 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditEntryDialog(
-    entry: JournalEntry,
+    entry: EntryWithCategories,
     categories: List<String>,
     onDismiss: () -> Unit,
-    onSave: (String, String, Long, Boolean) -> Unit
+    onSave: (List<String>, String, Long, Boolean) -> Unit
 ) {
-    var text by remember { mutableStateOf(entry.content) }
-    var hasImage by remember { mutableStateOf(entry.hasImage) }
-    var selectedCategory by remember { mutableStateOf(entry.title) }
+    var text by remember { mutableStateOf(entry.entry.content) }
+    var hasImage by remember { mutableStateOf(entry.entry.hasImage) }
+    val selectedCategories = remember { mutableStateOf(entry.categories.map { it.category }) }
     val context = LocalContext.current
     var currentDateTime by remember {
         mutableStateOf(
             LocalDateTime.ofInstant(
-                Instant.ofEpochMilli(entry.timestamp),
+                Instant.ofEpochMilli(entry.entry.timestamp),
                 ZoneId.systemDefault()
             )
         )
     }
-    var isDropdownExpanded by remember { mutableStateOf(false) }
-
 
     val timePickerDialog = android.app.TimePickerDialog(
         context,
@@ -79,34 +76,27 @@ fun EditEntryDialog(
         title = { Text("Edit Entry") },
         text = {
             Column {
-                ExposedDropdownMenuBox(
-                    expanded = isDropdownExpanded,
-                    onExpandedChange = { isDropdownExpanded = !isDropdownExpanded }
-                ) {
-                    TextField(
-                        modifier = Modifier.menuAnchor(),
-                        readOnly = true,
-                        value = selectedCategory,
-                        onValueChange = {},
-                        label = { Text("Category") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isDropdownExpanded) },
-                        colors = ExposedDropdownMenuDefaults.textFieldColors(),
-                    )
-                    ExposedDropdownMenu(
-                        expanded = isDropdownExpanded,
-                        onDismissRequest = { isDropdownExpanded = false }
-                    ) {
-                        categories.forEach { selectionOption ->
-                            DropdownMenuItem(
-                                text = { Text(selectionOption) },
-                                onClick = {
-                                    selectedCategory = selectionOption
-                                    isDropdownExpanded = false
+                Text("Categories:")
+                Column(Modifier.height(100.dp).verticalScroll(rememberScrollState())) {
+                    categories.forEach { category ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = selectedCategories.value.contains(category),
+                                onCheckedChange = {
+                                    val currentSelection = selectedCategories.value.toMutableList()
+                                    if (it) {
+                                        currentSelection.add(category)
+                                    } else {
+                                        currentSelection.remove(category)
+                                    }
+                                    selectedCategories.value = currentSelection
                                 }
                             )
+                            Text(category)
                         }
                     }
                 }
+
                 Spacer(modifier = Modifier.height(8.dp))
                 TextField(
                     value = text,
@@ -135,7 +125,7 @@ fun EditEntryDialog(
         confirmButton = {
             TextButton(onClick = {
                 val newTimestamp = currentDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                onSave(selectedCategory, text, newTimestamp, hasImage)
+                onSave(selectedCategories.value, text, newTimestamp, hasImage)
             }) {
                 Text("Save")
             }

@@ -222,10 +222,10 @@ class MainActivity : ComponentActivity() {
                     }
                 )
 
-                val textToShow = filteredEntries.joinToString("\n") { entry ->
-                    val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault())
+                val textToShow = filteredEntries.joinToString("\n") { entryWithCategories ->
+                    val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entryWithCategories.entry.timestamp), ZoneId.systemDefault())
                     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                    "[${date.format(formatter)}] ${entry.content}"
+                    "[${date.format(formatter)}] ${entryWithCategories.entry.content}"
                 }
                 val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission(),
@@ -374,8 +374,8 @@ class MainActivity : ComponentActivity() {
                                         onDateLongClicked = { date ->
                                             openGooglePhotos(date)
                                         },
-                                        onPhotoIconClicked = { entry ->
-                                            val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.timestamp), ZoneId.systemDefault()).toLocalDate()
+                                        onPhotoIconClicked = { entryWithCategories ->
+                                            val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entryWithCategories.entry.timestamp), ZoneId.systemDefault()).toLocalDate()
                                             openGooglePhotos(date)
                                         },
                                         shouldShowMoreButton = shouldShowMoreButton
@@ -391,8 +391,8 @@ class MainActivity : ComponentActivity() {
                         entry = entry,
                         categories = categories,
                         onDismiss = viewModel::onDismissEditEntry,
-                        onSave = { title, content, timestamp, hasImage ->
-                            viewModel.onSaveEntry(title, content, timestamp, hasImage)
+                        onSave = { updatedCategories, content, timestamp, hasImage ->
+                            viewModel.onSaveEntry(updatedCategories, content, timestamp, hasImage)
                         }
                     )
                 }

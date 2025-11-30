@@ -5,6 +5,7 @@ import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.BufferedReader
@@ -23,26 +24,51 @@ class JournalRepository(
 
     val allCategories = dao.getAllCategories()
 
-    fun getAllEntriesFlow() = dao.getAllEntriesFlow()
+    fun getAllEntriesWithCategories(): Flow<List<EntryWithCategories>> = dao.getEntriesWithCategories()
 
     suspend fun importJournal(uri: Uri) = withContext(Dispatchers.IO) {
         context.contentResolver.openInputStream(uri)?.use { inputStream ->
             BufferedReader(InputStreamReader(inputStream)).use { reader ->
                 val content = reader.readText()
                 try {
-                    // Try parsing as Version 2+ format
-                    val journalExport = Json.decodeFromString<JournalExport>(content)
-                    journalExport.entries.forEach { dao.insert(it) }
-                    journalExport.categories.forEach { dao.insertCategory(it) }
-                } catch (e1: Exception) {
-                    try {
-                        // If that fails, try parsing as Version 1 format (List<JournalEntry>)
-                        val entries = Json.decodeFromString<List<JournalEntry>>(content)
-                        entries.forEach { dao.insert(it) }
-                    } catch (e2: Exception) {
-                        // If all JSON parsing fails, fall back to the legacy text format
-                        parseLegacyFormat(content)
+                    val json = Json { ignoreUnknownKeys = true }
+                    if (content.contains("\"version\"")) {
+                        val version = json.decodeFromString<VersionCheck>(content).version
+                        if (version == 3) {
+                            val journalExport = json.decodeFromString<JournalExportV3>(content)
+                            journalExport.categories.forEach { dao.insertCategory(it) }
+                            journalExport.entries.forEach { entryExport ->
+                                val entry = JournalEntry(
+                                    content = entryExport.content,
+                                    timestamp = entryExport.timestamp,
+                                    hasImage = entryExport.hasImage
+                                )
+                                val categories = entryExport.categories.map { categoryName ->
+                                    Category(category = categoryName, aliases = "")
+                                }
+                                dao.insertWithCategories(entry, categories)
+                            }
+                        } else { // V2
+                            val journalExport = json.decodeFromString<JournalExport>(content)
+                            journalExport.categories.forEach { dao.insertCategory(it) }
+                            journalExport.entries.forEach { entry ->
+                                val v2Entry = json.decodeFromString<JournalEntryV2>(Json.encodeToString(entry))
+                                val newEntry = JournalEntry(content = v2Entry.content, timestamp = v2Entry.timestamp, hasImage = v2Entry.hasImage)
+                                val category = Category(category = v2Entry.title, aliases = "")
+                                dao.insertWithCategories(newEntry, listOf(category))
+                            }
+                        }
+                    } else { // V1 or legacy
+                        val entries = Json.decodeFromString<List<JournalEntryV2>>(content)
+                        entries.forEach { v2Entry ->
+                             val newEntry = JournalEntry(content = v2Entry.content, timestamp = v2Entry.timestamp, hasImage = v2Entry.hasImage)
+                             val category = Category(category = v2Entry.title, aliases = "")
+                             dao.insertWithCategories(newEntry, listOf(category))
+                        }
                     }
+                } catch (e: Exception) {
+                    // Fallback to legacy text format
+                    parseLegacyFormat(content)
                 }
             }
         }
@@ -62,22 +88,29 @@ class JournalRepository(
                     .toEpochMilli()
 
                 val entry = JournalEntry(
-                    title = "journal",
                     content = contentString,
                     timestamp = timestamp
                 )
-                dao.insert(entry)
+                dao.insertWithCategories(entry, listOf(Category(category="journal", aliases = "")))
             }
         }
     }
 
     suspend fun exportJournal(uri: Uri) = withContext(Dispatchers.IO) {
-        val entries = dao.getAllEntries()
+        val entriesWithCategories = dao.getAllEntriesWithCategories()
         val categories = dao.getAllCategoriesList()
-        val exportData = JournalExport(version = 2, entries = entries, categories = categories)
+        val exportEntries = entriesWithCategories.map {
+            JournalEntryExport(
+                content = it.entry.content,
+                timestamp = it.entry.timestamp,
+                hasImage = it.entry.hasImage,
+                categories = it.categories.map { c -> c.category }
+            )
+        }
+        val exportData = JournalExportV3(version = 3, entries = exportEntries, categories = categories)
         val jsonString = Json {
             prettyPrint = true
-            encodeDefaults = true // This ensures the 'version' field is always included
+            encodeDefaults = true
         }.encodeToString(exportData)
         context.contentResolver.openFileDescriptor(uri, "w")?.use {
             FileOutputStream(it.fileDescriptor).use { fos ->
@@ -86,24 +119,24 @@ class JournalRepository(
         }
     }
 
-    fun getEntriesSince(timestamp: Long) = dao.getEntriesSince(timestamp)
+    fun getEntriesWithCategoriesSince(timestamp: Long) = dao.getEntriesWithCategoriesSince(timestamp)
 
     suspend fun insertCategory(category: Category) = dao.insertCategory(category)
 
     suspend fun updateCategories(categories: List<Category>) = dao.updateCategories(categories)
 
-    suspend fun insert(entry: JournalEntry) = dao.insert(entry)
+    suspend fun insert(entry: JournalEntry, categories: List<Category>) = dao.insertWithCategories(entry, categories)
 
-    suspend fun update(entry: JournalEntry) = dao.update(entry)
+    suspend fun update(entry: JournalEntry, categories: List<Category>) = dao.updateWithCategories(entry, categories)
 
     suspend fun delete(entry: JournalEntry) = dao.delete(entry)
 
-    suspend fun updateAliasesForCategory(category: String, aliases: List<String>) {
+    suspend fun updateAliasesForCategory(categoryId: Int, aliases: List<String>) {
         val aliasesString = aliases.joinToString(",")
-        dao.updateAliasesForCategory(category, aliasesString)
+        dao.updateAliasesForCategory(categoryId, aliasesString)
     }
 
-    suspend fun deleteCategory(category: String) = dao.deleteCategory(category)
+    suspend fun deleteCategory(categoryId: Int) = dao.deleteCategory(categoryId)
 
     suspend fun deleteAll() = dao.deleteAll()
 
@@ -116,3 +149,15 @@ class JournalRepository(
         return gpsTrackPointDao.getTrackPointsForDay(dayStartMillis, dayEndMillis)
     }
 }
+
+@kotlinx.serialization.Serializable
+private data class VersionCheck(val version: Int)
+
+@kotlinx.serialization.Serializable
+private data class JournalEntryV2(
+    val id: Int = 0,
+    val title: String,
+    val content: String,
+    val timestamp: Long,
+    val hasImage: Boolean = false
+)

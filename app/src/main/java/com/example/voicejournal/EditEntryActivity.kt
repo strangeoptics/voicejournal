@@ -1,24 +1,25 @@
 package com.example.voicejournal
 
-import android.app.DatePickerDialog
-import android.app.TimePickerDialog
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.EntryWithCategories
@@ -55,7 +56,6 @@ class EditEntryActivity : ComponentActivity() {
                         onNavigateUp = { finish() }
                     )
                 } ?: run {
-                    // Show a loading indicator or an error message
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
@@ -93,27 +93,59 @@ fun EditEntryScreen(
             )
         )
     }
-    val context = LocalContext.current
 
-    val timePickerDialog = TimePickerDialog(
-        context,
-        { _, hourOfDay, minute ->
-            currentDateTime = currentDateTime.withHour(hourOfDay).withMinute(minute)
-        },
-        currentDateTime.hour,
-        currentDateTime.minute,
-        true
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = currentDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    )
+    val timePickerState = rememberTimePickerState(
+        initialHour = currentDateTime.hour,
+        initialMinute = currentDateTime.minute,
+        is24Hour = true
     )
 
-    val datePickerDialog = DatePickerDialog(
-        context,
-        { _, year, month, dayOfMonth ->
-            currentDateTime = currentDateTime.withYear(year).withMonth(month + 1).withDayOfMonth(dayOfMonth)
-        },
-        currentDateTime.year,
-        currentDateTime.monthValue - 1,
-        currentDateTime.dayOfMonth
-    )
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val selectedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                        currentDateTime = currentDateTime.with(selectedDate)
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showTimePicker) {
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text("Select Time") },
+            text = {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    TimePicker(state = timePickerState)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    currentDateTime = currentDateTime.withHour(timePickerState.hour).withMinute(timePickerState.minute)
+                    showTimePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) { Text("Cancel") }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -142,19 +174,52 @@ fun EditEntryScreen(
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            TextField(
+            OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
-                modifier = Modifier.fillMaxWidth().height(200.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
                 label = { Text("Content") }
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Date and Time pickers
-            Text(text = "Current: ${currentDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))}")
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                Button(onClick = { datePickerDialog.show() }) { Text("Change Date") }
-                Button(onClick = { timePickerDialog.show() }) { Text("Change Time") }
+            val dateInteractionSource = remember { MutableInteractionSource() }
+            LaunchedEffect(dateInteractionSource) {
+                dateInteractionSource.interactions.collect { interaction ->
+                    if (interaction is PressInteraction.Release) { showDatePicker = true }
+                }
+            }
+
+            val timeInteractionSource = remember { MutableInteractionSource() }
+            LaunchedEffect(timeInteractionSource) {
+                timeInteractionSource.interactions.collect { interaction ->
+                    if (interaction is PressInteraction.Release) { showTimePicker = true }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = currentDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+                    onValueChange = {},
+                    label = { Text("Date") },
+                    readOnly = true,
+                    modifier = Modifier.weight(1f),
+                    interactionSource = dateInteractionSource,
+                    trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = "Select Date") }
+                )
+                OutlinedTextField(
+                    value = currentDateTime.format(DateTimeFormatter.ofPattern("HH:mm")),
+                    onValueChange = {},
+                    label = { Text("Time") },
+                    readOnly = true,
+                    modifier = Modifier.weight(1f),
+                    interactionSource = timeInteractionSource,
+                    trailingIcon = { Icon(Icons.Default.Schedule, contentDescription = "Select Time") }
+                )
             }
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -164,7 +229,6 @@ fun EditEntryScreen(
             }
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Category selection
             Text("Categories:", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
             allCategories.forEach { category ->

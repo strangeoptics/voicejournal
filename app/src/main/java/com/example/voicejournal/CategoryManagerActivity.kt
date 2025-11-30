@@ -22,9 +22,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -34,20 +32,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 
@@ -63,9 +57,7 @@ class CategoryManagerActivity : ComponentActivity() {
         setContent {
             VoicejournalTheme {
                 val categories by viewModel.categoriesFlow.collectAsState()
-                var showEditDialog by remember { mutableStateOf(false) }
-                var categoryToEdit by remember { mutableStateOf<Category?>(null) }
-
+                val context = LocalContext.current
 
                 Scaffold(
                     topBar = {
@@ -80,8 +72,9 @@ class CategoryManagerActivity : ComponentActivity() {
                     },
                     floatingActionButton = {
                         FloatingActionButton(onClick = {
-                            categoryToEdit = null
-                            showEditDialog = true
+                            val highestIndex = categories.maxOfOrNull { it.orderIndex } ?: 0
+                            val intent = EditCategoryActivity.newIntent(context, null, highestIndex)
+                            context.startActivity(intent)
                         }) {
                             Icon(Icons.Default.Add, contentDescription = "Add Category")
                         }
@@ -91,8 +84,8 @@ class CategoryManagerActivity : ComponentActivity() {
                         modifier = Modifier.padding(padding),
                         categories = categories,
                         onCategoryLongClick = { category ->
-                            categoryToEdit = category
-                            showEditDialog = true
+                            val intent = EditCategoryActivity.newIntent(context, category.id)
+                            context.startActivity(intent)
                         },
                         onDeleteCategory = { category ->
                             viewModel.deleteCategory(category)
@@ -100,21 +93,6 @@ class CategoryManagerActivity : ComponentActivity() {
                         onMoveCategory = { category, moveUp ->
                             viewModel.moveCategory(category, moveUp)
                         }
-                    )
-                }
-
-                if (showEditDialog) {
-                    EditCategoryDialog(
-                        onDismiss = {
-                            showEditDialog = false
-                            categoryToEdit = null
-                        },
-                        onSave = { category, aliases, showAll ->
-                            viewModel.addOrUpdateCategory(category, aliases, showAll)
-                            showEditDialog = false
-                            categoryToEdit = null
-                        },
-                        initialCategory = categoryToEdit
                     )
                 }
             }
@@ -207,50 +185,6 @@ fun CategoryManagerScreen(
                             }
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun EditCategoryDialog(
-    onDismiss: () -> Unit,
-    onSave: (String, String, Boolean) -> Unit,
-    initialCategory: Category?
-) {
-    var category by remember { mutableStateOf(initialCategory?.category ?: "") }
-    var aliases by remember { mutableStateOf(initialCategory?.aliases ?: "") }
-    var showAll by remember { mutableStateOf(initialCategory?.showAll ?: false) }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(if (initialCategory == null) "Add New Category" else "Edit Category")
-                TextField(
-                    value = category,
-                    onValueChange = { category = it },
-                    label = { Text("Category") },
-                    enabled = initialCategory == null
-                )
-                TextField(
-                    value = aliases,
-                    onValueChange = { aliases = it },
-                    label = { Text("Aliases (comma-separated)") }
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = showAll,
-                        onCheckedChange = { showAll = it }
-                    )
-                    Text("Show all")
-                }
-                Button(onClick = {
-                    if (category.isNotBlank()) { // Aliases can be blank
-                        onSave(category, aliases, showAll)
-                    }
-                }) {
-                    Text("Save")
                 }
             }
         }

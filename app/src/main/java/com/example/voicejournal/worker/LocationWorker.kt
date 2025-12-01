@@ -53,7 +53,7 @@ class LocationWorker(
         }
 
         // Promote to a foreground service
-        setForeground(createForegroundInfo())
+        // setForeground(createForegroundInfo()) // Deaktiviert, um Absturz zu vermeiden
 
         return try {
             val location = getCurrentLocation()

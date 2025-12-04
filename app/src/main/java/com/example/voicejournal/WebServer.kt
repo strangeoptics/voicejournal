@@ -28,6 +28,10 @@ class WebServer(private val db: AppDatabase) {
                         val categories = db.categoryDao().getAll()
                         call.respond(categories)
                     }
+                    get("/journalentries") {
+                        val entries = db.journalEntryDao().getAllEntriesWithCategories()
+                        call.respond(entries)
+                    }
                 }
             }.start(wait = true)
         }

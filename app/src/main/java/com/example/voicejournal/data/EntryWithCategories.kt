@@ -3,7 +3,9 @@ package com.example.voicejournal.data
 import androidx.room.Embedded
 import androidx.room.Junction
 import androidx.room.Relation
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class EntryWithCategories(
     @Embedded val entry: JournalEntry,
     @Relation(

@@ -69,6 +69,7 @@ dependencies {
     implementation(libs.ktor.server.netty.jvm)
     implementation(libs.ktor.server.content.negotiation.jvm)
     implementation(libs.ktor.serialization.kotlinx.json.jvm)
+    implementation(libs.ktor.server.cors.jvm)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

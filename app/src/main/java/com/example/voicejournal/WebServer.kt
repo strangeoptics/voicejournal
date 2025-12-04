@@ -2,6 +2,8 @@ package com.example.voicejournal
 
 import com.example.voicejournal.data.AppDatabase
 import com.example.voicejournal.data.JournalEntryDto
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.call
@@ -9,6 +11,7 @@ import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
@@ -23,6 +26,11 @@ class WebServer(private val db: AppDatabase) {
             embeddedServer(Netty, port = 8080) {
                 install(ContentNegotiation) {
                     json()
+                }
+                install(CORS) {
+                    anyHost()
+                    allowHeader(HttpHeaders.ContentType)
+                    allowMethod(HttpMethod.Get)
                 }
                 routing {
                     get("/categories") {

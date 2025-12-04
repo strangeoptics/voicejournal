@@ -38,6 +38,7 @@ ktor-server-core-jvm = { group = "io.ktor", name = "ktor-server-core-jvm", versi
 ktor-server-netty-jvm = { group = "io.ktor", name = "ktor-server-netty-jvm", version.ref = "ktor" }
 ktor-server-content-negotiation-jvm = { group = "io.ktor", name = "ktor-server-content-negotiation-jvm", version.ref = "ktor" }
 ktor-serialization-kotlinx-json-jvm = { group = "io.ktor", name = "ktor-serialization-kotlinx-json-jvm", version.ref = "ktor" }
+ktor-server-cors-jvm = { group = "io.ktor", name = "ktor-server-cors-jvm", version.ref = "ktor" }
 
 
 [plugins]

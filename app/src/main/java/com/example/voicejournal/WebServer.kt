@@ -1,6 +1,7 @@
 package com.example.voicejournal
 
 import com.example.voicejournal.data.AppDatabase
+import com.example.voicejournal.data.JournalEntryDto
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.call
 import io.ktor.server.application.install
@@ -29,7 +30,16 @@ class WebServer(private val db: AppDatabase) {
                     }
                     get("/journalentries") {
                         val entries = db.journalEntryDao().getAllEntriesWithCategories()
-                        call.respond(entries)
+                        val dtos = entries.map { entryWithCategories ->
+                            JournalEntryDto(
+                                id = entryWithCategories.entry.id,
+                                content = entryWithCategories.entry.content,
+                                timestamp = entryWithCategories.entry.timestamp,
+                                hasImage = entryWithCategories.entry.hasImage,
+                                categoryIds = entryWithCategories.categories.map { it.id }
+                            )
+                        }
+                        call.respond(dtos)
                     }
                 }
             }.start(wait = true)

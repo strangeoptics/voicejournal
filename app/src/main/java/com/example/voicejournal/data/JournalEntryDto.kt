@@ -1,0 +1,13 @@
+package com.example.voicejournal.data
+
+import kotlinx.serialization.Serializable
+
+// DTO für einen einzelnen Journaleintrag
+@Serializable
+data class JournalEntryDto(
+    val id: Int,
+    val content: String,
+    val timestamp: Long,
+    val hasImage: Boolean,
+    val categoryIds: List<Int> // Hier verwenden wir eine Liste von IDs (Integer)
+)

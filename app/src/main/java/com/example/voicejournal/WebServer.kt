@@ -45,7 +45,11 @@ class WebServer(private val db: AppDatabase) {
                         call.respond(categories)
                     }
                     get("/journalentries") {
-                        val entries = db.journalEntryDao().getAllEntriesWithCategories()
+                        val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
+                        val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 10
+                        val offset = (page - 1) * pageSize
+
+                        val entries = db.journalEntryDao().getPaginatedEntriesWithCategories(pageSize, offset)
                         val dtos = entries.map { entryWithCategories ->
                             JournalEntryDto(
                                 id = entryWithCategories.entry.id,
@@ -64,7 +68,11 @@ class WebServer(private val db: AppDatabase) {
                             return@get
                         }
 
-                        val entries = db.journalEntryDao().getEntriesForCategory(id)
+                        val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
+                        val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 10
+                        val offset = (page - 1) * pageSize
+
+                        val entries = db.journalEntryDao().getPaginatedEntriesForCategory(id, pageSize, offset)
                         val dtos = entries.map { entryWithCategories ->
                             JournalEntryDto(
                                 id = entryWithCategories.entry.id,

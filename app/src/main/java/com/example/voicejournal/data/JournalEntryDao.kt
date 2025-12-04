@@ -20,12 +20,20 @@ interface JournalEntryDao {
     suspend fun getAllEntriesWithCategories(): List<EntryWithCategories>
 
     @Transaction
+    @Query("SELECT * FROM journal_entries ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
+    suspend fun getPaginatedEntriesWithCategories(limit: Int, offset: Int): List<EntryWithCategories>
+
+    @Transaction
     @Query("SELECT * FROM journal_entries WHERE timestamp >= :since ORDER BY timestamp DESC")
     fun getEntriesWithCategoriesSince(since: Long): Flow<List<EntryWithCategories>>
 
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY timestamp DESC")
     suspend fun getEntriesForCategory(categoryId: Int): List<EntryWithCategories>
+    
+    @Transaction
+    @Query("SELECT * FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
+    suspend fun getPaginatedEntriesForCategory(categoryId: Int, limit: Int, offset: Int): List<EntryWithCategories>
 
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE id = :entryId")

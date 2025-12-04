@@ -23,6 +23,14 @@ interface JournalEntryDao {
     @Query("SELECT * FROM journal_entries WHERE timestamp >= :since ORDER BY timestamp DESC")
     fun getEntriesWithCategoriesSince(since: Long): Flow<List<EntryWithCategories>>
 
+    @Transaction
+    @Query("SELECT * FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY timestamp DESC")
+    suspend fun getEntriesForCategory(categoryId: Int): List<EntryWithCategories>
+
+    @Transaction
+    @Query("SELECT * FROM journal_entries WHERE id = :entryId")
+    suspend fun getEntryById(entryId: Int): EntryWithCategories?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entry: JournalEntry): Long
 

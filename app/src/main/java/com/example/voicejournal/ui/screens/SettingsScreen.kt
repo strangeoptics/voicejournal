@@ -49,6 +49,7 @@ fun SettingsScreen(
     maxRecordingTime: Int,
     silenceThreshold: Int,
     silenceTimeRequired: Int,
+    truncationLength: Int,
     onDaysChanged: (Int) -> Unit,
     onGpsEnableChanged: (Boolean) -> Unit,
     onGpsIntervalChanged: (Int) -> Unit,
@@ -57,10 +58,12 @@ fun SettingsScreen(
     onMaxRecordingTimeChanged: (Int) -> Unit,
     onSilenceThresholdChanged: (Int) -> Unit,
     onSilenceTimeRequiredChanged: (Int) -> Unit,
+    onTruncationLengthChanged: (Int) -> Unit,
     onBackPressed: () -> Unit
 ) {
     var days by remember { mutableStateOf(currentDays.toString()) }
     var apiKey by remember { mutableStateOf(currentApiKey) }
+    var truncationLengthState by remember { mutableStateOf(truncationLength.toString()) }
 
     Scaffold(
         topBar = {
@@ -96,6 +99,25 @@ fun SettingsScreen(
                         modifier = Modifier.width(80.dp)
                     )
                 }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Textlänge für Vorschau")
+                    TextField(
+                        value = truncationLengthState,
+                        onValueChange = {
+                            truncationLengthState = it
+                            it.toIntOrNull()?.let(onTruncationLengthChanged)
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.width(80.dp)
+                    )
+                }
+
 
                 Spacer(modifier = Modifier.height(24.dp))
 

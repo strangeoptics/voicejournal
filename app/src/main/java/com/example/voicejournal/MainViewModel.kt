@@ -48,6 +48,7 @@ class MainViewModel(
         const val KEY_MAX_RECORDING_TIME = "max_recording_time"
         const val KEY_SILENCE_THRESHOLD = "silence_threshold"
         const val KEY_SILENCE_TIME_REQUIRED = "silence_time_required"
+        const val KEY_TRUNCATION_LENGTH = "truncation_length"
     }
 
     private val _selectedCategory = MutableStateFlow("")
@@ -85,6 +86,10 @@ class MainViewModel(
 
     private val _silenceTimeRequired = MutableStateFlow(sharedPreferences.getInt(KEY_SILENCE_TIME_REQUIRED, 2000))
     val silenceTimeRequired: StateFlow<Int> = _silenceTimeRequired.asStateFlow()
+
+    private val _truncationLength = MutableStateFlow(sharedPreferences.getInt(KEY_TRUNCATION_LENGTH, 160))
+    val truncationLength: StateFlow<Int> = _truncationLength.asStateFlow()
+
 
     private val _recentlyDeleted = MutableStateFlow<List<EntryWithCategories>>(emptyList())
     val canUndo: StateFlow<Boolean> = _recentlyDeleted.map { it.isNotEmpty() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -288,6 +293,11 @@ class MainViewModel(
     fun saveSilenceTimeRequired(time: Int) {
         _silenceTimeRequired.value = time
         sharedPreferences.edit { putInt(KEY_SILENCE_TIME_REQUIRED, time) }
+    }
+
+    fun saveTruncationLength(length: Int) {
+        _truncationLength.value = length
+        sharedPreferences.edit { putInt(KEY_TRUNCATION_LENGTH, length) }
     }
 
     fun addOrUpdateCategory(categoryName: String, aliasesString: String, showAll: Boolean) {

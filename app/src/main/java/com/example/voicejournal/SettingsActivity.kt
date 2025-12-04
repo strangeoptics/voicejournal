@@ -27,6 +27,7 @@ class SettingsActivity : ComponentActivity() {
                 val maxRecordingTime by viewModel.maxRecordingTime.collectAsState()
                 val silenceThreshold by viewModel.silenceThreshold.collectAsState()
                 val silenceTimeRequired by viewModel.silenceTimeRequired.collectAsState()
+                val truncationLength by viewModel.truncationLength.collectAsState()
 
                 SettingsScreen(
                     currentDays = daysToShow,
@@ -37,6 +38,7 @@ class SettingsActivity : ComponentActivity() {
                     maxRecordingTime = maxRecordingTime,
                     silenceThreshold = silenceThreshold,
                     silenceTimeRequired = silenceTimeRequired,
+                    truncationLength = truncationLength,
                     onDaysChanged = viewModel::saveDaysToShow,
                     onGpsEnableChanged = viewModel::saveGpsTrackingEnabled,
                     onGpsIntervalChanged = viewModel::saveGpsInterval,
@@ -45,6 +47,7 @@ class SettingsActivity : ComponentActivity() {
                     onMaxRecordingTimeChanged = viewModel::saveMaxRecordingTime,
                     onSilenceThresholdChanged = viewModel::saveSilenceThreshold,
                     onSilenceTimeRequiredChanged = viewModel::saveSilenceTimeRequired,
+                    onTruncationLengthChanged = viewModel::saveTruncationLength,
                     onBackPressed = { finish() }
                 )
             }

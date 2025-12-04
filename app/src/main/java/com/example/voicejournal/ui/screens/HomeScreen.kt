@@ -60,6 +60,7 @@ fun HomeScreen(
     groupedEntries: Map<LocalDate, List<EntryWithCategories>> = emptyMap(),
     categories: List<String> = emptyList(),
     selectedCategory: String = "",
+    truncationLength: Int,
     onCategoryChange: (String) -> Unit = {},
     onDeleteEntry: (EntryWithCategories) -> Unit = {},
     selectedEntry: EntryWithCategories? = null,
@@ -178,7 +179,7 @@ fun HomeScreen(
                                 .combinedClickable(
                                     onClick = {
                                         onEntrySelected(entryWithCategories)
-                                        if (entryWithCategories.entry.content.length > 160) {
+                                        if (entryWithCategories.entry.content.length > truncationLength) {
                                             expandedIds = if (isExpanded) {
                                                 expandedIds - entryWithCategories.entry.id
                                             } else {
@@ -201,8 +202,8 @@ fun HomeScreen(
                                 )
                                 val formatter = DateTimeFormatter.ofPattern("HH:mm")
                                 val content = entryWithCategories.entry.content
-                                val textToShow = if (!isExpanded && content.length > 160) {
-                                    "${content.take(160)}..."
+                                val textToShow = if (!isExpanded && content.length > truncationLength) {
+                                    "${content.take(truncationLength)}..."
                                 } else {
                                     content
                                 }
@@ -289,7 +290,8 @@ fun HomeScreenPreview() {
             groupedEntries = groupedEntries,
             categories = sampleCategories,
             selectedCategory = selectedCategory,
-            onCategoryChange = { selectedCategory = it }
+            onCategoryChange = { selectedCategory = it },
+            truncationLength = 160
         )
     }
 }

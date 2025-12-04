@@ -118,6 +118,8 @@ class MainActivity : ComponentActivity() {
                 val gpsTrackPoints by viewModel.gpsTrackPoints.collectAsState()
                 val hasGpsTrackForSelectedDate by viewModel.hasGpsTrackForSelectedDate.collectAsState()
                 val isRecording by speechRecognitionManager.isRecording.collectAsState()
+                val truncationLength by viewModel.truncationLength.collectAsState()
+
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
@@ -353,6 +355,7 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         Icon(Icons.Filled.Add, contentDescription = "Sprechen")
                                     }
+
                                 }
                             }
                         ) { innerPadding ->
@@ -385,7 +388,8 @@ class MainActivity : ComponentActivity() {
                                             val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entryWithCategories.entry.timestamp), ZoneId.systemDefault()).toLocalDate()
                                             openGooglePhotos(date)
                                         },
-                                        shouldShowMoreButton = shouldShowMoreButton
+                                        shouldShowMoreButton = shouldShowMoreButton,
+                                        truncationLength = truncationLength
                                     )
                                  }
                             }

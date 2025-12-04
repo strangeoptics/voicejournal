@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -116,6 +117,7 @@ class MainActivity : ComponentActivity() {
                 val shouldShowMoreButton by viewModel.shouldShowMoreButton.collectAsState()
                 val gpsTrackPoints by viewModel.gpsTrackPoints.collectAsState()
                 val hasGpsTrackForSelectedDate by viewModel.hasGpsTrackForSelectedDate.collectAsState()
+                val isRecording by speechRecognitionManager.isRecording.collectAsState()
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
@@ -329,20 +331,28 @@ class MainActivity : ComponentActivity() {
                             },
                             floatingActionButton = {
                                 FloatingActionButton(onClick = {
-                                    when {
-                                        ContextCompat.checkSelfPermission(
-                                            context,
-                                            Manifest.permission.RECORD_AUDIO
-                                        ) == PackageManager.PERMISSION_GRANTED -> {
-                                            startListening()
-                                        }
+                                    if (isRecording) {
+                                        speechRecognitionManager.stopListening()
+                                    } else {
+                                        when {
+                                            ContextCompat.checkSelfPermission(
+                                                context,
+                                                Manifest.permission.RECORD_AUDIO
+                                            ) == PackageManager.PERMISSION_GRANTED -> {
+                                                startListening()
+                                            }
 
-                                        else -> {
-                                            recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                            else -> {
+                                                recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                            }
                                         }
                                     }
                                 }) {
-                                    Icon(Icons.Filled.Add, contentDescription = "Sprechen")
+                                    if (isRecording) {
+                                        Icon(Icons.Filled.Stop, contentDescription = "Stop recording")
+                                    } else {
+                                        Icon(Icons.Filled.Add, contentDescription = "Sprechen")
+                                    }
                                 }
                             }
                         ) { innerPadding ->

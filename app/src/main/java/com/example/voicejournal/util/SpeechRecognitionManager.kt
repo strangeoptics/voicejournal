@@ -16,6 +16,9 @@ import android.util.Log
 import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -34,7 +37,8 @@ class SpeechRecognitionManager(
 ) {
 
     private var speechRecognizer: SpeechRecognizer? = null
-    private var isRecording = false
+    private val _isRecording = MutableStateFlow(false)
+    val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
 
     init {
         setupSpeechRecognizer()
@@ -45,6 +49,7 @@ class SpeechRecognitionManager(
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
             speechRecognizer?.setRecognitionListener(object : RecognitionListener {
                 override fun onResults(results: Bundle?) {
+                    _isRecording.value = false
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     if (matches.isNullOrEmpty()) {
                         onError?.invoke(SpeechRecognizer.ERROR_NO_MATCH)
@@ -60,6 +65,7 @@ class SpeechRecognitionManager(
                 }
 
                 override fun onError(error: Int) {
+                    _isRecording.value = false
                     onError?.invoke(error)
                 }
 
@@ -67,7 +73,9 @@ class SpeechRecognitionManager(
                 override fun onBeginningOfSpeech() {}
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
-                override fun onEndOfSpeech() {}
+                override fun onEndOfSpeech() {
+                    _isRecording.value = false
+                }
                 override fun onPartialResults(partialResults: Bundle?) {}
                 override fun onEvent(eventType: Int, params: Bundle?) {}
             })
@@ -88,7 +96,20 @@ class SpeechRecognitionManager(
         }
     }
 
+    fun stopListening() {
+        if (_isRecording.value) {
+            // For Google Cloud, this will stop the recording loop
+            _isRecording.value = false
+            // For Android Recognizer
+            scope.launch(Dispatchers.Main) {
+                speechRecognizer?.stopListening()
+            }
+        }
+    }
+
+
     private fun startAndroidListening() {
+        _isRecording.value = true
         val speechRecognizerIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
@@ -108,6 +129,7 @@ class SpeechRecognitionManager(
             return
         }
 
+        _isRecording.value = true
         scope.launch(Dispatchers.IO) {
             try {
                 val sampleRate = 16000
@@ -122,13 +144,13 @@ class SpeechRecognitionManager(
                 val buffer = ByteArray(bufferSize)
 
                 audioRecord.startRecording()
-                isRecording = true
+
 
                 val startTime = System.currentTimeMillis()
                 val maxRecordingTime = maxRecordingTimeSeconds * 1000 // Convert to milliseconds
                 var lastSoundTime = System.currentTimeMillis()
 
-                while (isRecording && (System.currentTimeMillis() - startTime < maxRecordingTime)) {
+                while (_isRecording.value && (System.currentTimeMillis() - startTime < maxRecordingTime)) {
                     val read = audioRecord.read(buffer, 0, buffer.size)
                     if (read > 0) {
                         audioData.write(buffer, 0, read)
@@ -161,7 +183,7 @@ class SpeechRecognitionManager(
 
                 audioRecord.stop()
                 audioRecord.release()
-                isRecording = false
+                _isRecording.value = false
 
                 if (audioData.size() == 0) {
                     withContext(Dispatchers.Main) {
@@ -251,6 +273,6 @@ class SpeechRecognitionManager(
     fun destroy() {
         speechRecognizer?.destroy()
         speechRecognizer = null
-        isRecording = false
+        _isRecording.value = false
     }
 }

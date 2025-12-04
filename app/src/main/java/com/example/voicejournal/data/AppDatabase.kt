@@ -11,6 +11,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 abstract class AppDatabase : RoomDatabase() {
     abstract fun journalEntryDao(): JournalEntryDao
     abstract fun gpsTrackPointDao(): GpsTrackPointDao
+    abstract fun categoryDao(): CategoryDao
 
     companion object {
         @Volatile

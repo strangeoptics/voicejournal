@@ -7,6 +7,7 @@ import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.voicejournal.data.AppDatabase
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.data.GpsTrackPoint
@@ -34,7 +35,8 @@ import java.util.Locale
 class MainViewModel(
     private val repository: JournalRepository,
     private val sharedPreferences: SharedPreferences,
-    private val applicationContext: Context
+    private val applicationContext: Context,
+    val db: AppDatabase
 ) : ViewModel() {
 
     companion object {
@@ -440,7 +442,8 @@ class MainViewModelFactory(private val context: Context, private val sharedPrefe
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             val repository = Injector.provideJournalRepository(context)
-            return MainViewModel(repository, sharedPreferences, context.applicationContext) as T
+            val db = Injector.getDatabase(context)
+            return MainViewModel(repository, sharedPreferences, context.applicationContext, db) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

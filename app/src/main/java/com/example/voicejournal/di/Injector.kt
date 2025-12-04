@@ -6,7 +6,7 @@ import com.example.voicejournal.data.JournalRepository
 
 object Injector {
 
-    private fun getDatabase(context: Context): AppDatabase {
+    fun getDatabase(context: Context): AppDatabase {
         return AppDatabase.getDatabase(context)
     }
 

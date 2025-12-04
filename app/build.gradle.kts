@@ -40,6 +40,12 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        resources {
+            pickFirsts += "META-INF/INDEX.LIST"
+            pickFirsts += "META-INF/io.netty.versions.properties"
+        }
+    }
 }
 
 dependencies {
@@ -59,6 +65,10 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation("androidx.work:work-runtime-ktx:2.9.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation(libs.ktor.server.core.jvm)
+    implementation(libs.ktor.server.netty.jvm)
+    implementation(libs.ktor.server.content.negotiation.jvm)
+    implementation(libs.ktor.serialization.kotlinx.json.jvm)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

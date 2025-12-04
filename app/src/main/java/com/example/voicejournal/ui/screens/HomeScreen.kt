@@ -72,6 +72,7 @@ fun HomeScreen(
     onPhotoIconClicked: (EntryWithCategories) -> Unit = {},
     shouldShowMoreButton: Boolean = true
 ) {
+    var expandedIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
     Column(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Top,
@@ -135,6 +136,7 @@ fun HomeScreen(
 
                 items(entries, key = { it.entry.id }) { entryWithCategories ->
                     val isSelected = selectedEntry == entryWithCategories
+                    val isExpanded = entryWithCategories.entry.id in expandedIds
                     val dismissState = rememberSwipeToDismissBoxState(
                         confirmValueChange = {
                             if (it == SwipeToDismissBoxValue.StartToEnd) {
@@ -174,22 +176,41 @@ fun HomeScreen(
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
                                 .combinedClickable(
-                                    onClick = { onEntrySelected(entryWithCategories) },
+                                    onClick = {
+                                        onEntrySelected(entryWithCategories)
+                                        if (entryWithCategories.entry.content.length > 160) {
+                                            expandedIds = if (isExpanded) {
+                                                expandedIds - entryWithCategories.entry.id
+                                            } else {
+                                                expandedIds + entryWithCategories.entry.id
+                                            }
+                                        }
+                                    },
                                     onLongClick = { onEditEntry(entryWithCategories) }
                                 ),
                             colors = CardDefaults.cardColors(
                                 containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
                             )
                         ) {
-                            Box(modifier = Modifier.padding(8.dp).fillMaxWidth()) {
+                            Box(modifier = Modifier
+                                .padding(8.dp)
+                                .fillMaxWidth()) {
                                 val date = LocalDateTime.ofInstant(
                                     Instant.ofEpochMilli(entryWithCategories.entry.timestamp),
                                     ZoneId.systemDefault()
                                 )
                                 val formatter = DateTimeFormatter.ofPattern("HH:mm")
+                                val content = entryWithCategories.entry.content
+                                val textToShow = if (!isExpanded && content.length > 160) {
+                                    "${content.take(160)}..."
+                                } else {
+                                    content
+                                }
                                 Text(
-                                    text = entryWithCategories.entry.content,
-                                    modifier = Modifier.align(Alignment.TopStart).padding(top = 4.dp, end = 48.dp)
+                                    text = textToShow,
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .padding(top = 4.dp, end = 48.dp)
                                 )
                                 Text(
                                     text = date.format(formatter),
@@ -251,7 +272,7 @@ fun HomeScreenPreview() {
         val entries = remember {
             listOf(
                 EntryWithCategories(
-                    entry = JournalEntry(id = 1, content = "This is a preview entry.", timestamp = System.currentTimeMillis()),
+                    entry = JournalEntry(id = 1, content = "This is a preview entry.".repeat(20), timestamp = System.currentTimeMillis()),
                     categories = listOf(Category(1, "journal", aliases = "journal"))
                 ),
                 EntryWithCategories(

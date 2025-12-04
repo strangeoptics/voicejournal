@@ -65,6 +65,9 @@ interface JournalEntryDao {
     @Query("SELECT * FROM categories WHERE category = :categoryName LIMIT 1")
     suspend fun getCategoryByName(categoryName: String): Category?
 
+    @Query("SELECT * FROM categories WHERE id IN (:categoryIds)")
+    suspend fun getCategoriesByIds(categoryIds: List<Int>): List<Category>
+
     @Query("UPDATE categories SET aliases = :aliases WHERE id = :categoryId")
     suspend fun updateAliasesForCategory(categoryId: Int, aliases: String)
 

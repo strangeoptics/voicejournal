@@ -1,6 +1,7 @@
 package com.example.voicejournal
 
 import com.example.voicejournal.data.AppDatabase
+import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalEntryDto
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -12,8 +13,10 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
+import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +33,11 @@ class WebServer(private val db: AppDatabase) {
                 install(CORS) {
                     anyHost()
                     allowHeader(HttpHeaders.ContentType)
+                    allowMethod(HttpMethod.Options)
                     allowMethod(HttpMethod.Get)
+                    allowMethod(HttpMethod.Put)
+                    allowMethod(HttpMethod.Patch)
+                    allowMethod(HttpMethod.Delete)
                 }
                 routing {
                     get("/categories") {
@@ -90,6 +97,32 @@ class WebServer(private val db: AppDatabase) {
                             categoryIds = entry.categories.map { it.id }
                         )
                         call.respond(dto)
+                    }
+                    put("/journalentries/{id}") {
+                        val id = call.parameters["id"]?.toIntOrNull()
+                        if (id == null) {
+                            call.respond(HttpStatusCode.BadRequest, "Invalid or missing entry ID")
+                            return@put
+                        }
+
+                        val journalEntryDto = call.receive<JournalEntryDto>()
+
+                        val existingEntry = db.journalEntryDao().getEntryById(id)
+                        if (existingEntry == null) {
+                            call.respond(HttpStatusCode.NotFound, "Entry not found")
+                            return@put
+                        }
+
+                        val entry = JournalEntry(
+                            id = id,
+                            content = journalEntryDto.content,
+                            timestamp = journalEntryDto.timestamp,
+                            hasImage = journalEntryDto.hasImage
+                        )
+                        val categories = db.categoryDao().getCategoriesByIds(journalEntryDto.categoryIds)
+
+                        db.journalEntryDao().updateWithCategories(entry, categories)
+                        call.respond(HttpStatusCode.OK)
                     }
                 }
             }.start(wait = true)

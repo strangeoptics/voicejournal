@@ -30,12 +30,12 @@ class EditEntryViewModel(
         }
     }
 
-    fun saveEntry(updatedCategories: List<String>, updatedContent: String, updatedTimestamp: Long, hasImage: Boolean) {
+    fun saveEntry(updatedCategories: List<String>, updatedContent: String, updatedStartDatetime: Long, hasImage: Boolean) {
         viewModelScope.launch {
             _entry.value?.let { currentEntry ->
                 val updatedEntry = currentEntry.entry.copy(
                     content = updatedContent,
-                    timestamp = updatedTimestamp,
+                    start_datetime = updatedStartDatetime,
                     hasImage = hasImage
                 )
                 val categories = updatedCategories.map { categoryName ->

@@ -27,10 +27,10 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL("INSERT INTO journal_entry_category_cross_ref (entryId, categoryName) SELECT id, title FROM journal_entries")
 
                 // Create a new journal_entries table without the title column
-                database.execSQL("CREATE TABLE `journal_entries_new` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `content` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, `hasImage` INTEGER NOT NULL)")
+                database.execSQL("CREATE TABLE `journal_entries_new` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `content` TEXT NOT NULL, `start_datetime` INTEGER NOT NULL, `hasImage` INTEGER NOT NULL)")
                 
                 // Copy data to the new table
-                database.execSQL("INSERT INTO journal_entries_new (id, content, timestamp, hasImage) SELECT id, content, timestamp, hasImage FROM journal_entries")
+                database.execSQL("INSERT INTO journal_entries_new (id, content, start_datetime, hasImage) SELECT id, content, timestamp, hasImage FROM journal_entries")
                 
                 // Drop the old table
                 database.execSQL("DROP TABLE `journal_entries`")

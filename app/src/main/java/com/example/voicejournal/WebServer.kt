@@ -60,7 +60,7 @@ class WebServer(private val db: AppDatabase) {
                         JournalEntryDto(
                             id = entryWithCategories.entry.id,
                             content = entryWithCategories.entry.content,
-                            timestamp = entryWithCategories.entry.timestamp,
+                            start_datetime = entryWithCategories.entry.start_datetime,
                             hasImage = entryWithCategories.entry.hasImage,
                             categoryIds = entryWithCategories.categories.map { it.id }
                         )
@@ -83,7 +83,7 @@ class WebServer(private val db: AppDatabase) {
                         JournalEntryDto(
                             id = entryWithCategories.entry.id,
                             content = entryWithCategories.entry.content,
-                            timestamp = entryWithCategories.entry.timestamp,
+                            start_datetime = entryWithCategories.entry.start_datetime,
                             hasImage = entryWithCategories.entry.hasImage,
                             categoryIds = entryWithCategories.categories.map { it.id }
                         )
@@ -106,7 +106,7 @@ class WebServer(private val db: AppDatabase) {
                     val dto = JournalEntryDto(
                         id = entry.entry.id,
                         content = entry.entry.content,
-                        timestamp = entry.entry.timestamp,
+                        start_datetime = entry.entry.start_datetime,
                         hasImage = entry.entry.hasImage,
                         categoryIds = entry.categories.map { it.id }
                     )
@@ -117,7 +117,7 @@ class WebServer(private val db: AppDatabase) {
 
                     val entry = JournalEntry(
                         content = createDto.content,
-                        timestamp = createDto.timestamp,
+                        start_datetime = createDto.start_datetime,
                         hasImage = createDto.hasImage
                     )
 
@@ -130,7 +130,7 @@ class WebServer(private val db: AppDatabase) {
                         val dto = JournalEntryDto(
                             id = newEntry.entry.id,
                             content = newEntry.entry.content,
-                            timestamp = newEntry.entry.timestamp,
+                            start_datetime = newEntry.entry.start_datetime,
                             hasImage = newEntry.entry.hasImage,
                             categoryIds = newEntry.categories.map { it.id }
                         )
@@ -157,7 +157,7 @@ class WebServer(private val db: AppDatabase) {
                     val entry = JournalEntry(
                         id = id,
                         content = journalEntryDto.content,
-                        timestamp = journalEntryDto.timestamp,
+                        start_datetime = journalEntryDto.start_datetime,
                         hasImage = journalEntryDto.hasImage
                     )
                     val categories = db.categoryDao().getCategoriesByIds(journalEntryDto.categoryIds)

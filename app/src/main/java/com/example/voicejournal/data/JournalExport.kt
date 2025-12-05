@@ -14,7 +14,7 @@ data class JournalExport(
 @Serializable
 data class JournalEntryExport(
     val content: String,
-    val timestamp: Long,
+    val start_datetime: Long,
     val hasImage: Boolean,
     val categories: List<String>
 )

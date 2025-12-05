@@ -40,7 +40,7 @@ class JournalRepository(
                             journalExport.entries.forEach { entryExport ->
                                 val entry = JournalEntry(
                                     content = entryExport.content,
-                                    timestamp = entryExport.timestamp,
+                                    start_datetime = entryExport.start_datetime,
                                     hasImage = entryExport.hasImage
                                 )
                                 val categories = entryExport.categories.map { categoryName ->
@@ -53,7 +53,7 @@ class JournalRepository(
                             journalExport.categories.forEach { dao.insertCategory(it) }
                             journalExport.entries.forEach { entry ->
                                 val v2Entry = json.decodeFromString<JournalEntryV2>(Json.encodeToString(entry))
-                                val newEntry = JournalEntry(content = v2Entry.content, timestamp = v2Entry.timestamp, hasImage = v2Entry.hasImage)
+                                val newEntry = JournalEntry(content = v2Entry.content, start_datetime = v2Entry.timestamp, hasImage = v2Entry.hasImage)
                                 val category = Category(category = v2Entry.title, aliases = "")
                                 dao.insertWithCategories(newEntry, listOf(category))
                             }
@@ -61,7 +61,7 @@ class JournalRepository(
                     } else { // V1 or legacy
                         val entries = Json.decodeFromString<List<JournalEntryV2>>(content)
                         entries.forEach { v2Entry ->
-                             val newEntry = JournalEntry(content = v2Entry.content, timestamp = v2Entry.timestamp, hasImage = v2Entry.hasImage)
+                             val newEntry = JournalEntry(content = v2Entry.content, start_datetime = v2Entry.timestamp, hasImage = v2Entry.hasImage)
                              val category = Category(category = v2Entry.title, aliases = "")
                              dao.insertWithCategories(newEntry, listOf(category))
                         }
@@ -82,14 +82,14 @@ class JournalRepository(
                 val dateTimeString = matcher.group(1)
                 val contentString = matcher.group(2)
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                val timestamp = LocalDateTime.parse(dateTimeString, formatter)
+                val start_datetime = LocalDateTime.parse(dateTimeString, formatter)
                     .atZone(ZoneId.systemDefault())
                     .toInstant()
                     .toEpochMilli()
 
                 val entry = JournalEntry(
                     content = contentString,
-                    timestamp = timestamp
+                    start_datetime = start_datetime
                 )
                 dao.insertWithCategories(entry, listOf(Category(category="journal", aliases = "")))
             }
@@ -102,12 +102,12 @@ class JournalRepository(
         val exportEntries = entriesWithCategories.map {
             JournalEntryExport(
                 content = it.entry.content,
-                timestamp = it.entry.timestamp,
+                start_datetime = it.entry.start_datetime,
                 hasImage = it.entry.hasImage,
                 categories = it.categories.map { c -> c.category }
             )
         }
-        val exportData = JournalExportV3(version = 3, entries = exportEntries, categories = categories)
+        val exportData = JournalExportV3(entries = exportEntries, categories = categories)
         val jsonString = Json {
             prettyPrint = true
             encodeDefaults = true
@@ -119,7 +119,7 @@ class JournalRepository(
         }
     }
 
-    fun getEntriesWithCategoriesSince(timestamp: Long) = dao.getEntriesWithCategoriesSince(timestamp)
+    fun getEntriesWithCategoriesSince(since: Long) = dao.getEntriesWithCategoriesSince(since)
 
     suspend fun insertCategory(category: Category) = dao.insertCategory(category)
 

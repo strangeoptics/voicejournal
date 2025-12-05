@@ -50,8 +50,8 @@ class EditEntryActivity : ComponentActivity() {
                     EditEntryScreen(
                         entry = it,
                         allCategories = allCategories,
-                        onSave = { updatedCategories, content, timestamp, hasImage ->
-                            viewModel.saveEntry(updatedCategories, content, timestamp, hasImage)
+                        onSave = { updatedCategories, content, start_datetime, hasImage ->
+                            viewModel.saveEntry(updatedCategories, content, start_datetime, hasImage)
                             finish()
                         },
                         onNavigateUp = { finish() }
@@ -89,7 +89,7 @@ fun EditEntryScreen(
     var currentDateTime by remember {
         mutableStateOf(
             LocalDateTime.ofInstant(
-                Instant.ofEpochMilli(entry.entry.timestamp),
+                Instant.ofEpochMilli(entry.entry.start_datetime),
                 ZoneId.systemDefault()
             )
         )
@@ -161,8 +161,8 @@ fun EditEntryScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = {
-                val newTimestamp = currentDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                onSave(selectedCategories.value, text, newTimestamp, hasImage)
+                val newStartDatetime = currentDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                onSave(selectedCategories.value, text, newStartDatetime, hasImage)
             }) {
                 Icon(Icons.Default.Done, contentDescription = "Save Entry")
             }

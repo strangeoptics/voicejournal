@@ -10,6 +10,6 @@ data class JournalEntry(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     val content: String,
-    val timestamp: Long,
+    val start_datetime: Long,
     val hasImage: Boolean = false
 )

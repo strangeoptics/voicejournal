@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface JournalEntryDao {
     @Transaction
-    @Query("SELECT * FROM journal_entries ORDER BY timestamp DESC")
+    @Query("SELECT * FROM journal_entries ORDER BY start_datetime DESC")
     fun getEntriesWithCategories(): Flow<List<EntryWithCategories>>
 
     @Transaction
@@ -20,19 +20,19 @@ interface JournalEntryDao {
     suspend fun getAllEntriesWithCategories(): List<EntryWithCategories>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
+    @Query("SELECT * FROM journal_entries ORDER BY start_datetime DESC LIMIT :limit OFFSET :offset")
     suspend fun getPaginatedEntriesWithCategories(limit: Int, offset: Int): List<EntryWithCategories>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE timestamp >= :since ORDER BY timestamp DESC")
+    @Query("SELECT * FROM journal_entries WHERE start_datetime >= :since ORDER BY start_datetime DESC")
     fun getEntriesWithCategoriesSince(since: Long): Flow<List<EntryWithCategories>>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY timestamp DESC")
+    @Query("SELECT * FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC")
     suspend fun getEntriesForCategory(categoryId: Int): List<EntryWithCategories>
     
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
+    @Query("SELECT * FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC LIMIT :limit OFFSET :offset")
     suspend fun getPaginatedEntriesForCategory(categoryId: Int, limit: Int, offset: Int): List<EntryWithCategories>
 
     @Transaction

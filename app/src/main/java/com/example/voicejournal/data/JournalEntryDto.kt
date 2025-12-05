@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 data class JournalEntryDto(
     val id: Int,
     val content: String,
-    val timestamp: Long,
+    val start_datetime: Long,
     val hasImage: Boolean,
     val categoryIds: List<Int> // Hier verwenden wir eine Liste von IDs (Integer)
 )
@@ -15,7 +15,7 @@ data class JournalEntryDto(
 @Serializable
 data class CreateJournalEntryDto(
     val content: String,
-    val timestamp: Long,
+    val start_datetime: Long,
     val hasImage: Boolean,
     val categoryIds: List<Int>
 )

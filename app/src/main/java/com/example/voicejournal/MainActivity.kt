@@ -221,7 +221,7 @@ class MainActivity : ComponentActivity() {
                 )
 
                 val textToShow = filteredEntries.joinToString("\n") { entryWithCategories ->
-                    val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entryWithCategories.entry.timestamp), ZoneId.systemDefault())
+                    val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entryWithCategories.entry.start_datetime), ZoneId.systemDefault())
                     val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
                     "[${date.format(formatter)}] ${entryWithCategories.entry.content}"
                 }
@@ -385,7 +385,7 @@ class MainActivity : ComponentActivity() {
                                             openGooglePhotos(date)
                                         },
                                         onPhotoIconClicked = { entryWithCategories ->
-                                            val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entryWithCategories.entry.timestamp), ZoneId.systemDefault()).toLocalDate()
+                                            val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entryWithCategories.entry.start_datetime), ZoneId.systemDefault()).toLocalDate()
                                             openGooglePhotos(date)
                                         },
                                         shouldShowMoreButton = shouldShowMoreButton,

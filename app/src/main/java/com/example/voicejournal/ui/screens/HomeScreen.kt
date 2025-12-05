@@ -197,7 +197,7 @@ fun HomeScreen(
                                 .padding(8.dp)
                                 .fillMaxWidth()) {
                                 val date = LocalDateTime.ofInstant(
-                                    Instant.ofEpochMilli(entryWithCategories.entry.timestamp),
+                                    Instant.ofEpochMilli(entryWithCategories.entry.start_datetime),
                                     ZoneId.systemDefault()
                                 )
                                 val formatter = DateTimeFormatter.ofPattern("HH:mm")
@@ -273,17 +273,17 @@ fun HomeScreenPreview() {
         val entries = remember {
             listOf(
                 EntryWithCategories(
-                    entry = JournalEntry(id = 1, content = "This is a preview entry.".repeat(20), timestamp = System.currentTimeMillis()),
+                    entry = JournalEntry(id = 1, content = "This is a preview entry.".repeat(20), start_datetime = System.currentTimeMillis()),
                     categories = listOf(Category(1, "journal", aliases = "journal"))
                 ),
                 EntryWithCategories(
-                    entry = JournalEntry(id = 2, content = "This is a todo preview.", timestamp = System.currentTimeMillis(), hasImage = true),
+                    entry = JournalEntry(id = 2, content = "This is a todo preview.", start_datetime = System.currentTimeMillis(), hasImage = true),
                     categories = listOf(Category(2, "todo", aliases = "todo"))
                 )
             )
         }
         val groupedEntries = entries.filter { it.categories.any { c -> c.category == selectedCategory } }.groupBy {
-            Instant.ofEpochMilli(it.entry.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
+            Instant.ofEpochMilli(it.entry.start_datetime).atZone(ZoneId.systemDefault()).toLocalDate()
         }
 
         HomeScreen(

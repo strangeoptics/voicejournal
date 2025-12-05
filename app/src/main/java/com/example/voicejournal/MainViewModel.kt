@@ -193,7 +193,7 @@ class MainViewModel(
     val groupedEntries: StateFlow<Map<LocalDate, List<EntryWithCategories>>> =
         filteredEntries.map { entries ->
             entries.groupBy {
-                Instant.ofEpochMilli(it.entry.timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
+                Instant.ofEpochMilli(it.entry.start_datetime).atZone(ZoneId.systemDefault()).toLocalDate()
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
@@ -219,11 +219,11 @@ class MainViewModel(
         _editingEntry.value = null
     }
 
-    fun onSaveEntry(updatedCategories: List<String>, updatedContent: String, updatedTimestamp: Long, hasImage: Boolean) {
+    fun onSaveEntry(updatedCategories: List<String>, updatedContent: String, updatedStartDatetime: Long, hasImage: Boolean) {
         val sanitizedContent = updatedContent.replace("luisa", "Eloisa", ignoreCase = true)
         viewModelScope.launch {
             _editingEntry.value?.let {
-                val updatedEntry = it.entry.copy(content = sanitizedContent, timestamp = updatedTimestamp, hasImage = hasImage)
+                val updatedEntry = it.entry.copy(content = sanitizedContent, start_datetime = updatedStartDatetime, hasImage = hasImage)
                 val categories = updatedCategories.map { categoryName ->
                     categoriesFlow.value.find { c -> c.category == categoryName } ?: Category(category = categoryName, aliases = "")
                 }
@@ -373,7 +373,7 @@ class MainViewModel(
         viewModelScope.launch {
             repository.deleteAll()
 
-            fun timestampFromString(dateTimeString: String): Long {
+            fun startDatetimeFromString(dateTimeString: String): Long {
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
                 val localDateTime = java.time.LocalDateTime.parse(dateTimeString, formatter)
                 return localDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -390,19 +390,19 @@ class MainViewModel(
             val eloisa = Category(category = "eloisa", aliases = "")
 
             val testEntries: List<Pair<JournalEntry, List<Category>>> = listOf(
-                JournalEntry(content = "Habe beim Ausschalten versehentlich den dritten Wecker diesen Monat zerdrückt...", timestamp = timestampFromString("${today}T06:15:00")) to listOf(journal),
-                JournalEntry(content = "Nach drei Tassen schwarzem Kaffee...", timestamp = timestampFromString("${today}T07:00:00")) to listOf(journal),
-                JournalEntry(content = "Die Verfolgungsjagd auf der Autobahn war erfolgreich...", timestamp = timestampFromString("${today}T09:30:00"), hasImage = true) to listOf(journal),
-                JournalEntry(content = "Während im Fernsehen Berichte über meine Heldentaten laufen...", timestamp = timestampFromString("${today}T21:00:00")) to listOf(journal),
-                JournalEntry(content = "This is a test todo item from today.", timestamp = timestampFromString("${today}T12:00:00")) to listOf(todo),
-                JournalEntry(content = "Milk, eggs, bread.", timestamp = timestampFromString("${today}T14:00:00")) to listOf(kaufen),
-                JournalEntry(content = "A great new app idea from today.", timestamp = timestampFromString("${today}T16:00:00")) to listOf(baumarkt),
-                JournalEntry(content = "Mittagspause mit zwei Dönern...", timestamp = timestampFromString("${yesterday}T12:30:00"), hasImage = true) to listOf(journal),
-                JournalEntry(content = "Ein kleinerer Schurke wollte die U-Bahn sabotieren...", timestamp = timestampFromString("${yesterday}T10:00:00")) to listOf(journal),
-                JournalEntry(content = "Todo item from yesterday.", timestamp = timestampFromString("${yesterday}T15:00:00")) to listOf(todo),
-                JournalEntry(content = "Apples, bananas.", timestamp = timestampFromString("${yesterday}T17:00:00")) to listOf(kaufen),
-                JournalEntry(content = "Journal entry from two days ago.", timestamp = timestampFromString("${twoDaysAgo}T18:00:00")) to listOf(journal),
-                JournalEntry(content = "Another app idea from two days ago.", timestamp = timestampFromString("${twoDaysAgo}T20:00:00")) to listOf(eloisa)
+                JournalEntry(content = "Habe beim Ausschalten versehentlich den dritten Wecker diesen Monat zerdrückt...", start_datetime = startDatetimeFromString("${today}T06:15:00")) to listOf(journal),
+                JournalEntry(content = "Nach drei Tassen schwarzem Kaffee...", start_datetime = startDatetimeFromString("${today}T07:00:00")) to listOf(journal),
+                JournalEntry(content = "Die Verfolgungsjagd auf der Autobahn war erfolgreich...", start_datetime = startDatetimeFromString("${today}T09:30:00"), hasImage = true) to listOf(journal),
+                JournalEntry(content = "Während im Fernsehen Berichte über meine Heldentaten laufen...", start_datetime = startDatetimeFromString("${today}T21:00:00")) to listOf(journal),
+                JournalEntry(content = "This is a test todo item from today.", start_datetime = startDatetimeFromString("${today}T12:00:00")) to listOf(todo),
+                JournalEntry(content = "Milk, eggs, bread.", start_datetime = startDatetimeFromString("${today}T14:00:00")) to listOf(kaufen),
+                JournalEntry(content = "A great new app idea from today.", start_datetime = startDatetimeFromString("${today}T16:00:00")) to listOf(baumarkt),
+                JournalEntry(content = "Mittagspause mit zwei Dönern...", start_datetime = startDatetimeFromString("${yesterday}T12:30:00"), hasImage = true) to listOf(journal),
+                JournalEntry(content = "Ein kleinerer Schurke wollte die U-Bahn sabotieren...", start_datetime = startDatetimeFromString("${yesterday}T10:00:00")) to listOf(journal),
+                JournalEntry(content = "Todo item from yesterday.", start_datetime = startDatetimeFromString("${yesterday}T15:00:00")) to listOf(todo),
+                JournalEntry(content = "Apples, bananas.", start_datetime = startDatetimeFromString("${yesterday}T17:00:00")) to listOf(kaufen),
+                JournalEntry(content = "Journal entry from two days ago.", start_datetime = startDatetimeFromString("${twoDaysAgo}T18:00:00")) to listOf(journal),
+                JournalEntry(content = "Another app idea from two days ago.", start_datetime = startDatetimeFromString("${twoDaysAgo}T20:00:00")) to listOf(eloisa)
             )
             testEntries.forEach { (entry, categories) -> repository.insert(entry, categories) }
         }
@@ -424,7 +424,7 @@ class MainViewModel(
                             (recognizedText.length == keyword.length || recognizedText.getOrNull(keyword.length)?.isWhitespace() == true)
                 }
                 val now = java.time.LocalDateTime.now()
-                val timestamp = _selectedDate.value?.atTime(now.toLocalTime())?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+                val start_datetime = _selectedDate.value?.atTime(now.toLocalTime())?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
                     ?: System.currentTimeMillis()
                 _selectedDate.value = null
 
@@ -443,7 +443,7 @@ class MainViewModel(
                     val sanitizedContent = contentToAdd.replace("luisa", "Eloisa", ignoreCase = true)
                     val entry = JournalEntry(
                         content = sanitizedContent,
-                        timestamp = timestamp
+                        start_datetime = start_datetime
                     )
                     repository.insert(entry, listOf(targetCategory))
                 }

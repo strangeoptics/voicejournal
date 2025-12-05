@@ -1,6 +1,7 @@
 package com.example.voicejournal
 
 import com.example.voicejournal.data.AppDatabase
+import com.example.voicejournal.data.CreateJournalEntryDto
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalEntryDto
 import io.ktor.http.HttpHeaders
@@ -16,6 +17,7 @@ import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +37,7 @@ class WebServer(private val db: AppDatabase) {
                     allowHeader(HttpHeaders.ContentType)
                     allowMethod(HttpMethod.Options)
                     allowMethod(HttpMethod.Get)
+                    allowMethod(HttpMethod.Post)
                     allowMethod(HttpMethod.Put)
                     allowMethod(HttpMethod.Patch)
                     allowMethod(HttpMethod.Delete)
@@ -105,6 +108,33 @@ class WebServer(private val db: AppDatabase) {
                             categoryIds = entry.categories.map { it.id }
                         )
                         call.respond(dto)
+                    }
+                    post("/journalentries") {
+                        val createDto = call.receive<CreateJournalEntryDto>()
+
+                        val entry = JournalEntry(
+                            content = createDto.content,
+                            timestamp = createDto.timestamp,
+                            hasImage = createDto.hasImage
+                        )
+
+                        val categories = db.categoryDao().getCategoriesByIds(createDto.categoryIds)
+                        val newEntryId = db.journalEntryDao().insertWithCategories(entry, categories)
+
+                        val newEntry = db.journalEntryDao().getEntryById(newEntryId)
+
+                        if (newEntry != null) {
+                            val dto = JournalEntryDto(
+                                id = newEntry.entry.id,
+                                content = newEntry.entry.content,
+                                timestamp = newEntry.entry.timestamp,
+                                hasImage = newEntry.entry.hasImage,
+                                categoryIds = newEntry.categories.map { it.id }
+                            )
+                            call.respond(HttpStatusCode.Created, dto)
+                        } else {
+                            call.respond(HttpStatusCode.InternalServerError, "Could not retrieve the newly created entry.")
+                        }
                     }
                     put("/journalentries/{id}") {
                         val id = call.parameters["id"]?.toIntOrNull()

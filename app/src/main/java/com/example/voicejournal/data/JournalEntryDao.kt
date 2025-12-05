@@ -83,7 +83,7 @@ interface JournalEntryDao {
     suspend fun deleteCategory(categoryId: Int)
 
     @Transaction
-    suspend fun insertWithCategories(entry: JournalEntry, categories: List<Category>) {
+    suspend fun insertWithCategories(entry: JournalEntry, categories: List<Category>): Int {
         val entryId = insert(entry).toInt()
         categories.forEach { category ->
             var cat = getCategoryByName(category.category)
@@ -95,6 +95,7 @@ interface JournalEntryDao {
                 JournalEntryCategoryCrossRef(entryId, cat.id)
             )
         }
+        return entryId
     }
 
     @Transaction

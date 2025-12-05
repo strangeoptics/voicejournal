@@ -11,3 +11,11 @@ data class JournalEntryDto(
     val hasImage: Boolean,
     val categoryIds: List<Int> // Hier verwenden wir eine Liste von IDs (Integer)
 )
+
+@Serializable
+data class CreateJournalEntryDto(
+    val content: String,
+    val timestamp: Long,
+    val hasImage: Boolean,
+    val categoryIds: List<Int>
+)

@@ -20,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.EntryWithCategories
@@ -172,13 +173,16 @@ fun EditEntryScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp)
+                .verticalScroll(rememberScrollState())
         ) {
+            val configuration = LocalConfiguration.current
+            val screenHeight = configuration.screenHeightDp.dp
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.5f),
+                    .height(screenHeight / 3),
                 label = { Text("Content") }
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -228,28 +232,23 @@ fun EditEntryScreen(
             }
             Spacer(modifier = Modifier.height(16.dp))
 
-            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                Text("Categories:", style = MaterialTheme.typography.titleMedium)
-                Spacer(modifier = Modifier.height(8.dp))
-                allCategories.forEach { category ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Checkbox(
-                            checked = selectedCategories.value.contains(category.category),
-                            onCheckedChange = {
-                                val currentSelection = selectedCategories.value.toMutableList()
-                                if (it) {
-                                    currentSelection.add(category.category)
-                                } else {
-                                    currentSelection.remove(category.category)
-                                }
-                                selectedCategories.value = currentSelection
+            Text("Categories:", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            allCategories.forEach { category ->
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                    Checkbox(
+                        checked = selectedCategories.value.contains(category.category),
+                        onCheckedChange = {
+                            val currentSelection = selectedCategories.value.toMutableList()
+                            if (it) {
+                                currentSelection.add(category.category)
+                            } else {
+                                currentSelection.remove(category.category)
                             }
-                        )
-                        Text(category.category)
-                    }
+                            selectedCategories.value = currentSelection
+                        }
+                    )
+                    Text(category.category)
                 }
             }
         }

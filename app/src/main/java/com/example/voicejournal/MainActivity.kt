@@ -68,7 +68,6 @@ import java.util.Locale
 class MainActivity : ComponentActivity() {
 
     private lateinit var speechRecognitionManager: SpeechRecognitionManager
-    private lateinit var webServer: WebServer
 
     private val viewModel: MainViewModel by viewModels {
         MainViewModelFactory(applicationContext, getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE))
@@ -78,8 +77,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
-        webServer = WebServer(viewModel.db)
-        webServer.start()
 
         speechRecognitionManager = SpeechRecognitionManager(
             context = this,

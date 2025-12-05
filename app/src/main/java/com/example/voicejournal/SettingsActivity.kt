@@ -21,6 +21,7 @@ class SettingsActivity : ComponentActivity() {
             VoicejournalTheme {
                 val daysToShow by viewModel.daysToShow.collectAsState()
                 val isGpsTrackingEnabled by viewModel.isGpsTrackingEnabled.collectAsState()
+                val isWebServerEnabled by viewModel.isWebServerEnabled.collectAsState()
                 val gpsInterval by viewModel.gpsInterval.collectAsState()
                 val speechService by viewModel.speechService.collectAsState()
                 val googleCloudApiKey by viewModel.googleCloudApiKey.collectAsState()
@@ -32,6 +33,7 @@ class SettingsActivity : ComponentActivity() {
                 SettingsScreen(
                     currentDays = daysToShow,
                     isGpsTrackingEnabled = isGpsTrackingEnabled,
+                    isWebServerEnabled = isWebServerEnabled,
                     gpsInterval = gpsInterval,
                     currentSpeechService = speechService,
                     currentApiKey = googleCloudApiKey,
@@ -41,6 +43,7 @@ class SettingsActivity : ComponentActivity() {
                     truncationLength = truncationLength,
                     onDaysChanged = viewModel::saveDaysToShow,
                     onGpsEnableChanged = viewModel::saveGpsTrackingEnabled,
+                    onWebServerEnableChanged = viewModel::saveWebServerEnabled,
                     onGpsIntervalChanged = viewModel::saveGpsInterval,
                     onSpeechServiceChanged = viewModel::saveSpeechService,
                     onApiKeyChanged = viewModel::saveApiKey,

@@ -43,6 +43,7 @@ import kotlin.math.roundToInt
 fun SettingsScreen(
     currentDays: Int,
     isGpsTrackingEnabled: Boolean,
+    isWebServerEnabled: Boolean,
     gpsInterval: Int,
     currentSpeechService: String,
     currentApiKey: String,
@@ -52,6 +53,7 @@ fun SettingsScreen(
     truncationLength: Int,
     onDaysChanged: (Int) -> Unit,
     onGpsEnableChanged: (Boolean) -> Unit,
+    onWebServerEnableChanged: (Boolean) -> Unit,
     onGpsIntervalChanged: (Int) -> Unit,
     onSpeechServiceChanged: (String) -> Unit,
     onApiKeyChanged: (String) -> Unit,
@@ -141,6 +143,18 @@ fun SettingsScreen(
                     steps = 54, // (60-5) / 1
                     enabled = isGpsTrackingEnabled
                 )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Webserver aktivieren", modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = isWebServerEnabled,
+                        onCheckedChange = onWebServerEnableChanged
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(24.dp))
                 Text("Spracherkennung Dienst", style = MaterialTheme.typography.titleMedium)

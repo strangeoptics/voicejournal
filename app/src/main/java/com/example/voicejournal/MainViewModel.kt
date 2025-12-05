@@ -1,6 +1,7 @@
 package com.example.voicejournal
 
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import androidx.core.content.edit
@@ -51,6 +52,7 @@ class MainViewModel(
         const val KEY_SILENCE_THRESHOLD = "silence_threshold"
         const val KEY_SILENCE_TIME_REQUIRED = "silence_time_required"
         const val KEY_TRUNCATION_LENGTH = "truncation_length"
+        const val KEY_WEBSERVER_ENABLED = "webserver_enabled"
     }
 
     private val _selectedCategory = MutableStateFlow("")
@@ -70,6 +72,9 @@ class MainViewModel(
 
     private val _isGpsTrackingEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_GPS_TRACKING_ENABLED, false))
     val isGpsTrackingEnabled: StateFlow<Boolean> = _isGpsTrackingEnabled.asStateFlow()
+
+    private val _isWebServerEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_WEBSERVER_ENABLED, false))
+    val isWebServerEnabled: StateFlow<Boolean> = _isWebServerEnabled.asStateFlow()
 
     private val _gpsInterval = MutableStateFlow(sharedPreferences.getInt(KEY_GPS_INTERVAL_MINUTES, 10))
     val gpsInterval: StateFlow<Int> = _gpsInterval.asStateFlow()
@@ -264,6 +269,16 @@ class MainViewModel(
         _isGpsTrackingEnabled.value = isEnabled
         sharedPreferences.edit { putBoolean(KEY_GPS_TRACKING_ENABLED, isEnabled) }
         VoiceJournalApplication.setupLocationWorker(applicationContext)
+    }
+
+    fun saveWebServerEnabled(isEnabled: Boolean) {
+        _isWebServerEnabled.value = isEnabled
+        sharedPreferences.edit { putBoolean(KEY_WEBSERVER_ENABLED, isEnabled) }
+
+        val intent = Intent(applicationContext, WebServerService::class.java).apply {
+            action = if (isEnabled) WebServerService.ACTION_START else WebServerService.ACTION_STOP
+        }
+        applicationContext.startService(intent)
     }
 
     fun saveGpsInterval(interval: Int) {

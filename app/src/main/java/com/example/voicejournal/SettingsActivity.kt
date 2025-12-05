@@ -1,5 +1,7 @@
 package com.example.voicejournal
 
+import android.content.Context
+import android.net.wifi.WifiManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,6 +10,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.example.voicejournal.ui.screens.SettingsScreen
 import com.example.voicejournal.ui.theme.VoicejournalTheme
+import java.util.Formatter
 
 class SettingsActivity : ComponentActivity() {
 
@@ -30,10 +33,13 @@ class SettingsActivity : ComponentActivity() {
                 val silenceTimeRequired by viewModel.silenceTimeRequired.collectAsState()
                 val truncationLength by viewModel.truncationLength.collectAsState()
 
+                val ipAddress = getIpAddress(applicationContext) ?: "Unavailable"
+
                 SettingsScreen(
                     currentDays = daysToShow,
                     isGpsTrackingEnabled = isGpsTrackingEnabled,
                     isWebServerEnabled = isWebServerEnabled,
+                    ipAddress = ipAddress,
                     gpsInterval = gpsInterval,
                     currentSpeechService = speechService,
                     currentApiKey = googleCloudApiKey,
@@ -55,5 +61,15 @@ class SettingsActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    private fun getIpAddress(context: Context): String? {
+        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        val ipAddress = wifiManager.connectionInfo.ipAddress
+        if (ipAddress == 0) return null
+        return (ipAddress and 0xFF).toString() + "." +
+               (ipAddress shr 8 and 0xFF) + "." +
+               (ipAddress shr 16 and 0xFF) + "." +
+               (ipAddress shr 24 and 0xFF)
     }
 }

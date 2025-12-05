@@ -44,6 +44,7 @@ fun SettingsScreen(
     currentDays: Int,
     isGpsTrackingEnabled: Boolean,
     isWebServerEnabled: Boolean,
+    ipAddress: String,
     gpsInterval: Int,
     currentSpeechService: String,
     currentApiKey: String,
@@ -155,6 +156,14 @@ fun SettingsScreen(
                         onCheckedChange = onWebServerEnableChanged
                     )
                 }
+                if (isWebServerEnabled) {
+                    Text(
+                        text = "Server running at: http://$ipAddress:8080",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    )
+                }
+
 
                 Spacer(modifier = Modifier.height(24.dp))
                 Text("Spracherkennung Dienst", style = MaterialTheme.typography.titleMedium)

@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [JournalEntry::class, Category::class, GpsTrackPoint::class, JournalEntryCategoryCrossRef::class], version = 10, exportSchema = false)
+@Database(entities = [JournalEntry::class, Category::class, GpsTrackPoint::class, JournalEntryCategoryCrossRef::class], version = 11, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun journalEntryDao(): JournalEntryDao
     abstract fun gpsTrackPointDao(): GpsTrackPointDao
@@ -64,6 +64,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `journal_entries` ADD COLUMN `stop_datetime` INTEGER")
+            }
+        }
+
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -72,7 +78,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "journal_database"
                 )
-                    .addMigrations(MIGRATION_8_9, MIGRATION_9_10) // Be sure to add all migrations here
+                    .addMigrations(MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11) // Be sure to add all migrations here
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Schedule
@@ -50,8 +51,8 @@ class EditEntryActivity : ComponentActivity() {
                     EditEntryScreen(
                         entry = it,
                         allCategories = allCategories,
-                        onSave = { updatedCategories, content, start_datetime, hasImage ->
-                            viewModel.saveEntry(updatedCategories, content, start_datetime, hasImage)
+                        onSave = { updatedCategories, content, start_datetime, stop_datetime, hasImage ->
+                            viewModel.saveEntry(updatedCategories, content, start_datetime, stop_datetime, hasImage)
                             finish()
                         },
                         onNavigateUp = { finish() }
@@ -80,13 +81,13 @@ class EditEntryActivity : ComponentActivity() {
 fun EditEntryScreen(
     entry: EntryWithCategories,
     allCategories: List<Category>,
-    onSave: (List<String>, String, Long, Boolean) -> Unit,
+    onSave: (List<String>, String, Long, Long?, Boolean) -> Unit,
     onNavigateUp: () -> Unit
 ) {
     var text by remember { mutableStateOf(entry.entry.content) }
     var hasImage by remember { mutableStateOf(entry.entry.hasImage) }
     val selectedCategories = remember { mutableStateOf(entry.categories.map { it.category }) }
-    var currentDateTime by remember {
+    var startDateTime by remember {
         mutableStateOf(
             LocalDateTime.ofInstant(
                 Instant.ofEpochMilli(entry.entry.start_datetime),
@@ -94,59 +95,121 @@ fun EditEntryScreen(
             )
         )
     }
+    var stopDateTime by remember {
+        mutableStateOf(
+            entry.entry.stop_datetime?.let {
+                LocalDateTime.ofInstant(
+                    Instant.ofEpochMilli(it),
+                    ZoneId.systemDefault()
+                )
+            }
+        )
+    }
 
-    var showDatePicker by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showStartTimePicker by remember { mutableStateOf(false) }
+    var showStopDatePicker by remember { mutableStateOf(false) }
+    var showStopTimePicker by remember { mutableStateOf(false) }
 
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = currentDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    val startDatePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = startDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
     )
-    val timePickerState = rememberTimePickerState(
-        initialHour = currentDateTime.hour,
-        initialMinute = currentDateTime.minute,
+    val startTimePickerState = rememberTimePickerState(
+        initialHour = startDateTime.hour,
+        initialMinute = startDateTime.minute,
+        is24Hour = true
+    )
+    val stopDatePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = stopDateTime?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+    )
+    val stopTimePickerState = rememberTimePickerState(
+        initialHour = stopDateTime?.hour ?: 0,
+        initialMinute = stopDateTime?.minute ?: 0,
         is24Hour = true
     )
 
-    if (showDatePicker) {
+    if (showStartDatePicker) {
         DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
+            onDismissRequest = { showStartDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
+                    startDatePickerState.selectedDateMillis?.let { millis ->
                         val selectedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-                        currentDateTime = currentDateTime.with(selectedDate)
+                        startDateTime = startDateTime.with(selectedDate)
                     }
-                    showDatePicker = false
+                    showStartDatePicker = false
                 }) { Text("OK") }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showStartDatePicker = false }) { Text("Cancel") }
             }
         ) {
-            DatePicker(state = datePickerState)
+            DatePicker(state = startDatePickerState)
         }
     }
 
-    if (showTimePicker) {
+    if (showStartTimePicker) {
         AlertDialog(
-            onDismissRequest = { showTimePicker = false },
+            onDismissRequest = { showStartTimePicker = false },
             title = { Text("Select Time") },
             text = {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    TimePicker(state = timePickerState)
+                    TimePicker(state = startTimePickerState)
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    currentDateTime = currentDateTime.withHour(timePickerState.hour).withMinute(timePickerState.minute)
-                    showTimePicker = false
+                    startDateTime = startDateTime.withHour(startTimePickerState.hour).withMinute(startTimePickerState.minute)
+                    showStartTimePicker = false
                 }) { Text("OK") }
             },
             dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showStartTimePicker = false }) { Text("Cancel") }
             }
         )
     }
+
+    if (showStopDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showStopDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    stopDatePickerState.selectedDateMillis?.let { millis ->
+                        val selectedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                        stopDateTime = stopDateTime?.with(selectedDate) ?: LocalDateTime.now().with(selectedDate)
+                    }
+                    showStopDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStopDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = stopDatePickerState)
+        }
+    }
+
+    if (showStopTimePicker) {
+        AlertDialog(
+            onDismissRequest = { showStopTimePicker = false },
+            title = { Text("Select Time") },
+            text = {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    TimePicker(state = stopTimePickerState)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    stopDateTime = (stopDateTime ?: LocalDateTime.now()).withHour(stopTimePickerState.hour).withMinute(stopTimePickerState.minute)
+                    showStopTimePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showStopTimePicker = false }) { Text("Cancel") }
+            }
+        )
+    }
+
 
     Scaffold(
         topBar = {
@@ -161,8 +224,9 @@ fun EditEntryScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = {
-                val newStartDatetime = currentDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                onSave(selectedCategories.value, text, newStartDatetime, hasImage)
+                val newStartDatetime = startDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                val newStopDatetime = stopDateTime?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+                onSave(selectedCategories.value, text, newStartDatetime, newStopDatetime, hasImage)
             }) {
                 Icon(Icons.Default.Done, contentDescription = "Save Entry")
             }
@@ -187,17 +251,31 @@ fun EditEntryScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            val dateInteractionSource = remember { MutableInteractionSource() }
-            LaunchedEffect(dateInteractionSource) {
-                dateInteractionSource.interactions.collect { interaction ->
-                    if (interaction is PressInteraction.Release) { showDatePicker = true }
+            val startDateInteractionSource = remember { MutableInteractionSource() }
+            LaunchedEffect(startDateInteractionSource) {
+                startDateInteractionSource.interactions.collect { interaction ->
+                    if (interaction is PressInteraction.Release) { showStartDatePicker = true }
                 }
             }
 
-            val timeInteractionSource = remember { MutableInteractionSource() }
-            LaunchedEffect(timeInteractionSource) {
-                timeInteractionSource.interactions.collect { interaction ->
-                    if (interaction is PressInteraction.Release) { showTimePicker = true }
+            val startTimeInteractionSource = remember { MutableInteractionSource() }
+            LaunchedEffect(startTimeInteractionSource) {
+                startTimeInteractionSource.interactions.collect { interaction ->
+                    if (interaction is PressInteraction.Release) { showStartTimePicker = true }
+                }
+            }
+            
+            val stopDateInteractionSource = remember { MutableInteractionSource() }
+            LaunchedEffect(stopDateInteractionSource) {
+                stopDateInteractionSource.interactions.collect { interaction ->
+                    if (interaction is PressInteraction.Release) { showStopDatePicker = true }
+                }
+            }
+
+            val stopTimeInteractionSource = remember { MutableInteractionSource() }
+            LaunchedEffect(stopTimeInteractionSource) {
+                stopTimeInteractionSource.interactions.collect { interaction ->
+                    if (interaction is PressInteraction.Release) { showStopTimePicker = true }
                 }
             }
 
@@ -206,24 +284,53 @@ fun EditEntryScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedTextField(
-                    value = currentDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+                    value = startDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
                     onValueChange = {},
-                    label = { Text("Date") },
+                    label = { Text("Start Date") },
                     readOnly = true,
                     modifier = Modifier.weight(1f),
-                    interactionSource = dateInteractionSource,
-                    trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = "Select Date") }
+                    interactionSource = startDateInteractionSource,
+                    trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = "Select Start Date") }
                 )
                 OutlinedTextField(
-                    value = currentDateTime.format(DateTimeFormatter.ofPattern("HH:mm")),
+                    value = startDateTime.format(DateTimeFormatter.ofPattern("HH:mm")),
                     onValueChange = {},
-                    label = { Text("Time") },
+                    label = { Text("Start Time") },
                     readOnly = true,
                     modifier = Modifier.weight(1f),
-                    interactionSource = timeInteractionSource,
-                    trailingIcon = { Icon(Icons.Default.Schedule, contentDescription = "Select Time") }
+                    interactionSource = startTimeInteractionSource,
+                    trailingIcon = { Icon(Icons.Default.Schedule, contentDescription = "Select Start Time") }
                 )
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = stopDateTime?.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) ?: "",
+                    onValueChange = {},
+                    label = { Text("Stop Date") },
+                    readOnly = true,
+                    modifier = Modifier.weight(1f),
+                    interactionSource = stopDateInteractionSource,
+                    trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = "Select Stop Date") }
+                )
+                OutlinedTextField(
+                    value = stopDateTime?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "",
+                    onValueChange = {},
+                    label = { Text("Stop Time") },
+                    readOnly = true,
+                    modifier = Modifier.weight(1f),
+                    interactionSource = stopTimeInteractionSource,
+                    trailingIcon = { Icon(Icons.Default.Schedule, contentDescription = "Select Stop Time") }
+                )
+                IconButton(onClick = { stopDateTime = null }) {
+                    Icon(Icons.Default.Clear, contentDescription = "Clear Stop Time")
+                }
+            }
+            
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {

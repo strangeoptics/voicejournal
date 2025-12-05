@@ -41,6 +41,7 @@ class JournalRepository(
                                 val entry = JournalEntry(
                                     content = entryExport.content,
                                     start_datetime = entryExport.start_datetime,
+                                    stop_datetime = entryExport.stop_datetime,
                                     hasImage = entryExport.hasImage
                                 )
                                 val categories = entryExport.categories.map { categoryName ->
@@ -103,6 +104,7 @@ class JournalRepository(
             JournalEntryExport(
                 content = it.entry.content,
                 start_datetime = it.entry.start_datetime,
+                stop_datetime = it.entry.stop_datetime,
                 hasImage = it.entry.hasImage,
                 categories = it.categories.map { c -> c.category }
             )

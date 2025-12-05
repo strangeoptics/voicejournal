@@ -61,6 +61,7 @@ class WebServer(private val db: AppDatabase) {
                             id = entryWithCategories.entry.id,
                             content = entryWithCategories.entry.content,
                             start_datetime = entryWithCategories.entry.start_datetime,
+                            stop_datetime = entryWithCategories.entry.stop_datetime,
                             hasImage = entryWithCategories.entry.hasImage,
                             categoryIds = entryWithCategories.categories.map { it.id }
                         )
@@ -84,6 +85,7 @@ class WebServer(private val db: AppDatabase) {
                             id = entryWithCategories.entry.id,
                             content = entryWithCategories.entry.content,
                             start_datetime = entryWithCategories.entry.start_datetime,
+                            stop_datetime = entryWithCategories.entry.stop_datetime,
                             hasImage = entryWithCategories.entry.hasImage,
                             categoryIds = entryWithCategories.categories.map { it.id }
                         )
@@ -107,6 +109,7 @@ class WebServer(private val db: AppDatabase) {
                         id = entry.entry.id,
                         content = entry.entry.content,
                         start_datetime = entry.entry.start_datetime,
+                        stop_datetime = entry.entry.stop_datetime,
                         hasImage = entry.entry.hasImage,
                         categoryIds = entry.categories.map { it.id }
                     )
@@ -118,6 +121,7 @@ class WebServer(private val db: AppDatabase) {
                     val entry = JournalEntry(
                         content = createDto.content,
                         start_datetime = createDto.start_datetime,
+                        stop_datetime = createDto.stop_datetime,
                         hasImage = createDto.hasImage
                     )
 
@@ -131,6 +135,7 @@ class WebServer(private val db: AppDatabase) {
                             id = newEntry.entry.id,
                             content = newEntry.entry.content,
                             start_datetime = newEntry.entry.start_datetime,
+                            stop_datetime = newEntry.entry.stop_datetime,
                             hasImage = newEntry.entry.hasImage,
                             categoryIds = newEntry.categories.map { it.id }
                         )
@@ -158,6 +163,7 @@ class WebServer(private val db: AppDatabase) {
                         id = id,
                         content = journalEntryDto.content,
                         start_datetime = journalEntryDto.start_datetime,
+                        stop_datetime = journalEntryDto.stop_datetime,
                         hasImage = journalEntryDto.hasImage
                     )
                     val categories = db.categoryDao().getCategoriesByIds(journalEntryDto.categoryIds)

@@ -11,5 +11,6 @@ data class JournalEntry(
     val id: Int = 0,
     val content: String,
     val start_datetime: Long,
+    var stop_datetime: Long? = null,
     val hasImage: Boolean = false
 )

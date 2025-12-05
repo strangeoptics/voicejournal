@@ -196,11 +196,22 @@ fun HomeScreen(
                             Box(modifier = Modifier
                                 .padding(8.dp)
                                 .fillMaxWidth()) {
-                                val date = LocalDateTime.ofInstant(
+                                val startDate = LocalDateTime.ofInstant(
                                     Instant.ofEpochMilli(entryWithCategories.entry.start_datetime),
                                     ZoneId.systemDefault()
                                 )
+                                val stopDate = entryWithCategories.entry.stop_datetime?.let {
+                                    LocalDateTime.ofInstant(
+                                        Instant.ofEpochMilli(it),
+                                        ZoneId.systemDefault()
+                                    )
+                                }
                                 val formatter = DateTimeFormatter.ofPattern("HH:mm")
+                                val timeText = if (stopDate != null) {
+                                    "${startDate.format(formatter)} - ${stopDate.format(formatter)}"
+                                } else {
+                                    startDate.format(formatter)
+                                }
                                 val content = entryWithCategories.entry.content
                                 val textToShow = if (!isExpanded && content.length > truncationLength) {
                                     "${content.take(truncationLength)}..."
@@ -214,7 +225,7 @@ fun HomeScreen(
                                         .padding(top = 4.dp, end = 48.dp)
                                 )
                                 Text(
-                                    text = date.format(formatter),
+                                    text = timeText,
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.align(Alignment.TopEnd)
                                 )
@@ -277,7 +288,7 @@ fun HomeScreenPreview() {
                     categories = listOf(Category(1, "journal", aliases = "journal"))
                 ),
                 EntryWithCategories(
-                    entry = JournalEntry(id = 2, content = "This is a todo preview.", start_datetime = System.currentTimeMillis(), hasImage = true),
+                    entry = JournalEntry(id = 2, content = "This is a todo preview.", start_datetime = System.currentTimeMillis(), stop_datetime = System.currentTimeMillis() + 60000, hasImage = true),
                     categories = listOf(Category(2, "todo", aliases = "todo"))
                 )
             )

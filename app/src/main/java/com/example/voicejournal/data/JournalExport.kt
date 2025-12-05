@@ -15,6 +15,7 @@ data class JournalExport(
 data class JournalEntryExport(
     val content: String,
     val start_datetime: Long,
+    var stop_datetime: Long? = null,
     val hasImage: Boolean,
     val categories: List<String>
 )

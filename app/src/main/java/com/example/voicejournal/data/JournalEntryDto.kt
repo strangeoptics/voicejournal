@@ -8,6 +8,7 @@ data class JournalEntryDto(
     val id: Int,
     val content: String,
     val start_datetime: Long,
+    var stop_datetime: Long? = null,
     val hasImage: Boolean,
     val categoryIds: List<Int> // Hier verwenden wir eine Liste von IDs (Integer)
 )
@@ -16,6 +17,7 @@ data class JournalEntryDto(
 data class CreateJournalEntryDto(
     val content: String,
     val start_datetime: Long,
+    var stop_datetime: Long? = null,
     val hasImage: Boolean,
     val categoryIds: List<Int>
 )

@@ -219,11 +219,16 @@ class MainViewModel(
         _editingEntry.value = null
     }
 
-    fun onSaveEntry(updatedCategories: List<String>, updatedContent: String, updatedStartDatetime: Long, hasImage: Boolean) {
+    fun onSaveEntry(updatedCategories: List<String>, updatedContent: String, updatedStartDatetime: Long, updatedStopDatetime: Long?, hasImage: Boolean) {
         val sanitizedContent = updatedContent.replace("luisa", "Eloisa", ignoreCase = true)
         viewModelScope.launch {
             _editingEntry.value?.let {
-                val updatedEntry = it.entry.copy(content = sanitizedContent, start_datetime = updatedStartDatetime, hasImage = hasImage)
+                val updatedEntry = it.entry.copy(
+                    content = sanitizedContent,
+                    start_datetime = updatedStartDatetime,
+                    stop_datetime = updatedStopDatetime,
+                    hasImage = hasImage
+                )
                 val categories = updatedCategories.map { categoryName ->
                     categoriesFlow.value.find { c -> c.category == categoryName } ?: Category(category = categoryName, aliases = "")
                 }
@@ -390,11 +395,11 @@ class MainViewModel(
             val eloisa = Category(category = "eloisa", aliases = "")
 
             val testEntries: List<Pair<JournalEntry, List<Category>>> = listOf(
-                JournalEntry(content = "Habe beim Ausschalten versehentlich den dritten Wecker diesen Monat zerdrückt...", start_datetime = startDatetimeFromString("${today}T06:15:00")) to listOf(journal),
+                JournalEntry(content = "Habe beim Ausschalten versehentlich den dritten Wecker diesen Monat zerdrückt...", start_datetime = startDatetimeFromString("${today}T06:15:00"), stop_datetime = startDatetimeFromString("${today}T06:20:00")) to listOf(journal),
                 JournalEntry(content = "Nach drei Tassen schwarzem Kaffee...", start_datetime = startDatetimeFromString("${today}T07:00:00")) to listOf(journal),
                 JournalEntry(content = "Die Verfolgungsjagd auf der Autobahn war erfolgreich...", start_datetime = startDatetimeFromString("${today}T09:30:00"), hasImage = true) to listOf(journal),
                 JournalEntry(content = "Während im Fernsehen Berichte über meine Heldentaten laufen...", start_datetime = startDatetimeFromString("${today}T21:00:00")) to listOf(journal),
-                JournalEntry(content = "This is a test todo item from today.", start_datetime = startDatetimeFromString("${today}T12:00:00")) to listOf(todo),
+                JournalEntry(content = "This is a test todo item from today.", start_datetime = startDatetimeFromString("${today}T12:00:00"), stop_datetime = startDatetimeFromString("${today}T12:30:00")) to listOf(todo),
                 JournalEntry(content = "Milk, eggs, bread.", start_datetime = startDatetimeFromString("${today}T14:00:00")) to listOf(kaufen),
                 JournalEntry(content = "A great new app idea from today.", start_datetime = startDatetimeFromString("${today}T16:00:00")) to listOf(baumarkt),
                 JournalEntry(content = "Mittagspause mit zwei Dönern...", start_datetime = startDatetimeFromString("${yesterday}T12:30:00"), hasImage = true) to listOf(journal),
@@ -443,7 +448,8 @@ class MainViewModel(
                     val sanitizedContent = contentToAdd.replace("luisa", "Eloisa", ignoreCase = true)
                     val entry = JournalEntry(
                         content = sanitizedContent,
-                        start_datetime = start_datetime
+                        start_datetime = start_datetime,
+                        stop_datetime = System.currentTimeMillis()
                     )
                     repository.insert(entry, listOf(targetCategory))
                 }

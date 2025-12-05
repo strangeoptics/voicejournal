@@ -172,14 +172,13 @@ fun EditEntryScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp)
-                .verticalScroll(rememberScrollState())
         ) {
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp),
+                    .fillMaxHeight(0.5f),
                 label = { Text("Content") }
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -229,23 +228,28 @@ fun EditEntryScreen(
             }
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("Categories:", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-            allCategories.forEach { category ->
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Checkbox(
-                        checked = selectedCategories.value.contains(category.category),
-                        onCheckedChange = {
-                            val currentSelection = selectedCategories.value.toMutableList()
-                            if (it) {
-                                currentSelection.add(category.category)
-                            } else {
-                                currentSelection.remove(category.category)
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text("Categories:", style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                allCategories.forEach { category ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Checkbox(
+                            checked = selectedCategories.value.contains(category.category),
+                            onCheckedChange = {
+                                val currentSelection = selectedCategories.value.toMutableList()
+                                if (it) {
+                                    currentSelection.add(category.category)
+                                } else {
+                                    currentSelection.remove(category.category)
+                                }
+                                selectedCategories.value = currentSelection
                             }
-                            selectedCategories.value = currentSelection
-                        }
-                    )
-                    Text(category.category)
+                        )
+                        Text(category.category)
+                    }
                 }
             }
         }

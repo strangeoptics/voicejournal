@@ -448,8 +448,7 @@ class MainViewModel(
                     val sanitizedContent = contentToAdd.replace("luisa", "Eloisa", ignoreCase = true)
                     val entry = JournalEntry(
                         content = sanitizedContent,
-                        start_datetime = start_datetime,
-                        stop_datetime = System.currentTimeMillis()
+                        start_datetime = start_datetime
                     )
                     repository.insert(entry, listOf(targetCategory))
                 }

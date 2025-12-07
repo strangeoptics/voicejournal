@@ -119,6 +119,7 @@ class MainActivity : ComponentActivity() {
                 val hasGpsTrackForSelectedDate by viewModel.hasGpsTrackForSelectedDate.collectAsState()
                 val isRecording by speechRecognitionManager.isRecording.collectAsState()
                 val truncationLength by viewModel.truncationLength.collectAsState()
+                val isDeveloperModeEnabled by viewModel.isDeveloperModeEnabled.collectAsState()
 
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -251,6 +252,7 @@ class MainActivity : ComponentActivity() {
                     drawerState = drawerState,
                     drawerContent = {
                         AppDrawer(
+                            isDeveloperModeEnabled = isDeveloperModeEnabled,
                             onSettingsClicked = {
                                 scope.launch { drawerState.close() }
                                 context.startActivity(Intent(context, SettingsActivity::class.java))

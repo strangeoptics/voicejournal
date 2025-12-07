@@ -53,6 +53,7 @@ class MainViewModel(
         const val KEY_SILENCE_TIME_REQUIRED = "silence_time_required"
         const val KEY_TRUNCATION_LENGTH = "truncation_length"
         const val KEY_WEBSERVER_ENABLED = "webserver_enabled"
+        const val KEY_DEVELOPER_MODE_ENABLED = "developer_mode_enabled"
     }
 
     private val _selectedCategory = MutableStateFlow("")
@@ -97,6 +98,9 @@ class MainViewModel(
     private val _truncationLength = MutableStateFlow(sharedPreferences.getInt(KEY_TRUNCATION_LENGTH, 160))
     val truncationLength: StateFlow<Int> = _truncationLength.asStateFlow()
 
+    private val _isDeveloperModeEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_DEVELOPER_MODE_ENABLED, false))
+    val isDeveloperModeEnabled: StateFlow<Boolean> = _isDeveloperModeEnabled.asStateFlow()
+
 
     private val _recentlyDeleted = MutableStateFlow<List<EntryWithCategories>>(emptyList())
     val canUndo: StateFlow<Boolean> = _recentlyDeleted.map { it.isNotEmpty() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -135,8 +139,25 @@ class MainViewModel(
         date != null && points.size >= 2
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+        when (key) {
+            KEY_DAYS_TO_SHOW -> _daysToShow.value = prefs.getInt(key, 3)
+            KEY_GPS_TRACKING_ENABLED -> _isGpsTrackingEnabled.value = prefs.getBoolean(key, false)
+            KEY_WEBSERVER_ENABLED -> _isWebServerEnabled.value = prefs.getBoolean(key, false)
+            KEY_GPS_INTERVAL_MINUTES -> _gpsInterval.value = prefs.getInt(key, 10)
+            KEY_SPEECH_SERVICE -> _speechService.value = prefs.getString(key, "ANDROID") ?: "ANDROID"
+            KEY_GOOGLE_CLOUD_API_KEY -> _googleCloudApiKey.value = prefs.getString(key, "") ?: ""
+            KEY_MAX_RECORDING_TIME -> _maxRecordingTime.value = prefs.getInt(key, 15)
+            KEY_SILENCE_THRESHOLD -> _silenceThreshold.value = prefs.getInt(key, 500)
+            KEY_SILENCE_TIME_REQUIRED -> _silenceTimeRequired.value = prefs.getInt(key, 2000)
+            KEY_TRUNCATION_LENGTH -> _truncationLength.value = prefs.getInt(key, 160)
+            KEY_DEVELOPER_MODE_ENABLED -> _isDeveloperModeEnabled.value = prefs.getBoolean(key, false)
+        }
+    }
+
 
     init {
+        sharedPreferences.registerOnSharedPreferenceChangeListener(prefsListener)
         viewModelScope.launch {
             val areDefaultCategoriesAdded = sharedPreferences.getBoolean(KEY_DEFAULT_CATEGORIES_ADDED, false)
             if (!areDefaultCategoriesAdded) {
@@ -149,6 +170,11 @@ class MainViewModel(
                 }
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        sharedPreferences.unregisterOnSharedPreferenceChangeListener(prefsListener)
     }
 
     private suspend fun addDefaultCategories() {
@@ -266,18 +292,15 @@ class MainViewModel(
     }
     
     fun saveDaysToShow(days: Int) {
-        _daysToShow.value = days
         sharedPreferences.edit { putInt(KEY_DAYS_TO_SHOW, days) }
     }
 
     fun saveGpsTrackingEnabled(isEnabled: Boolean) {
-        _isGpsTrackingEnabled.value = isEnabled
         sharedPreferences.edit { putBoolean(KEY_GPS_TRACKING_ENABLED, isEnabled) }
         VoiceJournalApplication.setupLocationWorker(applicationContext)
     }
 
     fun saveWebServerEnabled(isEnabled: Boolean) {
-        _isWebServerEnabled.value = isEnabled
         sharedPreferences.edit { putBoolean(KEY_WEBSERVER_ENABLED, isEnabled) }
 
         val intent = Intent(applicationContext, WebServerService::class.java).apply {
@@ -287,39 +310,36 @@ class MainViewModel(
     }
 
     fun saveGpsInterval(interval: Int) {
-        _gpsInterval.value = interval
         sharedPreferences.edit { putInt(KEY_GPS_INTERVAL_MINUTES, interval) }
         VoiceJournalApplication.setupLocationWorker(applicationContext)
     }
 
     fun saveSpeechService(service: String) {
-        _speechService.value = service
         sharedPreferences.edit { putString(KEY_SPEECH_SERVICE, service) }
     }
 
     fun saveApiKey(apiKey: String) {
-        _googleCloudApiKey.value = apiKey
         sharedPreferences.edit { putString(KEY_GOOGLE_CLOUD_API_KEY, apiKey) }
     }
 
     fun saveMaxRecordingTime(time: Int) {
-        _maxRecordingTime.value = time
         sharedPreferences.edit { putInt(KEY_MAX_RECORDING_TIME, time) }
     }
 
     fun saveSilenceThreshold(threshold: Int) {
-        _silenceThreshold.value = threshold
         sharedPreferences.edit { putInt(KEY_SILENCE_THRESHOLD, threshold) }
     }
 
     fun saveSilenceTimeRequired(time: Int) {
-        _silenceTimeRequired.value = time
         sharedPreferences.edit { putInt(KEY_SILENCE_TIME_REQUIRED, time) }
     }
 
     fun saveTruncationLength(length: Int) {
-        _truncationLength.value = length
         sharedPreferences.edit { putInt(KEY_TRUNCATION_LENGTH, length) }
+    }
+
+    fun saveDeveloperModeEnabled(isEnabled: Boolean) {
+        sharedPreferences.edit { putBoolean(KEY_DEVELOPER_MODE_ENABLED, isEnabled) }
     }
 
     fun addOrUpdateCategory(categoryName: String, aliasesString: String, showAll: Boolean) {

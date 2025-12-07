@@ -32,6 +32,7 @@ class SettingsActivity : ComponentActivity() {
                 val silenceThreshold by viewModel.silenceThreshold.collectAsState()
                 val silenceTimeRequired by viewModel.silenceTimeRequired.collectAsState()
                 val truncationLength by viewModel.truncationLength.collectAsState()
+                val isDeveloperModeEnabled by viewModel.isDeveloperModeEnabled.collectAsState()
 
                 val ipAddress = getIpAddress(applicationContext) ?: "Unavailable"
 
@@ -47,6 +48,7 @@ class SettingsActivity : ComponentActivity() {
                     silenceThreshold = silenceThreshold,
                     silenceTimeRequired = silenceTimeRequired,
                     truncationLength = truncationLength,
+                    isDeveloperModeEnabled = isDeveloperModeEnabled,
                     onDaysChanged = viewModel::saveDaysToShow,
                     onGpsEnableChanged = viewModel::saveGpsTrackingEnabled,
                     onWebServerEnableChanged = viewModel::saveWebServerEnabled,
@@ -57,6 +59,7 @@ class SettingsActivity : ComponentActivity() {
                     onSilenceThresholdChanged = viewModel::saveSilenceThreshold,
                     onSilenceTimeRequiredChanged = viewModel::saveSilenceTimeRequired,
                     onTruncationLengthChanged = viewModel::saveTruncationLength,
+                    onDeveloperModeEnableChanged = viewModel::saveDeveloperModeEnabled,
                     onBackPressed = { finish() }
                 )
             }

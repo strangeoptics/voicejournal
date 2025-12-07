@@ -52,6 +52,7 @@ fun SettingsScreen(
     silenceThreshold: Int,
     silenceTimeRequired: Int,
     truncationLength: Int,
+    isDeveloperModeEnabled: Boolean,
     onDaysChanged: (Int) -> Unit,
     onGpsEnableChanged: (Boolean) -> Unit,
     onWebServerEnableChanged: (Boolean) -> Unit,
@@ -62,6 +63,7 @@ fun SettingsScreen(
     onSilenceThresholdChanged: (Int) -> Unit,
     onSilenceTimeRequiredChanged: (Int) -> Unit,
     onTruncationLengthChanged: (Int) -> Unit,
+    onDeveloperModeEnableChanged: (Boolean) -> Unit,
     onBackPressed: () -> Unit
 ) {
     var days by remember { mutableStateOf(currentDays.toString()) }
@@ -164,6 +166,17 @@ fun SettingsScreen(
                     )
                 }
 
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Developer-Mode aktivieren", modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = isDeveloperModeEnabled,
+                        onCheckedChange = onDeveloperModeEnableChanged
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(24.dp))
                 Text("Spracherkennung Dienst", style = MaterialTheme.typography.titleMedium)

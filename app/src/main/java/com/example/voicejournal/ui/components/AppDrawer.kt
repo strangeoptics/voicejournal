@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun AppDrawer(
+    isDeveloperModeEnabled: Boolean,
     onSettingsClicked: () -> Unit,
     onManageCategoriesClicked: () -> Unit,
     onImportJournalClicked: () -> Unit,
@@ -66,25 +67,27 @@ fun AppDrawer(
             modifier = Modifier.padding(12.dp)
         )
         NavigationDrawerItem(
-            icon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add test data") },
-            label = { Text("Add Test Data") },
-            selected = false,
-            onClick = onAddTestDataClicked,
-            modifier = Modifier.padding(12.dp)
-        )
-        NavigationDrawerItem(
             icon = { Icon(Icons.Filled.Map, contentDescription = "Show GPS Track") },
             label = { Text("Show GPS Track") },
             selected = false,
             onClick = onShowGpsTrackClicked,
             modifier = Modifier.padding(12.dp)
         )
-        NavigationDrawerItem(
-            icon = { Icon(Icons.Filled.DeleteForever, contentDescription = "Delete All Data") },
-            label = { Text("Delete All Data") },
-            selected = false,
-            onClick = onDeleteAllClicked,
-            modifier = Modifier.padding(12.dp)
-        )
+        if (isDeveloperModeEnabled) {
+            NavigationDrawerItem(
+                icon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add test data") },
+                label = { Text("Add Test Data") },
+                selected = false,
+                onClick = onAddTestDataClicked,
+                modifier = Modifier.padding(12.dp)
+            )
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Filled.DeleteForever, contentDescription = "Delete All Data") },
+                label = { Text("Delete All Data") },
+                selected = false,
+                onClick = onDeleteAllClicked,
+                modifier = Modifier.padding(12.dp)
+            )
+        }
     }
 }

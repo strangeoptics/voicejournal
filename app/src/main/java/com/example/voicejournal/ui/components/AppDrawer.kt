@@ -66,14 +66,14 @@ fun AppDrawer(
             onClick = onShowNotificationClicked,
             modifier = Modifier.padding(12.dp)
         )
-        NavigationDrawerItem(
-            icon = { Icon(Icons.Filled.Map, contentDescription = "Show GPS Track") },
-            label = { Text("Show GPS Track") },
-            selected = false,
-            onClick = onShowGpsTrackClicked,
-            modifier = Modifier.padding(12.dp)
-        )
         if (isDeveloperModeEnabled) {
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Filled.Map, contentDescription = "Show GPS Track") },
+                label = { Text("Show GPS Track") },
+                selected = false,
+                onClick = onShowGpsTrackClicked,
+                modifier = Modifier.padding(12.dp)
+            )
             NavigationDrawerItem(
                 icon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Add test data") },
                 label = { Text("Add Test Data") },

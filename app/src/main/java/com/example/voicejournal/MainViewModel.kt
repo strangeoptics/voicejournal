@@ -226,6 +226,7 @@ class MainViewModel(
 
     fun onCategoryChange(category: String) {
         _selectedCategory.value = category
+        _selectedEntry.value = null
     }
     fun onDateSelected(date: LocalDate) {
         _selectedDate.value = if (_selectedDate.value == date) null else date

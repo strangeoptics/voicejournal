@@ -45,6 +45,7 @@ fun SettingsScreen(
     isGpsTrackingEnabled: Boolean,
     isWebServerEnabled: Boolean,
     ipAddress: String,
+    dnsName: String,
     gpsInterval: Int,
     currentSpeechService: String,
     currentApiKey: String,
@@ -164,6 +165,13 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(start = 16.dp, top = 4.dp)
                     )
+                    if (dnsName.isNotBlank()) {
+                        Text(
+                            text = "or http://$dnsName:8080",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))

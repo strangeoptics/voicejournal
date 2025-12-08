@@ -3,6 +3,7 @@ package com.example.voicejournal
 import android.content.Context
 import android.net.wifi.WifiManager
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -35,12 +36,14 @@ class SettingsActivity : ComponentActivity() {
                 val isDeveloperModeEnabled by viewModel.isDeveloperModeEnabled.collectAsState()
 
                 val ipAddress = getIpAddress(applicationContext) ?: "Unavailable"
+                val dnsName = getDnsName(applicationContext)
 
                 SettingsScreen(
                     currentDays = daysToShow,
                     isGpsTrackingEnabled = isGpsTrackingEnabled,
                     isWebServerEnabled = isWebServerEnabled,
                     ipAddress = ipAddress,
+                    dnsName = dnsName,
                     gpsInterval = gpsInterval,
                     currentSpeechService = speechService,
                     currentApiKey = googleCloudApiKey,
@@ -74,5 +77,9 @@ class SettingsActivity : ComponentActivity() {
                (ipAddress shr 8 and 0xFF) + "." +
                (ipAddress shr 16 and 0xFF) + "." +
                (ipAddress shr 24 and 0xFF)
+    }
+    
+    private fun getDnsName(context: Context): String {
+        return Settings.Secure.getString(context.contentResolver, "bluetooth_name") ?: android.os.Build.MODEL
     }
 }

@@ -31,10 +31,15 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 class EditEntryActivity : ComponentActivity() {
 
-    private val entryId by lazy { intent.getIntExtra(EXTRA_ENTRY_ID, -1) }
+    private val entryId by lazy {
+        val idString = intent.getStringExtra(EXTRA_ENTRY_ID)
+        requireNotNull(idString) { "Entry ID must be provided" }
+        UUID.fromString(idString)
+    }
 
     private val viewModel: EditEntryViewModel by viewModels {
         EditEntryViewModelFactory(Injector.provideJournalRepository(this), entryId)
@@ -68,9 +73,9 @@ class EditEntryActivity : ComponentActivity() {
 
     companion object {
         private const val EXTRA_ENTRY_ID = "extra_entry_id"
-        fun newIntent(context: Context, entryId: Int): Intent {
+        fun newIntent(context: Context, entryId: UUID): Intent {
             return Intent(context, EditEntryActivity::class.java).apply {
-                putExtra(EXTRA_ENTRY_ID, entryId)
+                putExtra(EXTRA_ENTRY_ID, entryId.toString())
             }
         }
     }

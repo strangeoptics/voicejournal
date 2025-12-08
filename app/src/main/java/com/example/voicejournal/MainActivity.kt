@@ -331,7 +331,7 @@ class MainActivity : ComponentActivity() {
                                             Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopiert")
                                         }
                                     }
-                                )
+                                 )
                             },
                             floatingActionButton = {
                                 FloatingActionButton(onClick = {

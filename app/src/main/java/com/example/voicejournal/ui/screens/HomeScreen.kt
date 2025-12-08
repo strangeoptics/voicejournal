@@ -52,6 +52,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -73,7 +74,7 @@ fun HomeScreen(
     onPhotoIconClicked: (EntryWithCategories) -> Unit = {},
     shouldShowMoreButton: Boolean = true
 ) {
-    var expandedIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    var expandedIds by remember { mutableStateOf<Set<UUID>>(emptySet()) }
     Column(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Top,
@@ -139,8 +140,8 @@ fun HomeScreen(
                     val isSelected = selectedEntry == entryWithCategories
                     val isExpanded = entryWithCategories.entry.id in expandedIds
                     val dismissState = rememberSwipeToDismissBoxState(
-                        confirmValueChange = {
-                            if (it == SwipeToDismissBoxValue.StartToEnd) {
+                        confirmValueChange = { value ->
+                            if (value == SwipeToDismissBoxValue.StartToEnd) {
                                 onDeleteEntry(entryWithCategories)
                                 true
                             } else {
@@ -284,11 +285,11 @@ fun HomeScreenPreview() {
         val entries = remember {
             listOf(
                 EntryWithCategories(
-                    entry = JournalEntry(id = 1, content = "This is a preview entry.".repeat(20), start_datetime = System.currentTimeMillis()),
+                    entry = JournalEntry(content = "This is a preview entry.".repeat(20), start_datetime = System.currentTimeMillis()),
                     categories = listOf(Category(1, "journal", aliases = "journal"))
                 ),
                 EntryWithCategories(
-                    entry = JournalEntry(id = 2, content = "This is a todo preview.", start_datetime = System.currentTimeMillis(), stop_datetime = System.currentTimeMillis() + 60000, hasImage = true),
+                    entry = JournalEntry(content = "This is a todo preview.", start_datetime = System.currentTimeMillis(), stop_datetime = System.currentTimeMillis() + 60000, hasImage = true),
                     categories = listOf(Category(2, "todo", aliases = "todo"))
                 )
             )

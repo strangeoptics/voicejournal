@@ -21,6 +21,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
+import java.util.UUID
 
 class WebServer(private val db: AppDatabase) {
 
@@ -47,7 +48,7 @@ class WebServer(private val db: AppDatabase) {
             }
             routing {
                 get("/categories") {
-                    val categories = db.categoryDao().getAll()
+                    val categories = db.categoryDao().getAllCategoriesList()
                     call.respond(categories)
                 }
                 get("/journalentries") {
@@ -93,7 +94,13 @@ class WebServer(private val db: AppDatabase) {
                     call.respond(dtos)
                 }
                 get("/journalentries/{id}") {
-                    val id = call.parameters["id"]?.toIntOrNull()
+                    val id = call.parameters["id"]?.let {
+                        try {
+                            UUID.fromString(it)
+                        } catch (e: IllegalArgumentException) {
+                            null
+                        }
+                    }
                     if (id == null) {
                         call.respond(HttpStatusCode.BadRequest, "Invalid or missing entry ID")
                         return@get
@@ -126,9 +133,9 @@ class WebServer(private val db: AppDatabase) {
                     )
 
                     val categories = db.categoryDao().getCategoriesByIds(createDto.categoryIds)
-                    val newEntryId = db.journalEntryDao().insertWithCategories(entry, categories)
+                    db.journalEntryDao().insertWithCategories(entry, categories, db.categoryDao())
 
-                    val newEntry = db.journalEntryDao().getEntryById(newEntryId)
+                    val newEntry = db.journalEntryDao().getEntryById(entry.id)
 
                     if (newEntry != null) {
                         val dto = JournalEntryDto(
@@ -145,7 +152,13 @@ class WebServer(private val db: AppDatabase) {
                     }
                 }
                 put("/journalentries/{id}") {
-                    val id = call.parameters["id"]?.toIntOrNull()
+                    val id = call.parameters["id"]?.let {
+                        try {
+                            UUID.fromString(it)
+                        } catch (e: IllegalArgumentException) {
+                            null
+                        }
+                    }
                     if (id == null) {
                         call.respond(HttpStatusCode.BadRequest, "Invalid or missing entry ID")
                         return@put
@@ -168,7 +181,7 @@ class WebServer(private val db: AppDatabase) {
                     )
                     val categories = db.categoryDao().getCategoriesByIds(journalEntryDto.categoryIds)
 
-                    db.journalEntryDao().updateWithCategories(entry, categories)
+                    db.journalEntryDao().updateWithCategories(entry, categories, db.categoryDao())
                     call.respond(HttpStatusCode.OK)
                 }
             }

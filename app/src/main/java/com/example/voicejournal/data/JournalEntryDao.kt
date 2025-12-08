@@ -8,6 +8,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
+import java.util.UUID
 
 @Dao
 interface JournalEntryDao {
@@ -37,10 +38,10 @@ interface JournalEntryDao {
 
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE id = :entryId")
-    suspend fun getEntryById(entryId: Int): EntryWithCategories?
+    suspend fun getEntryById(entryId: UUID): EntryWithCategories?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(entry: JournalEntry): Long
+    suspend fun insert(entry: JournalEntry)
 
     @Update
     suspend fun update(entry: JournalEntry)
@@ -55,57 +56,31 @@ interface JournalEntryDao {
     suspend fun insertJournalEntryCategoryCrossRef(crossRef: JournalEntryCategoryCrossRef)
 
     @Query("DELETE FROM journal_entry_category_cross_ref WHERE entryId = :entryId")
-    suspend fun deleteCrossRefsForEntry(entryId: Int)
-
-    // Category DAO methods
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertCategory(category: Category): Long
-
-    @Update
-    suspend fun updateCategories(categories: List<Category>)
-
-    @Query("SELECT * FROM categories ORDER BY orderIndex ASC")
-    fun getAllCategories(): Flow<List<Category>>
-
-    @Query("SELECT * FROM categories ORDER BY orderIndex ASC")
-    suspend fun getAllCategoriesList(): List<Category>
-    
-    @Query("SELECT * FROM categories WHERE category = :categoryName LIMIT 1")
-    suspend fun getCategoryByName(categoryName: String): Category?
-
-    @Query("SELECT * FROM categories WHERE id IN (:categoryIds)")
-    suspend fun getCategoriesByIds(categoryIds: List<Int>): List<Category>
-
-    @Query("UPDATE categories SET aliases = :aliases WHERE id = :categoryId")
-    suspend fun updateAliasesForCategory(categoryId: Int, aliases: String)
-
-    @Query("DELETE FROM categories WHERE id = :categoryId")
-    suspend fun deleteCategory(categoryId: Int)
+    suspend fun deleteCrossRefsForEntry(entryId: UUID)
 
     @Transaction
-    suspend fun insertWithCategories(entry: JournalEntry, categories: List<Category>): Int {
-        val entryId = insert(entry).toInt()
+    suspend fun insertWithCategories(entry: JournalEntry, categories: List<Category>, categoryDao: CategoryDao) {
+        insert(entry)
         categories.forEach { category ->
-            var cat = getCategoryByName(category.category)
+            var cat = categoryDao.getCategoryByName(category.category)
             if (cat == null) {
-                val newId = insertCategory(category)
+                val newId = categoryDao.insertCategory(category)
                 cat = category.copy(id = newId.toInt())
             }
             insertJournalEntryCategoryCrossRef(
-                JournalEntryCategoryCrossRef(entryId, cat.id)
+                JournalEntryCategoryCrossRef(entry.id, cat.id)
             )
         }
-        return entryId
     }
 
     @Transaction
-    suspend fun updateWithCategories(entry: JournalEntry, categories: List<Category>) {
+    suspend fun updateWithCategories(entry: JournalEntry, categories: List<Category>, categoryDao: CategoryDao) {
         update(entry)
         deleteCrossRefsForEntry(entry.id)
         categories.forEach { category ->
-             var cat = getCategoryByName(category.category)
+             var cat = categoryDao.getCategoryByName(category.category)
             if (cat == null) {
-                val newId = insertCategory(category)
+                val newId = categoryDao.insertCategory(category)
                 cat = category.copy(id = newId.toInt())
             }
             insertJournalEntryCategoryCrossRef(

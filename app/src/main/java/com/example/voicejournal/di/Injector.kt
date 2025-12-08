@@ -13,7 +13,8 @@ object Injector {
     fun provideJournalRepository(context: Context): JournalRepository {
         val database = getDatabase(context)
         return JournalRepository(
-            dao = database.journalEntryDao(),
+            entryDao = database.journalEntryDao(),
+            categoryDao = database.categoryDao(),
             gpsTrackPointDao = database.gpsTrackPointDao(),
             context = context.applicationContext
         )

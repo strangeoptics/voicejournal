@@ -12,10 +12,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 class EditEntryViewModel(
     private val repository: JournalRepository,
-    private val entryId: Int
+    private val entryId: UUID
 ) : ViewModel() {
 
     private val _entry = MutableStateFlow<EntryWithCategories?>(null)
@@ -26,7 +27,7 @@ class EditEntryViewModel(
 
     init {
         viewModelScope.launch {
-            _entry.value = repository.getAllEntriesWithCategories().first().find { it.entry.id == entryId }
+            _entry.value = repository.getEntryById(entryId)
         }
     }
 
@@ -50,7 +51,7 @@ class EditEntryViewModel(
 
 class EditEntryViewModelFactory(
     private val repository: JournalRepository,
-    private val entryId: Int
+    private val entryId: UUID
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(EditEntryViewModel::class.java)) {

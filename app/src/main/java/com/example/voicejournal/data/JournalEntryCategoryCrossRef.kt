@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import kotlinx.serialization.Serializable
+import java.util.UUID
 
 @Serializable
 @Entity(
@@ -25,7 +26,8 @@ import kotlinx.serialization.Serializable
     ]
 )
 data class JournalEntryCategoryCrossRef(
-    val entryId: Int,
+    @Serializable(with = UuidSerializer::class)
+    val entryId: UUID,
     @ColumnInfo(index = true)
     val categoryId: Int
 )

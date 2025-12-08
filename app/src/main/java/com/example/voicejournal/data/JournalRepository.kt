@@ -14,17 +14,21 @@ import java.io.InputStreamReader
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 import java.util.regex.Pattern
 
 class JournalRepository(
-    private val dao: JournalEntryDao,
+    private val entryDao: JournalEntryDao,
+    private val categoryDao: CategoryDao,
     private val gpsTrackPointDao: GpsTrackPointDao,
     private val context: Context
 ) {
 
-    val allCategories = dao.getAllCategories()
+    val allCategories = categoryDao.getAllCategories()
 
-    fun getAllEntriesWithCategories(): Flow<List<EntryWithCategories>> = dao.getEntriesWithCategories()
+    fun getAllEntriesWithCategories(): Flow<List<EntryWithCategories>> = entryDao.getEntriesWithCategories()
+
+    suspend fun getEntryById(entryId: UUID): EntryWithCategories? = entryDao.getEntryById(entryId)
 
     suspend fun importJournal(uri: Uri) = withContext(Dispatchers.IO) {
         context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -36,7 +40,7 @@ class JournalRepository(
                         val version = json.decodeFromString<VersionCheck>(content).version
                         if (version == 3) {
                             val journalExport = json.decodeFromString<JournalExportV3>(content)
-                            journalExport.categories.forEach { dao.insertCategory(it) }
+                            journalExport.categories.forEach { categoryDao.insertCategory(it) }
                             journalExport.entries.forEach { entryExport ->
                                 val entry = JournalEntry(
                                     content = entryExport.content,
@@ -47,16 +51,16 @@ class JournalRepository(
                                 val categories = entryExport.categories.map { categoryName ->
                                     Category(category = categoryName, aliases = "")
                                 }
-                                dao.insertWithCategories(entry, categories)
+                                entryDao.insertWithCategories(entry, categories, categoryDao)
                             }
                         } else { // V2
                             val journalExport = json.decodeFromString<JournalExport>(content)
-                            journalExport.categories.forEach { dao.insertCategory(it) }
+                            journalExport.categories.forEach { categoryDao.insertCategory(it) }
                             journalExport.entries.forEach { entry ->
                                 val v2Entry = json.decodeFromString<JournalEntryV2>(Json.encodeToString(entry))
                                 val newEntry = JournalEntry(content = v2Entry.content, start_datetime = v2Entry.timestamp, hasImage = v2Entry.hasImage)
                                 val category = Category(category = v2Entry.title, aliases = "")
-                                dao.insertWithCategories(newEntry, listOf(category))
+                                entryDao.insertWithCategories(newEntry, listOf(category), categoryDao)
                             }
                         }
                     } else { // V1 or legacy
@@ -64,7 +68,7 @@ class JournalRepository(
                         entries.forEach { v2Entry ->
                              val newEntry = JournalEntry(content = v2Entry.content, start_datetime = v2Entry.timestamp, hasImage = v2Entry.hasImage)
                              val category = Category(category = v2Entry.title, aliases = "")
-                             dao.insertWithCategories(newEntry, listOf(category))
+                             entryDao.insertWithCategories(newEntry, listOf(category), categoryDao)
                         }
                     }
                 } catch (e: Exception) {
@@ -92,14 +96,14 @@ class JournalRepository(
                     content = contentString,
                     start_datetime = start_datetime
                 )
-                dao.insertWithCategories(entry, listOf(Category(category="journal", aliases = "")))
+                entryDao.insertWithCategories(entry, listOf(Category(category="journal", aliases = "")), categoryDao)
             }
         }
     }
 
     suspend fun exportJournal(uri: Uri) = withContext(Dispatchers.IO) {
-        val entriesWithCategories = dao.getAllEntriesWithCategories()
-        val categories = dao.getAllCategoriesList()
+        val entriesWithCategories = entryDao.getAllEntriesWithCategories()
+        val categories = categoryDao.getAllCategoriesList()
         val exportEntries = entriesWithCategories.map {
             JournalEntryExport(
                 content = it.entry.content,
@@ -121,26 +125,26 @@ class JournalRepository(
         }
     }
 
-    fun getEntriesWithCategoriesSince(since: Long) = dao.getEntriesWithCategoriesSince(since)
+    fun getEntriesWithCategoriesSince(since: Long) = entryDao.getEntriesWithCategoriesSince(since)
 
-    suspend fun insertCategory(category: Category) = dao.insertCategory(category)
+    suspend fun insertCategory(category: Category) = categoryDao.insertCategory(category)
 
-    suspend fun updateCategories(categories: List<Category>) = dao.updateCategories(categories)
+    suspend fun updateCategories(categories: List<Category>) = categoryDao.updateCategories(categories)
 
-    suspend fun insert(entry: JournalEntry, categories: List<Category>) = dao.insertWithCategories(entry, categories)
+    suspend fun insert(entry: JournalEntry, categories: List<Category>) = entryDao.insertWithCategories(entry, categories, categoryDao)
 
-    suspend fun update(entry: JournalEntry, categories: List<Category>) = dao.updateWithCategories(entry, categories)
+    suspend fun update(entry: JournalEntry, categories: List<Category>) = entryDao.updateWithCategories(entry, categories, categoryDao)
 
-    suspend fun delete(entry: JournalEntry) = dao.delete(entry)
+    suspend fun delete(entry: JournalEntry) = entryDao.delete(entry)
 
     suspend fun updateAliasesForCategory(categoryId: Int, aliases: List<String>) {
         val aliasesString = aliases.joinToString(",")
-        dao.updateAliasesForCategory(categoryId, aliasesString)
+        categoryDao.updateAliasesForCategory(categoryId, aliasesString)
     }
 
-    suspend fun deleteCategory(categoryId: Int) = dao.deleteCategory(categoryId)
+    suspend fun deleteCategory(categoryId: Int) = categoryDao.deleteCategory(categoryId)
 
-    suspend fun deleteAll() = dao.deleteAll()
+    suspend fun deleteAll() = entryDao.deleteAll() // Should also delete categories? For now, it doesn't.
 
     // GPS Track Point methods
     suspend fun insertGpsPoint(point: GpsTrackPoint) {

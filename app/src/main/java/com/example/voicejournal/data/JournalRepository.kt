@@ -43,6 +43,7 @@ class JournalRepository(
                             journalExport.categories.forEach { categoryDao.insertCategory(it) }
                             journalExport.entries.forEach { entryExport ->
                                 val entry = JournalEntry(
+                                    id = entryExport.id,
                                     content = entryExport.content,
                                     start_datetime = entryExport.start_datetime,
                                     stop_datetime = entryExport.stop_datetime,
@@ -106,6 +107,7 @@ class JournalRepository(
         val categories = categoryDao.getAllCategoriesList()
         val exportEntries = entriesWithCategories.map {
             JournalEntryExport(
+                id = it.entry.id,
                 content = it.entry.content,
                 start_datetime = it.entry.start_datetime,
                 stop_datetime = it.entry.stop_datetime,

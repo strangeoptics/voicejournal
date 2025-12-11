@@ -17,6 +17,7 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
@@ -183,6 +184,28 @@ class WebServer(private val db: AppDatabase) {
 
                     db.journalEntryDao().updateWithCategories(entry, categories, db.categoryDao())
                     call.respond(HttpStatusCode.OK)
+                }
+                delete("/journalentries/{id}") {
+                    val id = call.parameters["id"]?.let {
+                        try {
+                            UUID.fromString(it)
+                        } catch (e: IllegalArgumentException) {
+                            null
+                        }
+                    }
+                    if (id == null) {
+                        call.respond(HttpStatusCode.BadRequest, "Invalid or missing entry ID")
+                        return@delete
+                    }
+
+                    val entryWithCategories = db.journalEntryDao().getEntryById(id)
+                    if (entryWithCategories == null) {
+                        call.respond(HttpStatusCode.NotFound, "Entry not found")
+                        return@delete
+                    }
+
+                    db.journalEntryDao().delete(entryWithCategories.entry)
+                    call.respond(HttpStatusCode.NoContent)
                 }
             }
         }.start(wait = false)

@@ -6,6 +6,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -62,6 +63,7 @@ fun HomeScreen(
     categories: List<String> = emptyList(),
     selectedCategory: String = "",
     truncationLength: Int,
+    showCategoryTags: Boolean,
     onCategoryChange: (String) -> Unit = {},
     onDeleteEntry: (EntryWithCategories) -> Unit = {},
     selectedEntry: EntryWithCategories? = null,
@@ -194,9 +196,11 @@ fun HomeScreen(
                                 containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
                             )
                         ) {
-                            Box(modifier = Modifier
-                                .padding(8.dp)
-                                .fillMaxWidth()) {
+                            Column(
+                                modifier = Modifier
+                                    .padding(8.dp)
+                                    .fillMaxWidth()
+                            ) {
                                 val startDate = LocalDateTime.ofInstant(
                                     Instant.ofEpochMilli(entryWithCategories.entry.start_datetime),
                                     ZoneId.systemDefault()
@@ -219,27 +223,64 @@ fun HomeScreen(
                                 } else {
                                     content
                                 }
-                                Text(
-                                    text = textToShow,
-                                    modifier = Modifier
-                                        .align(Alignment.TopStart)
-                                        .padding(top = 4.dp, end = 48.dp)
-                                )
-                                Text(
-                                    text = timeText,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.align(Alignment.TopEnd)
-                                )
-                                if (entryWithCategories.entry.hasImage) {
-                                    IconButton(
-                                        onClick = { onPhotoIconClicked(entryWithCategories) },
-                                        modifier = Modifier.align(Alignment.BottomEnd)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = textToShow,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(top = 4.dp, end = 8.dp)
+                                    )
+                                    Text(
+                                        text = timeText,
+                                        style = MaterialTheme.typography.bodySmall,
+                                    )
+                                }
+                                if (showCategoryTags) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.PhotoCamera,
-                                            contentDescription = "Open Photo",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                        Row(
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            entryWithCategories.categories.forEach { category ->
+                                                if (category.category != selectedCategory) {
+                                                    Card(
+                                                        modifier = Modifier.padding(end = 4.dp),
+                                                        colors = CardDefaults.cardColors(
+                                                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                                        )
+                                                    ) {
+                                                        Text(
+                                                            text = category.category,
+                                                            modifier = Modifier.padding(
+                                                                horizontal = 8.dp,
+                                                                vertical = 4.dp
+                                                            ),
+                                                            style = MaterialTheme.typography.bodySmall
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if (entryWithCategories.entry.hasImage) {
+                                            IconButton(
+                                                onClick = { onPhotoIconClicked(entryWithCategories) },
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.PhotoCamera,
+                                                    contentDescription = "Open Photo",
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -286,7 +327,7 @@ fun HomeScreenPreview() {
             listOf(
                 EntryWithCategories(
                     entry = JournalEntry(content = "This is a preview entry.".repeat(20), start_datetime = System.currentTimeMillis()),
-                    categories = listOf(Category(1, "journal", aliases = "journal"))
+                    categories = listOf(Category(1, "journal", aliases = "journal"), Category(2, "todo", aliases = "todo"))
                 ),
                 EntryWithCategories(
                     entry = JournalEntry(content = "This is a todo preview.", start_datetime = System.currentTimeMillis(), stop_datetime = System.currentTimeMillis() + 60000, hasImage = true),
@@ -303,7 +344,8 @@ fun HomeScreenPreview() {
             categories = sampleCategories,
             selectedCategory = selectedCategory,
             onCategoryChange = { selectedCategory = it },
-            truncationLength = 160
+            truncationLength = 160,
+            showCategoryTags = true
         )
     }
 }

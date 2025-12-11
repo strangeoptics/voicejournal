@@ -20,6 +20,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.LabelOff
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Stop
@@ -120,6 +122,7 @@ class MainActivity : ComponentActivity() {
                 val isRecording by speechRecognitionManager.isRecording.collectAsState()
                 val truncationLength by viewModel.truncationLength.collectAsState()
                 val isDeveloperModeEnabled by viewModel.isDeveloperModeEnabled.collectAsState()
+                val showCategoryTags by viewModel.showCategoryTags.collectAsState()
 
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -312,6 +315,12 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     actions = {
+                                        IconButton(onClick = { viewModel.toggleShowCategoryTags() }) {
+                                            Icon(
+                                                imageVector = if (showCategoryTags) Icons.Default.Label else Icons.Default.LabelOff,
+                                                contentDescription = "Toggle Category Tags"
+                                            )
+                                        }
                                         if (hasGpsTrackForSelectedDate) {
                                             IconButton(onClick = { openGoogleMapsWithTrack(gpsTrackPoints) }) {
                                                 Icon(Icons.Filled.Map, contentDescription = "Show GPS Track on Map")
@@ -391,7 +400,8 @@ class MainActivity : ComponentActivity() {
                                             openGooglePhotos(date)
                                         },
                                         shouldShowMoreButton = shouldShowMoreButton,
-                                        truncationLength = truncationLength
+                                        truncationLength = truncationLength,
+                                        showCategoryTags = showCategoryTags
                                     )
                                  }
                             }

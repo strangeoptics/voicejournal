@@ -54,6 +54,7 @@ class MainViewModel(
         const val KEY_TRUNCATION_LENGTH = "truncation_length"
         const val KEY_WEBSERVER_ENABLED = "webserver_enabled"
         const val KEY_DEVELOPER_MODE_ENABLED = "developer_mode_enabled"
+        const val KEY_SHOW_CATEGORY_TAGS = "show_category_tags"
     }
 
     private val _selectedCategory = MutableStateFlow("")
@@ -100,6 +101,9 @@ class MainViewModel(
 
     private val _isDeveloperModeEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_DEVELOPER_MODE_ENABLED, false))
     val isDeveloperModeEnabled: StateFlow<Boolean> = _isDeveloperModeEnabled.asStateFlow()
+
+    private val _showCategoryTags = MutableStateFlow(sharedPreferences.getBoolean(KEY_SHOW_CATEGORY_TAGS, true))
+    val showCategoryTags: StateFlow<Boolean> = _showCategoryTags.asStateFlow()
 
 
     private val _recentlyDeleted = MutableStateFlow<List<EntryWithCategories>>(emptyList())
@@ -152,6 +156,7 @@ class MainViewModel(
             KEY_SILENCE_TIME_REQUIRED -> _silenceTimeRequired.value = prefs.getInt(key, 2000)
             KEY_TRUNCATION_LENGTH -> _truncationLength.value = prefs.getInt(key, 160)
             KEY_DEVELOPER_MODE_ENABLED -> _isDeveloperModeEnabled.value = prefs.getBoolean(key, false)
+            KEY_SHOW_CATEGORY_TAGS -> _showCategoryTags.value = prefs.getBoolean(key, true)
         }
     }
 
@@ -342,6 +347,12 @@ class MainViewModel(
     fun saveDeveloperModeEnabled(isEnabled: Boolean) {
         sharedPreferences.edit { putBoolean(KEY_DEVELOPER_MODE_ENABLED, isEnabled) }
     }
+
+    fun toggleShowCategoryTags() {
+        val newValue = !showCategoryTags.value
+        sharedPreferences.edit { putBoolean(KEY_SHOW_CATEGORY_TAGS, newValue) }
+    }
+
 
     fun addOrUpdateCategory(categoryName: String, aliasesString: String, showAll: Boolean) {
         viewModelScope.launch {

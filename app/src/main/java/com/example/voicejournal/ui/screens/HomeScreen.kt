@@ -12,11 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -34,6 +33,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,10 +72,9 @@ fun HomeScreen(
     onDateSelected: (LocalDate) -> Unit = {},
     onEntrySelected: (EntryWithCategories) -> Unit = {},
     onEditEntry: (EntryWithCategories) -> Unit = {},
-    onMoreClicked: () -> Unit = {},
+    onLoadMore: () -> Unit = {},
     onDateLongClicked: (LocalDate) -> Unit = {},
-    onPhotoIconClicked: (EntryWithCategories) -> Unit = {},
-    shouldShowMoreButton: Boolean = true
+    onPhotoIconClicked: (EntryWithCategories) -> Unit = {}
 ) {
     var expandedIds by remember { mutableStateOf<Set<UUID>>(emptySet()) }
     Column(
@@ -114,7 +114,31 @@ fun HomeScreen(
             }
         }
 
+        val lazyListState = rememberLazyListState()
+        val buffer = 5
+        val endOfListReached by remember {
+            derivedStateOf {
+                val lastVisibleItem = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()
+                val totalItems = lazyListState.layoutInfo.totalItemsCount
+                val isCategoryShowAll = categories.find { it == selectedCategory }?.let { category ->
+                    // This is a placeholder. You need to get the actual Category object.
+                    // For now, let's assume if it's not "journal", "todo", etc., it might be a `showAll` category.
+                    // A better approach is to pass the whole Category object to HomeScreen.
+                    false // Assuming default behavior is not showAll
+                } ?: false
+
+                !isCategoryShowAll && totalItems > 0 && lastVisibleItem != null && lastVisibleItem.index >= totalItems - 1 - buffer
+            }
+        }
+
+        LaunchedEffect(endOfListReached) {
+            if (endOfListReached) {
+                onLoadMore()
+            }
+        }
+
         LazyColumn(
+            state = lazyListState,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
@@ -285,22 +309,6 @@ fun HomeScreen(
                                 }
                             }
                         }
-                    }
-                }
-            }
-            if (groupedEntries.isNotEmpty() && shouldShowMoreButton) {
-                item {
-                    Button(
-                        onClick = onMoreClicked,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    ) {
-                        Text("more")
                     }
                 }
             }

@@ -116,7 +116,6 @@ class MainActivity : ComponentActivity() {
                 val filteredEntries by viewModel.filteredEntries.collectAsState()
                 val canUndo by viewModel.canUndo.collectAsState()
                 val categories by viewModel.categories.collectAsState()
-                val shouldShowMoreButton by viewModel.shouldShowMoreButton.collectAsState()
                 val gpsTrackPoints by viewModel.gpsTrackPoints.collectAsState()
                 val hasGpsTrackForSelectedDate by viewModel.hasGpsTrackForSelectedDate.collectAsState()
                 val isRecording by speechRecognitionManager.isRecording.collectAsState()
@@ -391,7 +390,7 @@ class MainActivity : ComponentActivity() {
                                             val intent = EditEntryActivity.newIntent(context, entryToEdit.entry.id)
                                             context.startActivity(intent)
                                         },
-                                        onMoreClicked = viewModel::onMoreClicked,
+                                        onLoadMore = viewModel::loadMoreEntries,
                                         onDateLongClicked = { date ->
                                             openGooglePhotos(date)
                                         },
@@ -399,7 +398,6 @@ class MainActivity : ComponentActivity() {
                                             val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entryWithCategories.entry.start_datetime), ZoneId.systemDefault()).toLocalDate()
                                             openGooglePhotos(date)
                                         },
-                                        shouldShowMoreButton = shouldShowMoreButton,
                                         truncationLength = truncationLength,
                                         showCategoryTags = showCategoryTags
                                     )

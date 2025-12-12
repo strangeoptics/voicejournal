@@ -125,12 +125,6 @@ class MainViewModel(
         }.associate { it }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    val shouldShowMoreButton: StateFlow<Boolean> =
-        combine(selectedCategory, categoriesFlow) { selectedCat, categories ->
-            val category = categories.find { it.category == selectedCat }
-            category?.showAll != true
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
-
     val gpsTrackPoints: StateFlow<List<GpsTrackPoint>> = selectedDate
         .flatMapLatest { date ->
             val startOfDay = (date ?: LocalDate.now()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -292,7 +286,7 @@ class MainViewModel(
         }
     }
 
-    fun onMoreClicked() {
+    fun loadMoreEntries() {
         _daysToShow.value += 3
         sharedPreferences.edit { putInt(KEY_DAYS_TO_SHOW, _daysToShow.value) }
     }

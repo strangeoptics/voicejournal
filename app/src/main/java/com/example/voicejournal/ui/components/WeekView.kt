@@ -20,6 +20,7 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerDialog
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -164,10 +166,18 @@ fun WeekView(
     val hoursOfDay = (0..23).map { LocalTime.of(it, 0) }
     val scrollState = rememberScrollState()
     val context = LocalContext.current
-
-    var totalDrag by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
 
     val slotHeight = hourHeight + 1.dp // Total height of an hour slot (content + divider)
+    
+    LaunchedEffect(daysToDisplay) {
+        val slotHeightPx = with(density) { slotHeight.toPx() }
+        val scrollToPosition = (slotHeightPx * 8).toInt() // Scroll to 8 AM
+        scrollState.scrollTo(scrollToPosition)
+    }
+    
+    var totalDrag by remember { mutableFloatStateOf(0f) }
+
     val totalDayHeight = slotHeight * 24 // Total height for a full 24-hour day
 
     Column(modifier = modifier.fillMaxSize()) {

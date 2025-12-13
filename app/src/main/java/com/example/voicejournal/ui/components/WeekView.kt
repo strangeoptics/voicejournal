@@ -304,14 +304,14 @@ fun WeekView(
                                         fontSize = 12.sp,
                                         color = Color.White
                                     )
-                                    appointment.description?.let {
-                                        Text(
-                                            text = it,
-                                            fontSize = 10.sp,
-                                            color = Color.White,
-                                            modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart)
-                                        )
-                                    }
+                                    //appointment.description?.let {
+                                    //    Text(
+                                    //        text = it,
+                                    //        fontSize = 10.sp,
+                                    //        color = Color.White,
+                                    //        modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart)
+                                    //    )
+                                    //}
                                 }
                             }
                         }

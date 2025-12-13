@@ -38,7 +38,7 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
                 date = startDateTime.toLocalDate(),
                 startTime = startDateTime.toLocalTime(),
                 endTime = endDateTime?.toLocalTime() ?: startDateTime.toLocalTime().plusHours(1),
-                title = entry.content.split(" ").take(3).joinToString(" "),
+                title = entry.content.take(12),
                 description = entry.content,
                 entry = entry,
                 // You can add logic here to assign colors based on categories, for example

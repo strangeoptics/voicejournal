@@ -69,8 +69,8 @@ fun CalendarScreen(viewModel: CalendarViewModel, onFinish: () -> Unit) {
                             date.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM yyyy", Locale.GERMAN))
                         } ?: when (numberOfDays) {
                             1 -> currentDate.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM yyyy", Locale.GERMAN))
-                            3 -> "3-Tages-Ansicht"
-                            7 -> "Wochenansicht"
+                            3 -> currentDate.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.GERMAN))
+                            7 -> currentDate.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.GERMAN))
                             else -> ""
                         }
                     )
@@ -135,9 +135,6 @@ fun CalendarScreen(viewModel: CalendarViewModel, onFinish: () -> Unit) {
             modifier = Modifier.padding(innerPadding),
             appointments = appointments,
             numberOfDays = numberOfDays,
-            onAppointmentUpdate = { updatedAppointment ->
-                viewModel.updateAppointment(updatedAppointment)
-            },
             currentDate = currentDate,
             selectedDate = selectedDate,
             onDayClick = { date ->

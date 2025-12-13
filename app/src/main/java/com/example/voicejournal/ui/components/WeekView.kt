@@ -27,10 +27,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.voicejournal.EditEntryActivity
 import com.example.voicejournal.data.JournalEntry
 import java.time.LocalDate // New import
 import java.time.LocalTime
@@ -142,7 +144,6 @@ fun WeekView(
     appointments: List<Appointment> = emptyList(),
     hourHeight: Dp = 60.dp, // Height for one hour slot content
     numberOfDays: Int,
-    onAppointmentUpdate: (Appointment) -> Unit, // Callback for updates
     currentDate: LocalDate, // New parameter for current week's date
     selectedDate: LocalDate? = null, // Changed from selectedDay: DayOfWeek?
     onDayClick: (LocalDate?) -> Unit, // Changed to pass LocalDate?
@@ -162,9 +163,8 @@ fun WeekView(
 
     val hoursOfDay = (0..23).map { LocalTime.of(it, 0) }
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
 
-    var showEditDialog by remember { mutableStateOf(false) }
-    var selectedAppointment by remember { mutableStateOf<Appointment?>(null) }
     var totalDrag by remember { mutableFloatStateOf(0f) }
 
     val slotHeight = hourHeight + 1.dp // Total height of an hour slot (content + divider)
@@ -295,8 +295,10 @@ fun WeekView(
                                         .background(appointment.color.copy(alpha = 0.6f))
                                         .padding(4.dp)
                                         .clickable { // Make appointment clickable
-                                            selectedAppointment = appointment
-                                            showEditDialog = true
+                                            appointment.entry?.let {
+                                                val intent = EditEntryActivity.newIntent(context, it.id)
+                                                context.startActivity(intent)
+                                            }
                                         }
                                 ) {
                                     Text(
@@ -317,116 +319,6 @@ fun WeekView(
                         }
                     }
                 }
-            }
-        }
-    }
-
-    // Appointment Edit Dialog
-    if (showEditDialog && selectedAppointment != null) {
-        var editedTitle by remember(selectedAppointment) { mutableStateOf(selectedAppointment!!.title) }
-        var editedDescription by remember(selectedAppointment) { mutableStateOf(selectedAppointment!!.description ?: "") }
-        var editedStartTime by remember(selectedAppointment) { mutableStateOf(selectedAppointment!!.startTime) }
-        var editedEndTime by remember(selectedAppointment) { mutableStateOf(selectedAppointment!!.endTime) }
-
-        var showStartTimePickerDialog by remember { mutableStateOf(false) }
-        var showEndTimePickerDialog by remember { mutableStateOf(false) }
-
-        AlertDialog(
-            onDismissRequest = { showEditDialog = false },
-            title = { Text("Termin bearbeiten") },
-            text = {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    OutlinedTextField(
-                        value = editedTitle,
-                        onValueChange = { editedTitle = it },
-                        label = { Text("Titel") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = editedDescription,
-                        onValueChange = { editedDescription = it },
-                        label = { Text("Beschreibung") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                        TextButton(onClick = { showStartTimePickerDialog = true }) {
-                            Text("Startzeit: ${editedStartTime.format(DateTimeFormatter.ofPattern("HH:mm"))}")
-                        }
-                        TextButton(onClick = { showEndTimePickerDialog = true }) {
-                            Text("Endzeit: ${editedEndTime.format(DateTimeFormatter.ofPattern("HH:mm"))}")
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(onClick = {
-                    val updatedAppointment = selectedAppointment!!.copy(
-                        title = editedTitle,
-                        description = editedDescription.ifEmpty { null }, // Set to null if empty
-                        startTime = editedStartTime,
-                        endTime = editedEndTime,
-                        date = selectedAppointment!!.date // Copy the original date
-                    )
-                    onAppointmentUpdate(updatedAppointment)
-                    showEditDialog = false
-                }) {
-                    Text("Speichern")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showEditDialog = false }) {
-                    Text("Abbrechen")
-                }
-            }
-        )
-
-        // Start Time Picker Dialog
-        if (showStartTimePickerDialog) {
-            val timePickerState = rememberTimePickerState(initialHour = editedStartTime.hour, initialMinute = editedStartTime.minute)
-            TimePickerDialog(
-                onDismissRequest = { showStartTimePickerDialog = false },
-                title = { Text("Startzeit auswählen") },
-                confirmButton = {
-                    TextButton(onClick = {
-                        editedStartTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
-                        showStartTimePickerDialog = false
-                    }) {
-                        Text("OK")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showStartTimePickerDialog = false }) {
-                        Text("Abbrechen")
-                    }
-                }
-            ) {
-                TimePicker(state = timePickerState)
-            }
-        }
-
-        // End Time Picker Dialog
-        if (showEndTimePickerDialog) {
-            val timePickerState = rememberTimePickerState(initialHour = editedEndTime.hour, initialMinute = editedEndTime.minute)
-            TimePickerDialog(
-                onDismissRequest = { showEndTimePickerDialog = false },
-                title = { Text("Endzeit auswählen") },
-                confirmButton = {
-                    TextButton(onClick = {
-                        editedEndTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
-                        showEndTimePickerDialog = false
-                    }) {
-                        Text("OK")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showEndTimePickerDialog = false }) {
-                        Text("Abbrechen")
-                    }
-                }
-            ) {
-                TimePicker(state = timePickerState)
             }
         }
     }
@@ -500,7 +392,6 @@ fun WeekViewWithAppointmentsPreview() {
     )
     WeekView(
         appointments = sampleAppointments,
-        onAppointmentUpdate = {},
         onDayClick = {},
         currentDate = LocalDate.now().with(WeekFields.of(Locale.getDefault()).firstDayOfWeek),
         selectedDate = null,

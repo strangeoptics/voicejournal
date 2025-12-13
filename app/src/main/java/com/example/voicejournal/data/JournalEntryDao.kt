@@ -39,6 +39,10 @@ interface JournalEntryDao {
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE id = :entryId")
     suspend fun getEntryById(entryId: UUID): EntryWithCategories?
+    
+    @Transaction
+    @Query("SELECT * FROM journal_entries WHERE start_datetime >= :startTime AND start_datetime < :endTime AND stop_datetime IS NOT NULL ORDER BY start_datetime ASC")
+    fun getEntriesForCalendar(startTime: Long, endTime: Long): Flow<List<EntryWithCategories>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entry: JournalEntry)

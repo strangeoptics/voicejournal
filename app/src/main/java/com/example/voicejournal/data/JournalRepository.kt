@@ -27,6 +27,9 @@ class JournalRepository(
     val allCategories = categoryDao.getAllCategories()
 
     fun getAllEntriesWithCategories(): Flow<List<EntryWithCategories>> = entryDao.getEntriesWithCategories()
+    
+    fun getEntriesForCalendar(startTime: Long, endTime: Long): Flow<List<EntryWithCategories>> =
+        entryDao.getEntriesForCalendar(startTime, endTime)
 
     suspend fun getEntryById(entryId: UUID): EntryWithCategories? = entryDao.getEntryById(entryId)
 
@@ -136,6 +139,8 @@ class JournalRepository(
     suspend fun insert(entry: JournalEntry, categories: List<Category>) = entryDao.insertWithCategories(entry, categories, categoryDao)
 
     suspend fun update(entry: JournalEntry, categories: List<Category>) = entryDao.updateWithCategories(entry, categories, categoryDao)
+    
+    suspend fun updateJournalEntry(entry: JournalEntry) = entryDao.update(entry)
 
     suspend fun delete(entry: JournalEntry) = entryDao.delete(entry)
 

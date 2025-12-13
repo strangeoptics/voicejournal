@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Map
@@ -23,6 +24,7 @@ fun AppDrawer(
     isDeveloperModeEnabled: Boolean,
     onSettingsClicked: () -> Unit,
     onManageCategoriesClicked: () -> Unit,
+    onCalendarClicked: () -> Unit,
     onImportJournalClicked: () -> Unit,
     onExportJournalClicked: () -> Unit,
     onShowNotificationClicked: () -> Unit,
@@ -43,6 +45,13 @@ fun AppDrawer(
             label = { Text("Manage Categories") },
             selected = false,
             onClick = onManageCategoriesClicked,
+            modifier = Modifier.padding(12.dp)
+        )
+        NavigationDrawerItem(
+            icon = { Icon(Icons.Filled.DateRange, contentDescription = "Calendar") },
+            label = { Text("Calendar") },
+            selected = false,
+            onClick = onCalendarClicked,
             modifier = Modifier.padding(12.dp)
         )
         NavigationDrawerItem(

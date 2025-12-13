@@ -263,6 +263,10 @@ class MainActivity : ComponentActivity() {
                                 scope.launch { drawerState.close() }
                                 context.startActivity(Intent(context, CategoryManagerActivity::class.java))
                             },
+                            onCalendarClicked = {
+                                scope.launch { drawerState.close() }
+                                context.startActivity(Intent(context, CalendarActivity::class.java))
+                            },
                             onImportJournalClicked = {
                                 scope.launch { drawerState.close() }
                                 filePickerLauncher.launch(arrayOf("text/plain", "*/*"))

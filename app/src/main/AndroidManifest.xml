@@ -52,6 +52,10 @@
             android:name=".EditCategoryActivity"
             android:exported="false"
             android:label="@string/title_activity_edit_category" />
+        <activity
+            android:name=".CalendarActivity"
+            android:exported="false"
+            android:label="Calendar" />
 
         <service
             android:name=".util.TranscriptionService"

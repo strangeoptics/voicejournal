@@ -71,6 +71,9 @@ class MainViewModel(
 
     private val _daysToShow = MutableStateFlow(sharedPreferences.getInt(KEY_DAYS_TO_SHOW, 3))
     val daysToShow: StateFlow<Int> = _daysToShow.asStateFlow()
+    
+    private val _currentlyLoadedDays = MutableStateFlow(daysToShow.value)
+
 
     private val _isGpsTrackingEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_GPS_TRACKING_ENABLED, false))
     val isGpsTrackingEnabled: StateFlow<Boolean> = _isGpsTrackingEnabled.asStateFlow()
@@ -139,7 +142,11 @@ class MainViewModel(
 
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
         when (key) {
-            KEY_DAYS_TO_SHOW -> _daysToShow.value = prefs.getInt(key, 3)
+            KEY_DAYS_TO_SHOW -> {
+                val newDays = prefs.getInt(key, 3)
+                _daysToShow.value = newDays
+                _currentlyLoadedDays.value = newDays
+            }
             KEY_GPS_TRACKING_ENABLED -> _isGpsTrackingEnabled.value = prefs.getBoolean(key, false)
             KEY_WEBSERVER_ENABLED -> _isWebServerEnabled.value = prefs.getBoolean(key, false)
             KEY_GPS_INTERVAL_MINUTES -> _gpsInterval.value = prefs.getInt(key, 10)
@@ -189,7 +196,7 @@ class MainViewModel(
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val entries: StateFlow<List<EntryWithCategories>> =
-        combine(daysToShow, selectedCategory, categoriesFlow) { days, selectedCat, categories ->
+        combine(_currentlyLoadedDays, selectedCategory, categoriesFlow) { days, selectedCat, categories ->
             Triple(days, selectedCat, categories)
         }.flatMapLatest { (days, selectedCat, categories) ->
             val category = categories.find { it.category == selectedCat }
@@ -287,8 +294,7 @@ class MainViewModel(
     }
 
     fun loadMoreEntries() {
-        _daysToShow.value += 3
-        sharedPreferences.edit { putInt(KEY_DAYS_TO_SHOW, _daysToShow.value) }
+        _currentlyLoadedDays.value += 3
     }
     
     fun saveDaysToShow(days: Int) {

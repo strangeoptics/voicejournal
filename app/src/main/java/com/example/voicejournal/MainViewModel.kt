@@ -203,10 +203,28 @@ class MainViewModel(
             if (category?.showAll == true) {
                 repository.getAllEntriesWithCategories()
             } else {
-                val daysAgoMillis = Calendar.getInstance().apply {
-                    add(Calendar.DAY_OF_YEAR, -days)
-                }.timeInMillis
-                repository.getEntriesWithCategoriesSince(daysAgoMillis)
+                val today = LocalDate.now()
+                var startDateMillis: Long
+                var endDateMillis: Long
+
+                if (category != null) {
+                    val latestEntryMillis = repository.getLatestEntryDatetimeForCategory(category.id)
+                    if (latestEntryMillis != null) {
+                        val latestEntryLocalDate = Instant.ofEpochMilli(latestEntryMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+                        endDateMillis = latestEntryLocalDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() // Include the day of the latest entry
+                        startDateMillis = latestEntryLocalDate.minusDays(days.toLong()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    } else {
+                        // No entries for the selected category, fall back to default behavior (days ago from now)
+                        startDateMillis = today.minusDays(days.toLong()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        endDateMillis = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() // Include today
+                    }
+                    repository.getEntriesWithCategoriesInDateRangeForCategory(category.id, startDateMillis, endDateMillis)
+                } else {
+                    // No category selected, fall back to default behavior (days ago from now)
+                    startDateMillis = today.minusDays(days.toLong()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    endDateMillis = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() // Include today
+                    repository.getEntriesWithCategoriesInDateRange(startDateMillis, endDateMillis)
+                }
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

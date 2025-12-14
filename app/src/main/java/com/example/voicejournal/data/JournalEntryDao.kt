@@ -92,4 +92,15 @@ interface JournalEntryDao {
             )
         }
     }
+
+    @Query("SELECT MAX(je.start_datetime) FROM journal_entries AS je INNER JOIN journal_entry_category_cross_ref AS jecr ON je.id = jecr.entryId WHERE jecr.categoryId = :categoryId")
+    suspend fun getLatestEntryDatetimeForCategory(categoryId: Int): Long?
+
+    @Transaction
+    @Query("SELECT * FROM journal_entries WHERE start_datetime >= :startDateMillis AND start_datetime < :endDateMillis AND id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC")
+    fun getEntriesWithCategoriesInDateRangeForCategory(categoryId: Int, startDateMillis: Long, endDateMillis: Long): Flow<List<EntryWithCategories>>
+
+    @Transaction
+    @Query("SELECT * FROM journal_entries WHERE start_datetime >= :startDateMillis AND start_datetime < :endDateMillis ORDER BY start_datetime DESC")
+    fun getEntriesWithCategoriesInDateRange(startDateMillis: Long, endDateMillis: Long): Flow<List<EntryWithCategories>>
 }

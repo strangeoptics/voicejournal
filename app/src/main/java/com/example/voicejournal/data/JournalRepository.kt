@@ -161,6 +161,18 @@ class JournalRepository(
     fun getTrackPointsForDay(dayStartMillis: Long, dayEndMillis: Long): Flow<List<GpsTrackPoint>> {
         return gpsTrackPointDao.getTrackPointsForDay(dayStartMillis, dayEndMillis)
     }
+
+    suspend fun getLatestEntryDatetimeForCategory(categoryId: Int): Long? {
+        return entryDao.getLatestEntryDatetimeForCategory(categoryId)
+    }
+
+    fun getEntriesWithCategoriesInDateRangeForCategory(categoryId: Int, startDateMillis: Long, endDateMillis: Long): Flow<List<EntryWithCategories>> {
+        return entryDao.getEntriesWithCategoriesInDateRangeForCategory(categoryId, startDateMillis, endDateMillis)
+    }
+
+    fun getEntriesWithCategoriesInDateRange(startDateMillis: Long, endDateMillis: Long): Flow<List<EntryWithCategories>> {
+        return entryDao.getEntriesWithCategoriesInDateRange(startDateMillis, endDateMillis)
+    }
 }
 
 @kotlinx.serialization.Serializable

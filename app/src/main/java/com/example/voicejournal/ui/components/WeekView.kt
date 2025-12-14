@@ -37,8 +37,10 @@ import androidx.compose.ui.unit.sp
 import com.example.voicejournal.EditEntryActivity
 import com.example.voicejournal.data.JournalEntry
 import java.time.LocalDate // New import
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.time.temporal.WeekFields // New import
 import java.util.*
 import kotlin.math.abs
@@ -47,14 +49,19 @@ import kotlin.math.abs
 // Data class for an appointment
 data class Appointment(
     val id: String,
-    val date: LocalDate, // The date of the appointment is the single source of truth
-    val startTime: LocalTime,
-    val endTime: LocalTime,
+    val startDateTime: LocalDateTime,
+    val endDateTime: LocalDateTime,
     val title: String,
     val description: String? = null,
     val color: Color = Color.Blue, // Example color
     val entry: JournalEntry? = null
-)
+) {
+    // Helper properties for accessing date and time components
+    val startDate: LocalDate get() = startDateTime.toLocalDate()
+    val startTime: LocalTime get() = startDateTime.toLocalTime()
+    val endDate: LocalDate get() = endDateTime.toLocalDate()
+    val endTime: LocalTime get() = endDateTime.toLocalTime()
+}
 
 // New data class to hold layout information for an appointment
 data class AppointmentLayoutInfo(
@@ -68,11 +75,12 @@ data class AppointmentLayoutInfo(
 // Helper function to calculate layout for overlapping appointments
 fun calculateOverlappingAppointmentLayout(
     dailyAppointments: List<Appointment>,
-    dayWidth: Dp
+    dayWidth: Dp,
+    currentDate: LocalDate
 ): List<AppointmentLayoutInfo> {
     if (dailyAppointments.isEmpty()) return emptyList()
 
-    val sortedAppointments = dailyAppointments.sortedBy { it.startTime }
+    val sortedAppointments = dailyAppointments.sortedBy { it.startDateTime }
     val layoutInfoList = mutableListOf<AppointmentLayoutInfo>()
 
     // Simplified collision detection and column assignment
@@ -84,7 +92,12 @@ fun calculateOverlappingAppointmentLayout(
             val column = columns[i]
             // Check if this appointment overlaps with any appointment already in this column
             val overlapsWithColumn = column.any { existingAppt ->
-                !(appointment.endTime.isBefore(existingAppt.startTime) || appointment.startTime.isAfter(existingAppt.endTime))
+                val existingApptStart = if (existingAppt.startDate.isBefore(currentDate)) LocalTime.MIN else existingAppt.startTime
+                val existingApptEnd = if (existingAppt.endDate.isAfter(currentDate)) LocalTime.MAX else existingAppt.endTime
+                val appointmentStart = if (appointment.startDate.isBefore(currentDate)) LocalTime.MIN else appointment.startTime
+                val appointmentEnd = if (appointment.endDate.isAfter(currentDate)) LocalTime.MAX else appointment.endTime
+
+                !(appointmentEnd.isBefore(existingApptStart) || appointmentStart.isAfter(existingApptEnd))
             }
             if (!overlapsWithColumn) {
                 // Place in this column
@@ -169,13 +182,13 @@ fun WeekView(
     val density = LocalDensity.current
 
     val slotHeight = hourHeight + 1.dp // Total height of an hour slot (content + divider)
-    
+
     LaunchedEffect(daysToDisplay) {
         val slotHeightPx = with(density) { slotHeight.toPx() }
         val scrollToPosition = (slotHeightPx * 8).toInt() // Scroll to 8 AM
         scrollState.scrollTo(scrollToPosition)
     }
-    
+
     var totalDrag by remember { mutableFloatStateOf(0f) }
 
     val totalDayHeight = slotHeight * 24 // Total height for a full 24-hour day
@@ -281,17 +294,23 @@ fun WeekView(
                         ) {
                             val dayWidth = this.maxWidth // Get the width of the current day slot
 
-                            // Filter appointments for the current date ONLY
-                            val dailyAppointments = appointments.filter { it.date == dateInWeek }
+                            // Filter appointments for the current date
+                            val dailyAppointments = appointments.filter {
+                                !it.startDateTime.toLocalDate().isAfter(dateInWeek) && !it.endDateTime.toLocalDate().isBefore(dateInWeek)
+                            }
+
                             val appointmentLayoutInfos = remember(dailyAppointments, dayWidth) { // Re-calculate when appointments or dayWidth changes
-                                calculateOverlappingAppointmentLayout(dailyAppointments, dayWidth)
+                                calculateOverlappingAppointmentLayout(dailyAppointments, dayWidth, dateInWeek)
                             }
 
                             appointmentLayoutInfos.forEach { layoutInfo ->
                                 val appointment = layoutInfo.appointment
 
-                                val startMinuteOfDay = appointment.startTime.toSecondOfDay() / 60.0
-                                val endMinuteOfDay = appointment.endTime.toSecondOfDay() / 60.0
+                                val effectiveStartTime = if (appointment.startDate.isBefore(dateInWeek)) LocalTime.MIN else appointment.startTime
+                                val effectiveEndTime = if (appointment.endDate.isAfter(dateInWeek)) LocalTime.MAX else appointment.endTime
+
+                                val startMinuteOfDay = effectiveStartTime.toSecondOfDay() / 60.0
+                                val endMinuteOfDay = effectiveEndTime.toSecondOfDay() / 60.0 + if (effectiveEndTime == LocalTime.MAX) 1 else 0 // Add a minute to fill the day
                                 val durationMinutes = endMinuteOfDay - startMinuteOfDay
 
                                 val topOffset = (startMinuteOfDay / 60.0 * slotHeight.value).dp
@@ -351,51 +370,46 @@ fun WeekViewWithAppointmentsPreview() {
     val sampleAppointments = listOf(
         Appointment(
             id = "1",
-            date = mondayDate,
-            startTime = LocalTime.of(9, 30),
-            endTime = LocalTime.of(10, 30),
+            startDateTime = mondayDate.atTime(9, 30),
+            endDateTime = mondayDate.atTime(10, 30),
             title = "Meeting with John",
             description = "Project discussion",
             color = Color(0xFFE57373) // Light Red
         ),
         Appointment(
             id = "2",
-            date = tuesdayDate,
-            startTime = LocalTime.of(14, 0),
-            endTime = LocalTime.of(15, 0),
+            startDateTime = tuesdayDate.atTime(14, 0),
+            endDateTime = tuesdayDate.atTime(15, 0),
             title = "Team Standup",
             color = Color(0xFF81C784) // Light Green
         ),
         Appointment(
             id = "3",
-            date = wednesdayDate,
-            startTime = LocalTime.of(11, 0),
-            endTime = LocalTime.of(12, 30),
+            startDateTime = wednesdayDate.atTime(11, 0),
+            endDateTime = wednesdayDate.atTime(12, 30),
             title = "Client Call",
             description = "Review new features",
             color = Color(0xFF64B5F6) // Light Blue
         ),
         Appointment(
             id = "4",
-            date = mondayDate.plusDays(3),
-            startTime = LocalTime.of(11, 0),
-            endTime = LocalTime.of(11, 45),
+            startDateTime = thursdayDate.atTime(11, 0),
+            endDateTime = thursdayDate.atTime(11, 45),
             title = "Quick Sync",
             color = Color(0xFFFFF176) // Light Yellow
         ),
         Appointment(
             id = "5",
-            date = thursdayDate,
-            startTime = LocalTime.of(16, 0),
-            endTime = LocalTime.of(17, 0),
+            startDateTime = thursdayDate.atTime(16, 0),
+            endDateTime = thursdayDate.atTime(17, 0),
             title = "Gym Session",
             color = Color(0xFFFFB74D) // Light Orange
         ),
+        // Multi-day appointment
         Appointment(
             id = "6",
-            date = fridayDate,
-            startTime = LocalTime.of(9, 0),
-            endTime = LocalTime.of(17, 0),
+            startDateTime = fridayDate.atTime(10, 0),
+            endDateTime = saturdayDate.atTime(16, 0),
             title = "All Day Workshop",
             color = Color(0xFFBA68C8) // Light Purple
         )

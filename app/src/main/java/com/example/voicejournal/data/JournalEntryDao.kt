@@ -41,7 +41,20 @@ interface JournalEntryDao {
     suspend fun getEntryById(entryId: UUID): EntryWithCategories?
     
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE start_datetime >= :startTime AND start_datetime < :endTime AND stop_datetime IS NOT NULL ORDER BY start_datetime ASC")
+    @Query("""
+        SELECT * FROM journal_entries 
+        WHERE
+            stop_datetime IS NOT NULL AND
+            (
+                -- Entries that start within the window
+                (start_datetime >= :startTime AND start_datetime < :endTime) OR
+                -- Entries that end within the window
+                (stop_datetime > :startTime AND stop_datetime <= :endTime) OR
+                -- Entries that span the entire window
+                (start_datetime < :startTime AND stop_datetime > :endTime)
+            )
+        ORDER BY start_datetime ASC
+    """)
     fun getEntriesForCalendar(startTime: Long, endTime: Long): Flow<List<EntryWithCategories>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

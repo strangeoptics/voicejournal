@@ -35,9 +35,8 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
 
             Appointment(
                 id = entry.id.toString(),
-                date = startDateTime.toLocalDate(),
-                startTime = startDateTime.toLocalTime(),
-                endTime = endDateTime?.toLocalTime() ?: startDateTime.toLocalTime().plusHours(1),
+                startDateTime = startDateTime,
+                endDateTime = endDateTime ?: startDateTime.plusHours(1),
                 title = entry.content.take(12),
                 description = entry.content,
                 entry = entry,
@@ -56,10 +55,10 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
         viewModelScope.launch {
             val entry = appointment.entry
             if (entry != null) {
-                val newStartMillis = appointment.startTime.atDate(appointment.date)
+                val newStartMillis = appointment.startDateTime
                     .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
-                val newEndMillis = appointment.endTime.atDate(appointment.date)
+                val newEndMillis = appointment.endDateTime
                     .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
                 val updatedEntry = entry.copy(

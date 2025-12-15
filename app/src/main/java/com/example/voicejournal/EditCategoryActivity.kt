@@ -50,9 +50,9 @@ class EditCategoryActivity : ComponentActivity() {
                 } else {
                     EditCategoryScreen(
                         initialCategory = category,
-                        onSave = { name, aliases, showAll ->
+                        onSave = { name, aliases, showAll, color ->
                             val orderIndex = category?.orderIndex ?: (highestOrderIndex + 1)
-                            viewModel.saveCategory(name, aliases, showAll, orderIndex)
+                            viewModel.saveCategory(name, aliases, showAll, orderIndex, color)
                             finish()
                         },
                         onNavigateUp = { finish() }
@@ -79,12 +79,14 @@ class EditCategoryActivity : ComponentActivity() {
 @Composable
 fun EditCategoryScreen(
     initialCategory: Category?,
-    onSave: (String, String, Boolean) -> Unit,
+    onSave: (String, String, Boolean, String) -> Unit,
     onNavigateUp: () -> Unit
 ) {
     var name by remember { mutableStateOf(initialCategory?.category ?: "") }
     var aliases by remember { mutableStateOf(initialCategory?.aliases ?: "") }
     var showAll by remember { mutableStateOf(initialCategory?.showAll ?: false) }
+    var color by remember { mutableStateOf(initialCategory?.color ?: "#FFFFFF") }
+
 
     Scaffold(
         topBar = {
@@ -100,7 +102,7 @@ fun EditCategoryScreen(
         floatingActionButton = {
             FloatingActionButton(onClick = {
                 if (name.isNotBlank()) {
-                    onSave(name, aliases, showAll)
+                    onSave(name, aliases, showAll, color)
                 }
             }) {
                 Icon(Icons.Default.Done, contentDescription = "Save Category")
@@ -128,6 +130,13 @@ fun EditCategoryScreen(
                 value = aliases,
                 onValueChange = { aliases = it },
                 label = { Text("Aliases (comma-separated)") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = color,
+                onValueChange = { color = it },
+                label = { Text("Color (Hex)") },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(16.dp))

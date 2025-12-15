@@ -27,16 +27,21 @@ class EditCategoryViewModel(
         }
     }
 
-    fun saveCategory(name: String, aliases: String, showAll: Boolean, orderIndex: Int) {
+    fun saveCategory(name: String, aliases: String, showAll: Boolean, orderIndex: Int, color: String) {
         viewModelScope.launch {
             val categoryToSave = Category(
                 id = categoryId.takeIf { it != -1 } ?: 0,
                 category = name,
                 aliases = aliases,
                 showAll = showAll,
-                orderIndex = orderIndex
+                orderIndex = orderIndex,
+                color = color
             )
-            repository.insertCategory(categoryToSave)
+            if (categoryId != -1) {
+                repository.updateCategory(categoryToSave)
+            } else {
+                repository.insertCategory(categoryToSave)
+            }
         }
     }
      fun getHighestOrderIndex(): Int {

@@ -8,7 +8,7 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [JournalEntry::class, Category::class, GpsTrackPoint::class, JournalEntryCategoryCrossRef::class], version = 12, exportSchema = false)
+@Database(entities = [JournalEntry::class, Category::class, GpsTrackPoint::class, JournalEntryCategoryCrossRef::class], version = 13, exportSchema = false)
 @TypeConverters(UuidConverter::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun journalEntryDao(): JournalEntryDao
@@ -71,7 +71,12 @@ abstract class AppDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE `journal_entries` ADD COLUMN `stop_datetime` INTEGER")
             }
         }
-
+        
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `categories` ADD COLUMN `color` TEXT NOT NULL DEFAULT '#FFFFFF'")
+            }
+        }
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -80,8 +85,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "journal_database"
                 )
-                    .addMigrations(MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11) // Be sure to add all migrations here
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_12_13) // Neue Migration hinzufügen
                     .build()
                 INSTANCE = instance
                 instance

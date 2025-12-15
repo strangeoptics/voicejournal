@@ -13,6 +13,9 @@ interface CategoryDao {
     suspend fun insertCategory(category: Category): Long
 
     @Update
+    suspend fun updateCategory(category: Category)
+
+    @Update
     suspend fun updateCategories(categories: List<Category>)
 
     @Query("SELECT * FROM categories ORDER BY orderIndex ASC")

@@ -134,6 +134,8 @@ class JournalRepository(
 
     suspend fun insertCategory(category: Category) = categoryDao.insertCategory(category)
 
+    suspend fun updateCategory(category: Category) = categoryDao.updateCategory(category)
+
     suspend fun updateCategories(categories: List<Category>) = categoryDao.updateCategories(categories)
 
     suspend fun insert(entry: JournalEntry, categories: List<Category>) = entryDao.insertWithCategories(entry, categories, categoryDao)

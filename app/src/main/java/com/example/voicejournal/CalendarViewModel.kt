@@ -1,6 +1,7 @@
 package com.example.voicejournal
 
 import android.content.Context
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -32,6 +33,16 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
             val endDateTime = entry.stop_datetime?.let {
                 LocalDateTime.ofInstant(Instant.ofEpochMilli(it), ZoneId.systemDefault())
             }
+            val appointmentColor = entryWithCategories.categories
+                .filter { it.color.isNotBlank() }
+                .minByOrNull { it.orderIndex }
+                ?.let {
+                    try {
+                        Color(android.graphics.Color.parseColor(it.color))
+                    } catch (e: IllegalArgumentException) {
+                        Color.Gray // Fallback for invalid color string
+                    }
+                } ?: Color.Blue // Default color if no categories or no valid color
 
             Appointment(
                 id = entry.id.toString(),
@@ -40,8 +51,7 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
                 title = entry.content.take(12),
                 description = entry.content,
                 entry = entry,
-                // You can add logic here to assign colors based on categories, for example
-                // color = getColorForCategories(entryWithCategories.categories)
+                color = appointmentColor
             )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

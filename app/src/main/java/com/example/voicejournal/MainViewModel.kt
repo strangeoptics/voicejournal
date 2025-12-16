@@ -15,6 +15,7 @@ import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
 import com.example.voicejournal.di.Injector
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -108,6 +110,8 @@ class MainViewModel(
     private val _showCategoryTags = MutableStateFlow(sharedPreferences.getBoolean(KEY_SHOW_CATEGORY_TAGS, true))
     val showCategoryTags: StateFlow<Boolean> = _showCategoryTags.asStateFlow()
 
+    private val _refreshTrigger = MutableSharedFlow<Unit>(replay = 1)
+
 
     private val _recentlyDeleted = MutableStateFlow<List<EntryWithCategories>>(emptyList())
     val canUndo: StateFlow<Boolean> = _recentlyDeleted.map { it.isNotEmpty() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
@@ -176,6 +180,9 @@ class MainViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            _refreshTrigger.emit(Unit) // Emit initial value to trigger loading
+        }
     }
 
     override fun onCleared() {
@@ -196,7 +203,12 @@ class MainViewModel(
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val entries: StateFlow<List<EntryWithCategories>> =
-        combine(_currentlyLoadedDays, selectedCategory, categoriesFlow) { days, selectedCat, categories ->
+        combine(
+            _currentlyLoadedDays,
+            selectedCategory,
+            categoriesFlow,
+            _refreshTrigger
+        ) { days, selectedCat, categories, _ ->
             Triple(days, selectedCat, categories)
         }.flatMapLatest { (days, selectedCat, categories) ->
             val category = categories.find { it.category == selectedCat }
@@ -206,24 +218,67 @@ class MainViewModel(
                 val today = LocalDate.now()
                 var startDateMillis: Long
                 var endDateMillis: Long
+                val daysWithBuffer = days + 30
+
 
                 if (category != null) {
-                    val latestEntryMillis = repository.getLatestEntryDatetimeForCategory(category.id)
+                    val latestEntryMillis =
+                        repository.getLatestEntryDatetimeForCategory(category.id)
                     if (latestEntryMillis != null) {
-                        val latestEntryLocalDate = Instant.ofEpochMilli(latestEntryMillis).atZone(ZoneId.systemDefault()).toLocalDate()
-                        endDateMillis = latestEntryLocalDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() // Include the day of the latest entry
-                        startDateMillis = latestEntryLocalDate.minusDays(days.toLong()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        val latestEntryLocalDate =
+                            Instant.ofEpochMilli(latestEntryMillis).atZone(ZoneId.systemDefault())
+                                .toLocalDate()
+                        endDateMillis = latestEntryLocalDate.plusDays(1)
+                            .atStartOfDay(ZoneId.systemDefault()).toInstant()
+                            .toEpochMilli() // Include the day of the latest entry
+                        startDateMillis = latestEntryLocalDate.minusDays(daysWithBuffer.toLong())
+                            .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
                     } else {
                         // No entries for the selected category, fall back to default behavior (days ago from now)
-                        startDateMillis = today.minusDays(days.toLong()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                        endDateMillis = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() // Include today
+                        startDateMillis = today.minusDays(daysWithBuffer.toLong())
+                            .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        endDateMillis = today.plusDays(1).atStartOfDay(ZoneId.systemDefault())
+                            .toInstant().toEpochMilli() // Include today
                     }
-                    repository.getEntriesWithCategoriesInDateRangeForCategory(category.id, startDateMillis, endDateMillis)
+                    repository.getEntriesWithCategoriesInDateRangeForCategory(
+                        category.id,
+                        startDateMillis,
+                        endDateMillis
+                    ).map { entries ->
+                        if (entries.isEmpty()) {
+                            entries
+                        } else {
+                            val groupedByDate = entries.groupBy {
+                                Instant.ofEpochMilli(it.entry.start_datetime).atZone(ZoneId.systemDefault()).toLocalDate()
+                            }
+                            val recentDaysWithEntries = groupedByDate.keys.sortedDescending().take(days)
+                            entries.filter {
+                                val entryDate = Instant.ofEpochMilli(it.entry.start_datetime).atZone(ZoneId.systemDefault()).toLocalDate()
+                                entryDate in recentDaysWithEntries
+                            }
+                        }
+                    }
                 } else {
                     // No category selected, fall back to default behavior (days ago from now)
-                    startDateMillis = today.minusDays(days.toLong()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                    endDateMillis = today.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli() // Include today
+                    startDateMillis = today.minusDays(daysWithBuffer.toLong())
+                        .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    endDateMillis = today.plusDays(1).atStartOfDay(ZoneId.systemDefault())
+                        .toInstant().toEpochMilli() // Include today
                     repository.getEntriesWithCategoriesInDateRange(startDateMillis, endDateMillis)
+                        .map { entries ->
+                            if (entries.isEmpty()) {
+                                entries
+                            } else {
+                                val groupedByDate = entries.groupBy {
+                                    Instant.ofEpochMilli(it.entry.start_datetime).atZone(ZoneId.systemDefault()).toLocalDate()
+                                }
+                                val recentDaysWithEntries = groupedByDate.keys.sortedDescending().take(days)
+                                entries.filter {
+                                    val entryDate = Instant.ofEpochMilli(it.entry.start_datetime).atZone(ZoneId.systemDefault()).toLocalDate()
+                                    entryDate in recentDaysWithEntries
+                                }
+                            }
+                        }
                 }
             }
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -285,6 +340,7 @@ class MainViewModel(
                 }
                 repository.update(updatedEntry, categories)
                 _editingEntry.value = null
+                _refreshTrigger.emit(Unit)
             }
         }
     }
@@ -298,6 +354,7 @@ class MainViewModel(
             }
             _recentlyDeleted.value = currentDeleted
             repository.delete(entry.entry)
+            _refreshTrigger.emit(Unit)
         }
     }
 
@@ -307,6 +364,7 @@ class MainViewModel(
             if (lastDeleted != null) {
                 repository.insert(lastDeleted.entry, lastDeleted.categories)
                 _recentlyDeleted.value = _recentlyDeleted.value.dropLast(1)
+                _refreshTrigger.emit(Unit)
             }
         }
     }
@@ -472,6 +530,7 @@ class MainViewModel(
                 )
                 repository.update(updatedEntry, entryToUpdate.categories)
                 _selectedEntry.value = null // Deselect after update
+                _refreshTrigger.emit(Unit)
             } else {
                 val currentCategoryKeywords = categoryKeywordsMap.value
                 val foundKeyword = currentCategoryKeywords.keys.find { keyword ->
@@ -501,6 +560,7 @@ class MainViewModel(
                         start_datetime = start_datetime
                     )
                     repository.insert(entry, listOf(targetCategory))
+                    _refreshTrigger.emit(Unit)
                 }
             }
         }

@@ -1,5 +1,6 @@
 package com.example.voicejournal.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -34,7 +34,6 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,12 +41,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.voicejournal.data.Category
+import androidx.paging.compose.LazyPagingItems
 import com.example.voicejournal.data.EntryWithCategories
-import com.example.voicejournal.data.JournalEntry
-import com.example.voicejournal.ui.theme.VoicejournalTheme
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -60,7 +56,7 @@ import java.util.UUID
 @Composable
 fun HomeScreen(
     modifier: Modifier = Modifier,
-    groupedEntries: Map<LocalDate, List<EntryWithCategories>> = emptyMap(),
+    pagedEntries: LazyPagingItems<EntryWithCategories>,
     categories: List<String> = emptyList(),
     selectedCategory: String = "",
     truncationLength: Int,
@@ -72,7 +68,6 @@ fun HomeScreen(
     onDateSelected: (LocalDate) -> Unit = {},
     onEntrySelected: (EntryWithCategories) -> Unit = {},
     onEditEntry: (EntryWithCategories) -> Unit = {},
-    onLoadMore: () -> Unit = {},
     onDateLongClicked: (LocalDate) -> Unit = {},
     onPhotoIconClicked: (EntryWithCategories) -> Unit = {}
 ) {
@@ -83,6 +78,10 @@ fun HomeScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         var expanded by remember { mutableStateOf(false) }
+
+        LaunchedEffect(pagedEntries.itemCount) {
+            Log.d("Paging", "List updated. New total item count: ${pagedEntries.itemCount}")
+        }
 
         ExposedDropdownMenuBox(
             expanded = expanded,
@@ -115,27 +114,6 @@ fun HomeScreen(
         }
 
         val lazyListState = rememberLazyListState()
-        val buffer = 5
-        val endOfListReached by remember {
-            derivedStateOf {
-                val lastVisibleItem = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()
-                val totalItems = lazyListState.layoutInfo.totalItemsCount
-                val isCategoryShowAll = categories.find { it == selectedCategory }?.let { category ->
-                    // This is a placeholder. You need to get the actual Category object.
-                    // For now, let's assume if it's not "journal", "todo", etc., it might be a `showAll` category.
-                    // A better approach is to pass the whole Category object to HomeScreen.
-                    false // Assuming default behavior is not showAll
-                } ?: false
-
-                !isCategoryShowAll && totalItems > 0 && lastVisibleItem != null && lastVisibleItem.index >= totalItems - 1 - buffer
-            }
-        }
-
-        LaunchedEffect(endOfListReached) {
-            if (endOfListReached) {
-                onLoadMore()
-            }
-        }
 
         LazyColumn(
             state = lazyListState,
@@ -143,26 +121,41 @@ fun HomeScreen(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            groupedEntries.forEach { (date, entries) ->
-                stickyHeader {
-                    val isDateSelected = selectedDate == date
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .combinedClickable(
-                                onClick = { onDateSelected(date) },
-                                onLongClick = { onDateLongClicked(date) }
-                            ),
-                        color = if (isDateSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                    ) {
-                        Text(
-                            text = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd, EE", Locale.GERMAN)),
-                            modifier = Modifier.padding(8.dp)
-                        )
-                    }
-                }
+            items(
+                count = pagedEntries.itemCount,
+                key = { index -> pagedEntries.peek(index)?.entry?.id ?: UUID.randomUUID() }
+            ) { index ->
+                val entryWithCategories = pagedEntries[index]
+                if (entryWithCategories != null) {
 
-                items(entries, key = { it.entry.id }) { entryWithCategories ->
+                    val currentDate = Instant.ofEpochMilli(entryWithCategories.entry.start_datetime).atZone(ZoneId.systemDefault()).toLocalDate()
+                    val prevDate = if (index > 0) {
+                        pagedEntries.peek(index - 1)?.let {
+                            Instant.ofEpochMilli(it.entry.start_datetime).atZone(ZoneId.systemDefault()).toLocalDate()
+                        }
+                    } else {
+                        null
+                    }
+
+                    if (index == 0 || (prevDate != null && currentDate != prevDate)) {
+                        val isDateSelected = selectedDate == currentDate
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .combinedClickable(
+                                    onClick = { onDateSelected(currentDate) },
+                                    onLongClick = { onDateLongClicked(currentDate) }
+                                ),
+                            color = if (isDateSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+                        ) {
+                            Text(
+                                text = currentDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd, EE", Locale.GERMAN)),
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                    }
+
+
                     val isSelected = selectedEntry == entryWithCategories
                     val isExpanded = entryWithCategories.entry.id in expandedIds
                     val dismissState = rememberSwipeToDismissBoxState(
@@ -313,47 +306,5 @@ fun HomeScreen(
                 }
             }
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
-@Preview(showBackground = true)
-@Composable
-fun HomeScreenPreview() {
-    VoicejournalTheme {
-        val sampleCategoriesData = remember {
-            listOf(
-                Category(category = "journal", aliases = "journal,tagebuch"),
-                Category(category = "todo", aliases = "todo,to-do")
-            )
-        }
-        val sampleCategories = remember(sampleCategoriesData) {
-            sampleCategoriesData.map { it.category }
-        }
-        var selectedCategory by remember { mutableStateOf(sampleCategories.first()) }
-        val entries = remember {
-            listOf(
-                EntryWithCategories(
-                    entry = JournalEntry(content = "This is a preview entry.".repeat(20), start_datetime = System.currentTimeMillis()),
-                    categories = listOf(Category(1, "journal", aliases = "journal"), Category(2, "todo", aliases = "todo"))
-                ),
-                EntryWithCategories(
-                    entry = JournalEntry(content = "This is a todo preview.", start_datetime = System.currentTimeMillis(), stop_datetime = System.currentTimeMillis() + 60000, hasImage = true),
-                    categories = listOf(Category(2, "todo", aliases = "todo"))
-                )
-            )
-        }
-        val groupedEntries = entries.filter { it.categories.any { c -> c.category == selectedCategory } }.groupBy {
-            Instant.ofEpochMilli(it.entry.start_datetime).atZone(ZoneId.systemDefault()).toLocalDate()
-        }
-
-        HomeScreen(
-            groupedEntries = groupedEntries,
-            categories = sampleCategories,
-            selectedCategory = selectedCategory,
-            onCategoryChange = { selectedCategory = it },
-            truncationLength = 160,
-            showCategoryTags = true
-        )
     }
 }

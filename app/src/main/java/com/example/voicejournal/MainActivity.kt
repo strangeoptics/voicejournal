@@ -17,11 +17,11 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.automirrored.filled.LabelOff
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.Label
-import androidx.compose.material.icons.filled.LabelOff
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Stop
@@ -52,6 +52,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.ui.components.AppDrawer
 import com.example.voicejournal.ui.screens.HomeScreen
@@ -109,11 +110,9 @@ class MainActivity : ComponentActivity() {
                 val context = LocalContext.current
                 val navController = rememberNavController()
                 val category by viewModel.selectedCategory.collectAsState()
-                val groupedEntries by viewModel.groupedEntries.collectAsState()
                 val selectedEntry by viewModel.selectedEntry.collectAsState()
                 val selectedDate by viewModel.selectedDate.collectAsState()
                 val isGpsTrackingEnabled by viewModel.isGpsTrackingEnabled.collectAsState()
-                val filteredEntries by viewModel.filteredEntries.collectAsState()
                 val canUndo by viewModel.canUndo.collectAsState()
                 val categories by viewModel.categories.collectAsState()
                 val gpsTrackPoints by viewModel.gpsTrackPoints.collectAsState()
@@ -122,6 +121,7 @@ class MainActivity : ComponentActivity() {
                 val truncationLength by viewModel.truncationLength.collectAsState()
                 val isDeveloperModeEnabled by viewModel.isDeveloperModeEnabled.collectAsState()
                 val showCategoryTags by viewModel.showCategoryTags.collectAsState()
+                val pagedEntries = viewModel.pagedEntries.collectAsLazyPagingItems()
 
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -223,11 +223,7 @@ class MainActivity : ComponentActivity() {
                     }
                 )
 
-                val textToShow = filteredEntries.joinToString("\n") { entryWithCategories ->
-                    val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entryWithCategories.entry.start_datetime), ZoneId.systemDefault())
-                    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                    "[${date.format(formatter)}] ${entryWithCategories.entry.content}"
-                }
+                val textToShow = "" // TODO: Re-implement this with paged data if needed
                 val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission(),
                     onResult = { isGranted ->
@@ -320,7 +316,7 @@ class MainActivity : ComponentActivity() {
                                     actions = {
                                         IconButton(onClick = { viewModel.toggleShowCategoryTags() }) {
                                             Icon(
-                                                imageVector = if (showCategoryTags) Icons.Default.Label else Icons.Default.LabelOff,
+                                                imageVector = if (showCategoryTags) Icons.AutoMirrored.Filled.Label else Icons.AutoMirrored.Filled.LabelOff,
                                                 contentDescription = "Toggle Category Tags"
                                             )
                                         }
@@ -381,7 +377,7 @@ class MainActivity : ComponentActivity() {
                                 composable("home") {
                                     HomeScreen(
                                         modifier = Modifier,
-                                        groupedEntries = groupedEntries,
+                                        pagedEntries = pagedEntries,
                                         categories = categories,
                                         selectedCategory = category,
                                         onCategoryChange = viewModel::onCategoryChange,
@@ -394,7 +390,6 @@ class MainActivity : ComponentActivity() {
                                             val intent = EditEntryActivity.newIntent(context, entryToEdit.entry.id)
                                             context.startActivity(intent)
                                         },
-                                        onLoadMore = viewModel::loadMoreEntries,
                                         onDateLongClicked = { date ->
                                             openGooglePhotos(date)
                                         },

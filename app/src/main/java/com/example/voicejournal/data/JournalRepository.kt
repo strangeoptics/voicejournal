@@ -2,6 +2,9 @@ package com.example.voicejournal.data
 
 import android.content.Context
 import android.net.Uri
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -25,6 +28,23 @@ class JournalRepository(
 ) {
 
     val allCategories = categoryDao.getAllCategories()
+
+    fun getEntriesPager(categoryId: Int?): Flow<PagingData<EntryWithCategories>> {
+        return Pager(
+            config = PagingConfig(
+                pageSize = 20,
+                enablePlaceholders = false,
+                initialLoadSize = 20
+            ),
+            pagingSourceFactory = {
+                if (categoryId != null && categoryId != -1) {
+                    entryDao.getEntriesPagingSourceForCategory(categoryId)
+                } else {
+                    entryDao.getEntriesPagingSource()
+                }
+            }
+        ).flow
+    }
 
     fun getAllEntriesWithCategories(): Flow<List<EntryWithCategories>> = entryDao.getEntriesWithCategories()
     

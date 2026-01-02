@@ -1,5 +1,6 @@
 package com.example.voicejournal.data
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -17,6 +18,15 @@ interface JournalEntryDao {
     fun getEntriesWithCategories(): Flow<List<EntryWithCategories>>
 
     @Transaction
+    @Query("SELECT * FROM journal_entries ORDER BY start_datetime DESC")
+    fun getEntriesPagingSource(): PagingSource<Int, EntryWithCategories>
+
+    @Transaction
+    @Query("SELECT * FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC")
+    fun getEntriesPagingSourceForCategory(categoryId: Int): PagingSource<Int, EntryWithCategories>
+
+
+    @Transaction
     @Query("SELECT * FROM journal_entries")
     suspend fun getAllEntriesWithCategories(): List<EntryWithCategories>
 
@@ -31,7 +41,7 @@ interface JournalEntryDao {
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC")
     suspend fun getEntriesForCategory(categoryId: Int): List<EntryWithCategories>
-    
+
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC LIMIT :limit OFFSET :offset")
     suspend fun getPaginatedEntriesForCategory(categoryId: Int, limit: Int, offset: Int): List<EntryWithCategories>
@@ -39,7 +49,7 @@ interface JournalEntryDao {
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE id = :entryId")
     suspend fun getEntryById(entryId: UUID): EntryWithCategories?
-    
+
     @Transaction
     @Query("""
         SELECT * FROM journal_entries 

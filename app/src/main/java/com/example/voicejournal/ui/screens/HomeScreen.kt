@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
 import com.example.voicejournal.data.EntryWithCategories
+import com.example.voicejournal.ui.components.FastScroller
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -115,187 +116,190 @@ fun HomeScreen(
 
         val lazyListState = rememberLazyListState()
 
-        LazyColumn(
-            state = lazyListState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            items(
-                count = pagedEntries.itemCount,
-                key = { index -> pagedEntries.peek(index)?.entry?.id ?: UUID.randomUUID() }
-            ) { index ->
-                val entryWithCategories = pagedEntries[index]
-                if (entryWithCategories != null) {
+        Box {
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                items(
+                    count = pagedEntries.itemCount,
+                    key = { index -> pagedEntries.peek(index)?.entry?.id ?: UUID.randomUUID() }
+                ) { index ->
+                    val entryWithCategories = pagedEntries[index]
+                    if (entryWithCategories != null) {
 
-                    val currentDate = Instant.ofEpochMilli(entryWithCategories.entry.start_datetime).atZone(ZoneId.systemDefault()).toLocalDate()
-                    val prevDate = if (index > 0) {
-                        pagedEntries.peek(index - 1)?.let {
-                            Instant.ofEpochMilli(it.entry.start_datetime).atZone(ZoneId.systemDefault()).toLocalDate()
-                        }
-                    } else {
-                        null
-                    }
-
-                    if (index == 0 || (prevDate != null && currentDate != prevDate)) {
-                        val isDateSelected = selectedDate == currentDate
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .combinedClickable(
-                                    onClick = { onDateSelected(currentDate) },
-                                    onLongClick = { onDateLongClicked(currentDate) }
-                                ),
-                            color = if (isDateSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
-                        ) {
-                            Text(
-                                text = currentDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd, EE", Locale.GERMAN)),
-                                modifier = Modifier.padding(8.dp)
-                            )
-                        }
-                    }
-
-
-                    val isSelected = selectedEntry == entryWithCategories
-                    val isExpanded = entryWithCategories.entry.id in expandedIds
-                    val dismissState = rememberSwipeToDismissBoxState(
-                        confirmValueChange = { value ->
-                            if (value == SwipeToDismissBoxValue.StartToEnd) {
-                                onDeleteEntry(entryWithCategories)
-                                true
-                            } else {
-                                false
+                        val currentDate = Instant.ofEpochMilli(entryWithCategories.entry.start_datetime).atZone(
+                            ZoneId.systemDefault()).toLocalDate()
+                        val prevDate = if (index > 0) {
+                            pagedEntries.peek(index - 1)?.let {
+                                Instant.ofEpochMilli(it.entry.start_datetime).atZone(ZoneId.systemDefault()).toLocalDate()
                             }
-                        },
-                        positionalThreshold = { it * 0.75f }
-                    )
+                        } else {
+                            null
+                        }
 
-                    SwipeToDismissBox(
-                        state = dismissState,
-                        backgroundContent = {
-                            val color = when (dismissState.dismissDirection) {
-                                SwipeToDismissBoxValue.StartToEnd -> Color.Red
-                                else -> Color.Transparent
-                            }
-                            Box(
+                        if (index == 0 || (prevDate != null && currentDate != prevDate)) {
+                            val isDateSelected = selectedDate == currentDate
+                            Surface(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(color)
-                                    .padding(horizontal = 20.dp),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = "Delete",
-                                    tint = Color.White
-                                )
-                            }
-                        }
-                    ) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .combinedClickable(
-                                    onClick = {
-                                        onEntrySelected(entryWithCategories)
-                                        if (entryWithCategories.entry.content.length > truncationLength) {
-                                            expandedIds = if (isExpanded) {
-                                                expandedIds - entryWithCategories.entry.id
-                                            } else {
-                                                expandedIds + entryWithCategories.entry.id
-                                            }
-                                        }
-                                    },
-                                    onLongClick = { onEditEntry(entryWithCategories) }
-                                ),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .padding(8.dp)
                                     .fillMaxWidth()
+                                    .combinedClickable(
+                                        onClick = { onDateSelected(currentDate) },
+                                        onLongClick = { onDateLongClicked(currentDate) }
+                                    ),
+                                color = if (isDateSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                             ) {
-                                val startDate = LocalDateTime.ofInstant(
-                                    Instant.ofEpochMilli(entryWithCategories.entry.start_datetime),
-                                    ZoneId.systemDefault()
+                                Text(
+                                    text = currentDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd, EE", Locale.GERMAN)),
+                                    modifier = Modifier.padding(8.dp)
                                 )
-                                val stopDate = entryWithCategories.entry.stop_datetime?.let {
-                                    LocalDateTime.ofInstant(
-                                        Instant.ofEpochMilli(it),
+                            }
+                        }
+
+
+                        val isSelected = selectedEntry == entryWithCategories
+                        val isExpanded = entryWithCategories.entry.id in expandedIds
+                        val dismissState = rememberSwipeToDismissBoxState(
+                            confirmValueChange = { value ->
+                                if (value == SwipeToDismissBoxValue.StartToEnd) {
+                                    onDeleteEntry(entryWithCategories)
+                                    true
+                                } else {
+                                    false
+                                }
+                            },
+                            positionalThreshold = { it * 0.75f }
+                        )
+
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            backgroundContent = {
+                                val color = when (dismissState.dismissDirection) {
+                                    SwipeToDismissBoxValue.StartToEnd -> Color.Red
+                                    else -> Color.Transparent
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(color)
+                                        .padding(horizontal = 20.dp),
+                                    contentAlignment = Alignment.CenterStart
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+                        ) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .combinedClickable(
+                                        onClick = {
+                                            onEntrySelected(entryWithCategories)
+                                            if (entryWithCategories.entry.content.length > truncationLength) {
+                                                expandedIds = if (isExpanded) {
+                                                    expandedIds - entryWithCategories.entry.id
+                                                } else {
+                                                    expandedIds + entryWithCategories.entry.id
+                                                }
+                                            }
+                                        },
+                                        onLongClick = { onEditEntry(entryWithCategories) }
+                                    ),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .padding(8.dp)
+                                        .fillMaxWidth()
+                                ) {
+                                    val startDate = LocalDateTime.ofInstant(
+                                        Instant.ofEpochMilli(entryWithCategories.entry.start_datetime),
                                         ZoneId.systemDefault()
                                     )
-                                }
-                                val formatter = DateTimeFormatter.ofPattern("HH:mm")
-                                val timeText = if (stopDate != null) {
-                                    "${startDate.format(formatter)} - ${stopDate.format(formatter)}"
-                                } else {
-                                    startDate.format(formatter)
-                                }
-                                val content = entryWithCategories.entry.content
-                                val textToShow = if (!isExpanded && content.length > truncationLength) {
-                                    "${content.take(truncationLength)}..."
-                                } else {
-                                    content
-                                }
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = textToShow,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .padding(top = 4.dp, end = 8.dp)
-                                    )
-                                    Text(
-                                        text = timeText,
-                                        style = MaterialTheme.typography.bodySmall,
-                                    )
-                                }
-                                if (showCategoryTags) {
+                                    val stopDate = entryWithCategories.entry.stop_datetime?.let {
+                                        LocalDateTime.ofInstant(
+                                            Instant.ofEpochMilli(it),
+                                            ZoneId.systemDefault()
+                                        )
+                                    }
+                                    val formatter = DateTimeFormatter.ofPattern("HH:mm")
+                                    val timeText = if (stopDate != null) {
+                                        "${startDate.format(formatter)} - ${stopDate.format(formatter)}"
+                                    } else {
+                                        startDate.format(formatter)
+                                    }
+                                    val content = entryWithCategories.entry.content
+                                    val textToShow = if (!isExpanded && content.length > truncationLength) {
+                                        "${content.take(truncationLength)}..."
+                                    } else {
+                                        content
+                                    }
                                     Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 8.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
+                                        Text(
+                                            text = textToShow,
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .padding(top = 4.dp, end = 8.dp)
+                                        )
+                                        Text(
+                                            text = timeText,
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                    }
+                                    if (showCategoryTags) {
                                         Row(
-                                            modifier = Modifier.weight(1f)
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            entryWithCategories.categories.forEach { category ->
-                                                if (category.category != selectedCategory) {
-                                                    Card(
-                                                        modifier = Modifier.padding(end = 4.dp),
-                                                        colors = CardDefaults.cardColors(
-                                                            containerColor = MaterialTheme.colorScheme.secondaryContainer
-                                                        )
-                                                    ) {
-                                                        Text(
-                                                            text = category.category,
-                                                            modifier = Modifier.padding(
-                                                                horizontal = 8.dp,
-                                                                vertical = 4.dp
-                                                            ),
-                                                            style = MaterialTheme.typography.bodySmall
-                                                        )
+                                            Row(
+                                                modifier = Modifier.weight(1f)
+                                            ) {
+                                                entryWithCategories.categories.forEach { category ->
+                                                    if (category.category != selectedCategory) {
+                                                        Card(
+                                                            modifier = Modifier.padding(end = 4.dp),
+                                                            colors = CardDefaults.cardColors(
+                                                                containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                                            )
+                                                        ) {
+                                                            Text(
+                                                                text = category.category,
+                                                                modifier = Modifier.padding(
+                                                                    horizontal = 8.dp,
+                                                                    vertical = 4.dp
+                                                                ),
+                                                                style = MaterialTheme.typography.bodySmall
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }
-                                        }
 
-                                        if (entryWithCategories.entry.hasImage) {
-                                            IconButton(
-                                                onClick = { onPhotoIconClicked(entryWithCategories) },
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.PhotoCamera,
-                                                    contentDescription = "Open Photo",
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
+                                            if (entryWithCategories.entry.hasImage) {
+                                                IconButton(
+                                                    onClick = { onPhotoIconClicked(entryWithCategories) },
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.PhotoCamera,
+                                                        contentDescription = "Open Photo",
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -305,6 +309,10 @@ fun HomeScreen(
                     }
                 }
             }
+            FastScroller(
+                listState = lazyListState,
+                modifier = Modifier.align(Alignment.CenterEnd)
+            )
         }
     }
 }

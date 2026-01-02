@@ -80,6 +80,10 @@ class SettingsActivity : ComponentActivity() {
     }
     
     private fun getDnsName(context: Context): String {
-        return Settings.Secure.getString(context.contentResolver, "bluetooth_name") ?: android.os.Build.MODEL
+        return try {
+            Settings.Secure.getString(context.contentResolver, "bluetooth_name") ?: android.os.Build.MODEL
+        } catch (e: SecurityException) {
+            android.os.Build.MODEL
+        }
     }
 }

@@ -44,7 +44,6 @@ class MainViewModel(
 
     companion object {
         const val PREFS_NAME = "voice_journal_prefs"
-        const val KEY_DAYS_TO_SHOW = "days_to_show"
         const val KEY_DEFAULT_CATEGORIES_ADDED = "default_categories_added"
         const val KEY_GPS_TRACKING_ENABLED = "gps_tracking_enabled"
         const val KEY_GPS_INTERVAL_MINUTES = "gps_interval_minutes"
@@ -70,9 +69,6 @@ class MainViewModel(
 
     private val _editingEntry = MutableStateFlow<EntryWithCategories?>(null)
     val editingEntry: StateFlow<EntryWithCategories?> = _editingEntry.asStateFlow()
-
-    private val _daysToShow = MutableStateFlow(sharedPreferences.getInt(KEY_DAYS_TO_SHOW, 3))
-    val daysToShow: StateFlow<Int> = _daysToShow.asStateFlow()
 
     private val _isGpsTrackingEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_GPS_TRACKING_ENABLED, false))
     val isGpsTrackingEnabled: StateFlow<Boolean> = _isGpsTrackingEnabled.asStateFlow()
@@ -143,10 +139,6 @@ class MainViewModel(
 
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
         when (key) {
-            KEY_DAYS_TO_SHOW -> {
-                val newDays = prefs.getInt(key, 3)
-                _daysToShow.value = newDays
-            }
             KEY_GPS_TRACKING_ENABLED -> _isGpsTrackingEnabled.value = prefs.getBoolean(key, false)
             KEY_WEBSERVER_ENABLED -> _isWebServerEnabled.value = prefs.getBoolean(key, false)
             KEY_GPS_INTERVAL_MINUTES -> _gpsInterval.value = prefs.getInt(key, 10)
@@ -287,15 +279,7 @@ class MainViewModel(
             }
         }
     }
-
-    fun loadMoreEntries() {
-       // This is no longer needed with Paging3
-    }
     
-    fun saveDaysToShow(days: Int) {
-        sharedPreferences.edit { putInt(KEY_DAYS_TO_SHOW, days) }
-    }
-
     fun saveGpsTrackingEnabled(isEnabled: Boolean) {
         sharedPreferences.edit { putBoolean(KEY_GPS_TRACKING_ENABLED, isEnabled) }
         VoiceJournalApplication.setupLocationWorker(applicationContext)

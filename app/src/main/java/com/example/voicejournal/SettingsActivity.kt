@@ -23,7 +23,6 @@ class SettingsActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             VoicejournalTheme {
-                val daysToShow by viewModel.daysToShow.collectAsState()
                 val isGpsTrackingEnabled by viewModel.isGpsTrackingEnabled.collectAsState()
                 val isWebServerEnabled by viewModel.isWebServerEnabled.collectAsState()
                 val gpsInterval by viewModel.gpsInterval.collectAsState()
@@ -39,7 +38,6 @@ class SettingsActivity : ComponentActivity() {
                 val dnsName = getDnsName(applicationContext)
 
                 SettingsScreen(
-                    currentDays = daysToShow,
                     isGpsTrackingEnabled = isGpsTrackingEnabled,
                     isWebServerEnabled = isWebServerEnabled,
                     ipAddress = ipAddress,
@@ -52,7 +50,6 @@ class SettingsActivity : ComponentActivity() {
                     silenceTimeRequired = silenceTimeRequired,
                     truncationLength = truncationLength,
                     isDeveloperModeEnabled = isDeveloperModeEnabled,
-                    onDaysChanged = viewModel::saveDaysToShow,
                     onGpsEnableChanged = viewModel::saveGpsTrackingEnabled,
                     onWebServerEnableChanged = viewModel::saveWebServerEnabled,
                     onGpsIntervalChanged = viewModel::saveGpsInterval,

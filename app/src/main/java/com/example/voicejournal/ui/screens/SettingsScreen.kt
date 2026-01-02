@@ -41,7 +41,6 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    currentDays: Int,
     isGpsTrackingEnabled: Boolean,
     isWebServerEnabled: Boolean,
     ipAddress: String,
@@ -54,7 +53,6 @@ fun SettingsScreen(
     silenceTimeRequired: Int,
     truncationLength: Int,
     isDeveloperModeEnabled: Boolean,
-    onDaysChanged: (Int) -> Unit,
     onGpsEnableChanged: (Boolean) -> Unit,
     onWebServerEnableChanged: (Boolean) -> Unit,
     onGpsIntervalChanged: (Int) -> Unit,
@@ -67,7 +65,6 @@ fun SettingsScreen(
     onDeveloperModeEnableChanged: (Boolean) -> Unit,
     onBackPressed: () -> Unit
 ) {
-    var days by remember { mutableStateOf(currentDays.toString()) }
     var apiKey by remember { mutableStateOf(currentApiKey) }
     var truncationLengthState by remember { mutableStateOf(truncationLength.toString()) }
 
@@ -89,24 +86,6 @@ fun SettingsScreen(
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Anzeigetage")
-                    TextField(
-                        value = days,
-                        onValueChange = {
-                            days = it
-                            it.toIntOrNull()?.let(onDaysChanged)
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.width(80.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,

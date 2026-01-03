@@ -116,7 +116,6 @@ fun SearchResultsList(entries: List<EntryWithCategories>) {
                     onGoToEntryClicked = {
                         val intent = Intent(context, MainActivity::class.java).apply {
                             putExtra("ENTRY_ID", it.entry.id.toString())
-                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                         }
                         context.startActivity(intent)
                     }

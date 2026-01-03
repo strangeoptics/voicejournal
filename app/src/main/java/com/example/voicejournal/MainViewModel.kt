@@ -34,6 +34,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Collections
 import java.util.Locale
+import java.util.UUID
 
 class MainViewModel(
     private val repository: JournalRepository,
@@ -153,6 +154,8 @@ class MainViewModel(
         }
     }
 
+    private val _scrollToEntryId = MutableStateFlow<UUID?>(null)
+    val scrollToEntryId: StateFlow<UUID?> = _scrollToEntryId.asStateFlow()
 
     init {
         sharedPreferences.registerOnSharedPreferenceChangeListener(prefsListener)
@@ -193,11 +196,12 @@ class MainViewModel(
     val pagedEntries: Flow<PagingData<EntryWithCategories>> =
         combine(
             selectedCategory,
-            categoriesFlow
-        ) { selectedCat, categories ->
-            categories.find { it.category == selectedCat }
-        }.flatMapLatest { category ->
-            repository.getEntriesPager(category?.id)
+            categoriesFlow,
+            _scrollToEntryId
+        ) { selectedCat, categories, entryId ->
+            Triple(categories.find { it.category == selectedCat }, entryId, selectedCat)
+        }.flatMapLatest { (category, entryId, selectedCat) ->
+            repository.getEntriesPager(category?.id, entryId)
         }.cachedIn(viewModelScope)
 
 
@@ -215,6 +219,7 @@ class MainViewModel(
 
 
     fun onCategoryChange(category: String) {
+        _scrollToEntryId.value = null
         _selectedCategory.value = category
         _selectedEntry.value = null
     }
@@ -278,6 +283,23 @@ class MainViewModel(
                 _refreshTrigger.emit(Unit)
             }
         }
+    }
+
+    fun scrollToEntry(entryId: UUID) {
+        viewModelScope.launch {
+            val entry = repository.getEntryById(entryId)
+            if (entry != null) {
+                val entryCategory = entry.categories.firstOrNull()?.category
+                if (entryCategory != null && entryCategory != _selectedCategory.value) {
+                    _selectedCategory.value = entryCategory
+                }
+                _scrollToEntryId.value = entryId
+            }
+        }
+    }
+
+    fun onScrolledToEntry() {
+        _scrollToEntryId.value = null
     }
     
     fun saveGpsTrackingEnabled(isEnabled: Boolean) {

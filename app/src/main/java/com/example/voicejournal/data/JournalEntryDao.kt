@@ -130,4 +130,10 @@ interface JournalEntryDao {
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE LOWER(content) LIKE '%' || LOWER(:query) || '%' ORDER BY start_datetime DESC")
     fun searchEntries(query: String): Flow<List<EntryWithCategories>>
+
+    @Query("SELECT COUNT(*) FROM journal_entries WHERE start_datetime > (SELECT start_datetime FROM journal_entries WHERE id = :entryId)")
+    suspend fun getPositionOfEntry(entryId: UUID): Int
+
+    @Query("SELECT COUNT(*) FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) AND start_datetime > (SELECT start_datetime FROM journal_entries WHERE id = :entryId)")
+    suspend fun getPositionOfEntryInCategory(entryId: UUID, categoryId: Int): Int
 }

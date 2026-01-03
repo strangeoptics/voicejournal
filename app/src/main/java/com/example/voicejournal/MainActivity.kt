@@ -67,6 +67,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 class MainActivity : ComponentActivity() {
@@ -123,6 +124,7 @@ class MainActivity : ComponentActivity() {
                 val isDeveloperModeEnabled by viewModel.isDeveloperModeEnabled.collectAsState()
                 val showCategoryTags by viewModel.showCategoryTags.collectAsState()
                 val pagedEntries = viewModel.pagedEntries.collectAsLazyPagingItems()
+                val scrollToEntryId by viewModel.scrollToEntryId.collectAsState()
 
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -403,7 +405,9 @@ class MainActivity : ComponentActivity() {
                                             openGooglePhotos(date)
                                         },
                                         truncationLength = truncationLength,
-                                        showCategoryTags = showCategoryTags
+                                        showCategoryTags = showCategoryTags,
+                                        scrollToEntryId = scrollToEntryId,
+                                        onScrolledToEntry = viewModel::onScrolledToEntry
                                     )
                                  }
                             }
@@ -447,10 +451,11 @@ class MainActivity : ComponentActivity() {
         if (intent.hasExtra("ENTRY_ID")) {
             val entryId = intent.getStringExtra("ENTRY_ID")
             if (entryId != null) {
-                // The actual scrolling logic will need to be implemented in the ViewModel
-                // and observed in the HomeScreen. This is just the trigger.
-                // viewModel.scrollToEntry(UUID.fromString(entryId))
-                Toast.makeText(this, "Jumping to entry (scrolling not implemented yet)", Toast.LENGTH_SHORT).show()
+                try {
+                    viewModel.scrollToEntry(UUID.fromString(entryId))
+                } catch (e: IllegalArgumentException) {
+                    // Ignore invalid UUID
+                }
             }
         }
     }

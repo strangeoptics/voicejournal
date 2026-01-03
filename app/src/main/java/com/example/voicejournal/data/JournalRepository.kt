@@ -29,13 +29,25 @@ class JournalRepository(
 
     val allCategories = categoryDao.getAllCategories()
 
-    fun getEntriesPager(categoryId: Int?): Flow<PagingData<EntryWithCategories>> {
+    suspend fun getEntriesPager(
+        categoryId: Int?,
+        initialEntryId: UUID?
+    ): Flow<PagingData<EntryWithCategories>> {
+        val initialKey = initialEntryId?.let {
+            if (categoryId != null && categoryId != -1) {
+                entryDao.getPositionOfEntryInCategory(it, categoryId)
+            } else {
+                entryDao.getPositionOfEntry(it)
+            }
+        }
+
         return Pager(
             config = PagingConfig(
                 pageSize = 20,
                 enablePlaceholders = false,
                 initialLoadSize = 20
             ),
+            initialKey = initialKey,
             pagingSourceFactory = {
                 if (categoryId != null && categoryId != -1) {
                     entryDao.getEntriesPagingSourceForCategory(categoryId)

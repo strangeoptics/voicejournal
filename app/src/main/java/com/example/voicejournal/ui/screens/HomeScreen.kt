@@ -43,6 +43,8 @@ import androidx.paging.compose.LazyPagingItems
 import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.ui.components.FastScroller
 import com.example.voicejournal.ui.components.JournalEntryItem
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -67,7 +69,9 @@ fun HomeScreen(
     onEntrySelected: (EntryWithCategories) -> Unit = {},
     onEditEntry: (EntryWithCategories) -> Unit = {},
     onDateLongClicked: (LocalDate) -> Unit = {},
-    onPhotoIconClicked: (EntryWithCategories) -> Unit = {}
+    onPhotoIconClicked: (EntryWithCategories) -> Unit = {},
+    scrollToEntryId: UUID?,
+    onScrolledToEntry: () -> Unit
 ) {
     Column(
         modifier = modifier.fillMaxSize(),
@@ -111,6 +115,18 @@ fun HomeScreen(
         }
 
         val lazyListState = rememberLazyListState()
+
+        LaunchedEffect(pagedEntries.itemCount, scrollToEntryId) {
+            if (scrollToEntryId != null && pagedEntries.itemCount > 0) {
+                val targetIndex = (0 until pagedEntries.itemCount).find { index ->
+                    pagedEntries.peek(index)?.entry?.id == scrollToEntryId
+                }
+                if (targetIndex != null) {
+                    lazyListState.scrollToItem(targetIndex)
+                    // onScrolledToEntry() // DO NOT CALL THIS HERE TO PREVENT JUMP-BACK
+                }
+            }
+        }
 
         Box {
             LazyColumn(

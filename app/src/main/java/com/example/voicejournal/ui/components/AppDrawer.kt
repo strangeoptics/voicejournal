@@ -9,6 +9,7 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.Icon
@@ -25,6 +26,7 @@ fun AppDrawer(
     onSettingsClicked: () -> Unit,
     onManageCategoriesClicked: () -> Unit,
     onCalendarClicked: () -> Unit,
+    onSearchClicked: () -> Unit,
     onImportJournalClicked: () -> Unit,
     onExportJournalClicked: () -> Unit,
     onShowNotificationClicked: () -> Unit,
@@ -33,6 +35,13 @@ fun AppDrawer(
     onDeleteAllClicked: () -> Unit
 ) {
     ModalDrawerSheet {
+        NavigationDrawerItem(
+            icon = { Icon(Icons.Filled.Search, contentDescription = "Search") },
+            label = { Text("Search") },
+            selected = false,
+            onClick = onSearchClicked,
+            modifier = Modifier.padding(12.dp)
+        )
         NavigationDrawerItem(
             icon = { Icon(Icons.Filled.Settings, contentDescription = "Einstellungen") },
             label = { Text("Settings") },

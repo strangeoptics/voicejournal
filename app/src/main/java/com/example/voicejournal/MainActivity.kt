@@ -263,6 +263,10 @@ class MainActivity : ComponentActivity() {
                                 scope.launch { drawerState.close() }
                                 context.startActivity(Intent(context, CalendarActivity::class.java))
                             },
+                            onSearchClicked = {
+                                scope.launch { drawerState.close() }
+                                context.startActivity(Intent(context, com.example.voicejournal.ui.screens.search.SearchActivity::class.java))
+                            },
                             onImportJournalClicked = {
                                 scope.launch { drawerState.close() }
                                 filePickerLauncher.launch(arrayOf("text/plain", "*/*"))

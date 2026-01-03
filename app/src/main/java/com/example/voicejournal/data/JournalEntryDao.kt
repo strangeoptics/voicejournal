@@ -126,4 +126,8 @@ interface JournalEntryDao {
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE start_datetime >= :startDateMillis AND start_datetime < :endDateMillis ORDER BY start_datetime DESC")
     fun getEntriesWithCategoriesInDateRange(startDateMillis: Long, endDateMillis: Long): Flow<List<EntryWithCategories>>
+
+    @Transaction
+    @Query("SELECT * FROM journal_entries WHERE LOWER(content) LIKE '%' || LOWER(:query) || '%' ORDER BY start_datetime DESC")
+    fun searchEntries(query: String): Flow<List<EntryWithCategories>>
 }

@@ -57,6 +57,10 @@
             android:name=".CalendarActivity"
             android:exported="false"
             android:label="Calendar" />
+        <activity
+            android:name=".ui.screens.search.SearchActivity"
+            android:exported="false"
+            android:label="Search" />
 
         <service
             android:name=".util.TranscriptionService"

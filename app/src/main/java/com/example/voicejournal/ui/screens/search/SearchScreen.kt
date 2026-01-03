@@ -1,5 +1,6 @@
 package com.example.voicejournal.ui.screens.search
 
+import android.content.Intent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,10 +23,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import com.example.voicejournal.EditEntryActivity
 import com.example.voicejournal.data.EntryWithCategories
+import com.example.voicejournal.ui.components.SearchJournalEntryItem
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -80,6 +84,7 @@ fun SearchResultsList(entries: List<EntryWithCategories>) {
         val date = Date(it.entry.start_datetime)
         SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date)
     }
+    val context = LocalContext.current
 
     LazyColumn {
         groupedEntries.forEach { (date, entriesOnDate) ->
@@ -91,14 +96,22 @@ fun SearchResultsList(entries: List<EntryWithCategories>) {
                 )
             }
             items(entriesOnDate) { entry ->
-                // This is a simplified representation. You might want to use your existing EntryItem composable
-                Column(modifier = Modifier.padding(8.dp)) {
-                    Text(text = entry.entry.content, style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        text = "Categories: ${entry.categories.joinToString { it.category }}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+                SearchJournalEntryItem(
+                    entryWithCategories = entry,
+                    isSelected = false, // No selection in search results
+                    showCategoryTags = true, // Always show tags in search
+                    truncationLength = 200, // A reasonable default
+                    onEntrySelected = {
+                        // Navigate to edit screen on click
+                        val intent = EditEntryActivity.newIntent(context, it.entry.id)
+                        context.startActivity(intent)
+                    },
+                    onEditEntry = {
+                        val intent = EditEntryActivity.newIntent(context, it.entry.id)
+                        context.startActivity(intent)
+                    },
+                    onPhotoIconClicked = {} // No action for photo icon in search
+                )
             }
         }
     }

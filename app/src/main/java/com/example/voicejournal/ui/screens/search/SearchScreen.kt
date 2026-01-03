@@ -30,8 +30,9 @@ import androidx.compose.ui.unit.dp
 import com.example.voicejournal.EditEntryActivity
 import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.ui.components.SearchJournalEntryItem
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,9 +81,10 @@ fun SearchScreen(viewModel: SearchViewModel) {
 @Composable
 fun SearchResultsList(entries: List<EntryWithCategories>) {
     val groupedEntries = entries.groupBy {
-        // Group by day
-        val date = Date(it.entry.start_datetime)
-        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date)
+        // Group by day using java.time
+        Instant.ofEpochMilli(it.entry.start_datetime)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
     }
     val context = LocalContext.current
 
@@ -90,9 +92,8 @@ fun SearchResultsList(entries: List<EntryWithCategories>) {
         groupedEntries.forEach { (date, entriesOnDate) ->
             item {
                 Text(
-                    text = date,
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    text = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd, EE", Locale.GERMAN)),
+                    modifier = Modifier.padding(8.dp)
                 )
             }
             items(entriesOnDate) { entry ->

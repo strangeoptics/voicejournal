@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.example.voicejournal.EditEntryActivity
+import com.example.voicejournal.MainActivity
 import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.ui.components.SearchJournalEntryItem
 import java.time.Instant
@@ -111,7 +112,14 @@ fun SearchResultsList(entries: List<EntryWithCategories>) {
                         val intent = EditEntryActivity.newIntent(context, it.entry.id)
                         context.startActivity(intent)
                     },
-                    onPhotoIconClicked = {} // No action for photo icon in search
+                    onPhotoIconClicked = {}, // No action for photo icon in search
+                    onGoToEntryClicked = {
+                        val intent = Intent(context, MainActivity::class.java).apply {
+                            putExtra("ENTRY_ID", it.entry.id.toString())
+                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        }
+                        context.startActivity(intent)
+                    }
                 )
             }
         }

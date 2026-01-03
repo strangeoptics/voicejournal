@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowCircleRight
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,7 +39,8 @@ fun SearchJournalEntryItem(
     truncationLength: Int,
     onEntrySelected: (EntryWithCategories) -> Unit,
     onEditEntry: (EntryWithCategories) -> Unit,
-    onPhotoIconClicked: (EntryWithCategories) -> Unit
+    onPhotoIconClicked: (EntryWithCategories) -> Unit,
+    onGoToEntryClicked: (EntryWithCategories) -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
@@ -141,6 +143,13 @@ fun SearchJournalEntryItem(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+                    IconButton(onClick = { onGoToEntryClicked(entryWithCategories) }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowCircleRight,
+                            contentDescription = "Go to entry",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }

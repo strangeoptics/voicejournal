@@ -56,6 +56,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.ui.components.AppDrawer
 import com.example.voicejournal.ui.screens.HomeScreen
+import com.example.voicejournal.ui.screens.search.SearchActivity
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.NotificationHelper
 import com.example.voicejournal.util.SpeechRecognitionManager
@@ -265,7 +266,7 @@ class MainActivity : ComponentActivity() {
                             },
                             onSearchClicked = {
                                 scope.launch { drawerState.close() }
-                                context.startActivity(Intent(context, com.example.voicejournal.ui.screens.search.SearchActivity::class.java))
+                                context.startActivity(Intent(context, SearchActivity::class.java))
                             },
                             onImportJournalClicked = {
                                 scope.launch { drawerState.close() }
@@ -442,6 +443,15 @@ class MainActivity : ComponentActivity() {
     private fun handleIntent(intent: Intent) {
         if (intent.action == NotificationHelper.NOTIFICATION_ACTION) {
             handleNotificationAction()
+        }
+        if (intent.hasExtra("ENTRY_ID")) {
+            val entryId = intent.getStringExtra("ENTRY_ID")
+            if (entryId != null) {
+                // The actual scrolling logic will need to be implemented in the ViewModel
+                // and observed in the HomeScreen. This is just the trigger.
+                // viewModel.scrollToEntry(UUID.fromString(entryId))
+                Toast.makeText(this, "Jumping to entry (scrolling not implemented yet)", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

@@ -371,7 +371,10 @@ class MainActivity : ComponentActivity() {
                                         ) {
                                             FloatingActionButton(
                                                 onClick = {
-                                                    val intent = EditEntryActivity.newIntentForNewEntry(context)
+                                                    val intent = EditEntryActivity.newIntentForNewEntry(
+                                                        context,
+                                                        viewModel.selectedCategory.value
+                                                    )
                                                     context.startActivity(intent)
                                                     isFabMenuExpanded = false
                                                 }

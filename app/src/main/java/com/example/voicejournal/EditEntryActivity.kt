@@ -39,8 +39,12 @@ class EditEntryActivity : ComponentActivity() {
         intent.getStringExtra(EXTRA_ENTRY_ID)?.let { UUID.fromString(it) }
     }
 
+    private val categoryId: String? by lazy {
+        intent.getStringExtra(EXTRA_CATEGORY_ID)
+    }
+
     private val viewModel: EditEntryViewModel by viewModels {
-        EditEntryViewModelFactory(Injector.provideJournalRepository(this), entryId)
+        EditEntryViewModelFactory(Injector.provideJournalRepository(this), entryId, categoryId)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -72,13 +76,17 @@ class EditEntryActivity : ComponentActivity() {
 
     companion object {
         private const val EXTRA_ENTRY_ID = "extra_entry_id"
+        private const val EXTRA_CATEGORY_ID = "extra_category_id"
+
         fun newIntent(context: Context, entryId: UUID): Intent {
             return Intent(context, EditEntryActivity::class.java).apply {
                 putExtra(EXTRA_ENTRY_ID, entryId.toString())
             }
         }
-        fun newIntentForNewEntry(context: Context): Intent {
-            return Intent(context, EditEntryActivity::class.java)
+        fun newIntentForNewEntry(context: Context, categoryId: String? = null): Intent {
+            return Intent(context, EditEntryActivity::class.java).apply {
+                categoryId?.let { putExtra(EXTRA_CATEGORY_ID, it) }
+            }
         }
     }
 }

@@ -17,7 +17,8 @@ import java.util.UUID
 
 class EditEntryViewModel(
     private val repository: JournalRepository,
-    private val entryId: UUID?
+    private val entryId: UUID?,
+    private val categoryId: String?
 ) : ViewModel() {
 
     private val _entry = MutableStateFlow<EntryWithCategories?>(null)
@@ -31,6 +32,11 @@ class EditEntryViewModel(
             if (entryId != null) {
                 _entry.value = repository.getEntryById(entryId)
             } else {
+                val initialCategory = if (categoryId != null) {
+                    listOf(Category(category = categoryId, aliases = ""))
+                } else {
+                    emptyList()
+                }
                 _entry.value = EntryWithCategories(
                     entry = JournalEntry(
                         id = UUID.randomUUID(),
@@ -39,7 +45,7 @@ class EditEntryViewModel(
                         stop_datetime = null,
                         hasImage = false
                     ),
-                    categories = emptyList()
+                    categories = initialCategory
                 )
             }
         }
@@ -77,12 +83,13 @@ class EditEntryViewModel(
 
 class EditEntryViewModelFactory(
     private val repository: JournalRepository,
-    private val entryId: UUID?
+    private val entryId: UUID?,
+    private val categoryId: String?
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(EditEntryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return EditEntryViewModel(repository, entryId) as T
+            return EditEntryViewModel(repository, entryId, categoryId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

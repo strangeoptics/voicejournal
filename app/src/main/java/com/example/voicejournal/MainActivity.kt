@@ -13,16 +13,24 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.LabelOff
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
@@ -44,8 +52,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
@@ -130,6 +140,7 @@ class MainActivity : ComponentActivity() {
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
                 var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
+                var isFabMenuExpanded by remember { mutableStateOf(false) }
 
 
                 if (showDeleteConfirmationDialog) {
@@ -349,30 +360,57 @@ class MainActivity : ComponentActivity() {
                                  )
                             },
                             floatingActionButton = {
-                                FloatingActionButton(onClick = {
-                                    if (isRecording) {
-                                        speechRecognitionManager.stopListening()
-                                    } else {
-                                        when {
-                                            ContextCompat.checkSelfPermission(
-                                                context,
-                                                Manifest.permission.RECORD_AUDIO
-                                            ) == PackageManager.PERMISSION_GRANTED -> {
-                                                startListening()
+                                Column(horizontalAlignment = Alignment.End) {
+                                    AnimatedVisibility(visible = isFabMenuExpanded) {
+                                        Column(
+                                            horizontalAlignment = Alignment.End,
+                                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                                        ) {
+                                            FloatingActionButton(
+                                                onClick = {
+                                                    val intent = EditEntryActivity.newIntentForNewEntry(context)
+                                                    context.startActivity(intent)
+                                                    isFabMenuExpanded = false
+                                                }
+                                            ) {
+                                                Icon(Icons.Filled.Create, contentDescription = "Create Entry Manually")
                                             }
-
-                                            else -> {
-                                                recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                            FloatingActionButton(
+                                                onClick = {
+                                                    when {
+                                                        ContextCompat.checkSelfPermission(
+                                                            context,
+                                                            Manifest.permission.RECORD_AUDIO
+                                                        ) == PackageManager.PERMISSION_GRANTED -> {
+                                                            startListening()
+                                                        }
+                                                        else -> {
+                                                            recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                                        }
+                                                    }
+                                                    isFabMenuExpanded = false
+                                                }
+                                            ) {
+                                                Icon(Icons.Filled.Mic, contentDescription = "Sprechen")
                                             }
                                         }
                                     }
-                                }) {
-                                    if (isRecording) {
-                                        Icon(Icons.Filled.Stop, contentDescription = "Stop recording")
-                                    } else {
-                                        Icon(Icons.Filled.Add, contentDescription = "Sprechen")
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    FloatingActionButton(onClick = {
+                                        if (isRecording) {
+                                            speechRecognitionManager.stopListening()
+                                        } else {
+                                            isFabMenuExpanded = !isFabMenuExpanded
+                                        }
+                                    }) {
+                                        if (isRecording) {
+                                            Icon(Icons.Filled.Stop, contentDescription = "Stop recording")
+                                        } else if (isFabMenuExpanded) {
+                                            Icon(Icons.Filled.Close, contentDescription = "Close Menu")
+                                        } else {
+                                            Icon(Icons.Filled.Add, contentDescription = "Add Entry")
+                                        }
                                     }
-
                                 }
                             }
                         ) { innerPadding ->

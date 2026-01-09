@@ -35,10 +35,8 @@ import java.util.UUID
 
 class EditEntryActivity : ComponentActivity() {
 
-    private val entryId by lazy {
-        val idString = intent.getStringExtra(EXTRA_ENTRY_ID)
-        requireNotNull(idString) { "Entry ID must be provided" }
-        UUID.fromString(idString)
+    private val entryId: UUID? by lazy {
+        intent.getStringExtra(EXTRA_ENTRY_ID)?.let { UUID.fromString(it) }
     }
 
     private val viewModel: EditEntryViewModel by viewModels {
@@ -55,6 +53,7 @@ class EditEntryActivity : ComponentActivity() {
                 entry?.let {
                     EditEntryScreen(
                         entry = it,
+                        isNewEntry = entryId == null,
                         allCategories = allCategories,
                         onSave = { updatedCategories, content, start_datetime, stop_datetime, hasImage ->
                             viewModel.saveEntry(updatedCategories, content, start_datetime, stop_datetime, hasImage)
@@ -78,6 +77,9 @@ class EditEntryActivity : ComponentActivity() {
                 putExtra(EXTRA_ENTRY_ID, entryId.toString())
             }
         }
+        fun newIntentForNewEntry(context: Context): Intent {
+            return Intent(context, EditEntryActivity::class.java)
+        }
     }
 }
 
@@ -85,6 +87,7 @@ class EditEntryActivity : ComponentActivity() {
 @Composable
 fun EditEntryScreen(
     entry: EntryWithCategories,
+    isNewEntry: Boolean,
     allCategories: List<Category>,
     onSave: (List<String>, String, Long, Long?, Boolean) -> Unit,
     onNavigateUp: () -> Unit
@@ -219,7 +222,7 @@ fun EditEntryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Edit Entry") },
+                title = { Text(if (isNewEntry) "New Entry" else "Edit Entry") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateUp) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")

@@ -15,12 +15,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.filled.LabelOff
@@ -396,19 +399,43 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                     Spacer(modifier = Modifier.height(16.dp))
-                                    FloatingActionButton(onClick = {
-                                        if (isRecording) {
-                                            speechRecognitionManager.stopListening()
-                                        } else {
-                                            isFabMenuExpanded = !isFabMenuExpanded
-                                        }
-                                    }) {
-                                        if (isRecording) {
-                                            Icon(Icons.Filled.Stop, contentDescription = "Stop recording")
-                                        } else if (isFabMenuExpanded) {
-                                            Icon(Icons.Filled.Close, contentDescription = "Close Menu")
-                                        } else {
-                                            Icon(Icons.Filled.Add, contentDescription = "Add Entry")
+                                    FloatingActionButton(
+                                        onClick = {}
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(56.dp)
+                                                .combinedClickable(
+                                                    onClick = {
+                                                        if (isRecording) {
+                                                            speechRecognitionManager.stopListening()
+                                                        } else {
+                                                            isFabMenuExpanded = !isFabMenuExpanded
+                                                        }
+                                                    },
+                                                    onLongClick = {
+                                                        when {
+                                                            ContextCompat.checkSelfPermission(
+                                                                context,
+                                                                Manifest.permission.RECORD_AUDIO
+                                                            ) == PackageManager.PERMISSION_GRANTED -> {
+                                                                startListening()
+                                                            }
+                                                            else -> {
+                                                                recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                                            }
+                                                        }
+                                                    }
+                                                ),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (isRecording) {
+                                                Icon(Icons.Filled.Stop, contentDescription = "Stop recording")
+                                            } else if (isFabMenuExpanded) {
+                                                Icon(Icons.Filled.Close, contentDescription = "Close Menu")
+                                            } else {
+                                                Icon(Icons.Filled.Add, contentDescription = "Add Entry")
+                                            }
                                         }
                                     }
                                 }

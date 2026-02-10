@@ -82,7 +82,8 @@ class JournalRepository(
                                     content = entryExport.content,
                                     start_datetime = entryExport.start_datetime,
                                     stop_datetime = entryExport.stop_datetime,
-                                    hasImage = entryExport.hasImage
+                                    hasImage = entryExport.hasImage,
+                                    checked = entryExport.checked
                                 )
                                 val categories = entryExport.categories.map { categoryName ->
                                     Category(category = categoryName, aliases = "")
@@ -147,6 +148,7 @@ class JournalRepository(
                 start_datetime = it.entry.start_datetime,
                 stop_datetime = it.entry.stop_datetime,
                 hasImage = it.entry.hasImage,
+                checked = it.entry.checked,
                 categories = it.categories.map { c -> c.category }
             )
         }
@@ -175,6 +177,8 @@ class JournalRepository(
     suspend fun update(entry: JournalEntry, categories: List<Category>) = entryDao.updateWithCategories(entry, categories, categoryDao)
     
     suspend fun updateJournalEntry(entry: JournalEntry) = entryDao.update(entry)
+    
+    suspend fun updateEntryChecked(entryId: UUID, checked: Boolean) = entryDao.updateChecked(entryId, checked)
 
     suspend fun delete(entry: JournalEntry) = entryDao.delete(entry)
 

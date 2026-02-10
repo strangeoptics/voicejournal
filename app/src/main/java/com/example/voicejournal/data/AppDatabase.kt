@@ -8,7 +8,7 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [JournalEntry::class, Category::class, GpsTrackPoint::class, JournalEntryCategoryCrossRef::class], version = 13, exportSchema = false)
+@Database(entities = [JournalEntry::class, Category::class, GpsTrackPoint::class, JournalEntryCategoryCrossRef::class], version = 14, exportSchema = false)
 @TypeConverters(UuidConverter::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun journalEntryDao(): JournalEntryDao
@@ -78,6 +78,13 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `categories` ADD COLUMN `checkable` INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE `journal_entries` ADD COLUMN `checked` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -85,7 +92,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "journal_database"
                 )
-                    .addMigrations(MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_12_13) // Neue Migration hinzufügen
+                    .addMigrations(MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_12_13, MIGRATION_13_14)
                     .build()
                 INSTANCE = instance
                 instance

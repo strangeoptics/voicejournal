@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,9 +39,12 @@ fun JournalEntryItem(
     truncationLength: Int,
     onEntrySelected: (EntryWithCategories) -> Unit,
     onEditEntry: (EntryWithCategories) -> Unit,
-    onPhotoIconClicked: (EntryWithCategories) -> Unit
+    onPhotoIconClicked: (EntryWithCategories) -> Unit,
+    onCheckedChange: (Boolean) -> Unit
 ) {
     var isExpanded by remember { mutableStateOf(false) }
+
+    val isCheckable = entryWithCategories.categories.any { it.checkable }
 
     Card(
         modifier = Modifier
@@ -88,18 +92,33 @@ fun JournalEntryItem(
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = textToShow,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(top = 4.dp, end = 8.dp)
-                )
-                Text(
-                    text = timeText,
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                if (isCheckable) {
+                    Checkbox(
+                        checked = entryWithCategories.entry.checked,
+                        onCheckedChange = onCheckedChange,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = textToShow,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(top = 4.dp, end = 8.dp)
+                        )
+                        Text(
+                            text = timeText,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
             }
             if (showCategoryTags) {
                 Row(

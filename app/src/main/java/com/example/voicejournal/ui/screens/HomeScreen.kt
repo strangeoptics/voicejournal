@@ -71,7 +71,8 @@ fun HomeScreen(
     onDateLongClicked: (LocalDate) -> Unit = {},
     onPhotoIconClicked: (EntryWithCategories) -> Unit = {},
     scrollToEntryId: UUID?,
-    onScrolledToEntry: () -> Unit
+    onScrolledToEntry: () -> Unit,
+    onCheckedChange: (EntryWithCategories) -> Unit
 ) {
     Column(
         modifier = modifier.fillMaxSize(),
@@ -213,7 +214,8 @@ fun HomeScreen(
                                 truncationLength = truncationLength,
                                 onEntrySelected = onEntrySelected,
                                 onEditEntry = onEditEntry,
-                                onPhotoIconClicked = onPhotoIconClicked
+                                onPhotoIconClicked = onPhotoIconClicked,
+                                onCheckedChange = { onCheckedChange(entryWithCategories) }
                             )
                         }
                     }

@@ -27,7 +27,7 @@ class EditCategoryViewModel(
         }
     }
 
-    fun saveCategory(name: String, aliases: String, showAll: Boolean, orderIndex: Int, color: String) {
+    fun saveCategory(name: String, aliases: String, showAll: Boolean, orderIndex: Int, color: String, checkable: Boolean) {
         viewModelScope.launch {
             val categoryToSave = Category(
                 id = categoryId.takeIf { it != -1 } ?: 0,
@@ -35,7 +35,8 @@ class EditCategoryViewModel(
                 aliases = aliases,
                 showAll = showAll,
                 orderIndex = orderIndex,
-                color = color
+                color = color,
+                checkable = checkable
             )
             if (categoryId != -1) {
                 repository.updateCategory(categoryToSave)

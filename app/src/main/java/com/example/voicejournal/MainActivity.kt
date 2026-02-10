@@ -475,7 +475,8 @@ class MainActivity : ComponentActivity() {
                                         truncationLength = truncationLength,
                                         showCategoryTags = showCategoryTags,
                                         scrollToEntryId = scrollToEntryId,
-                                        onScrolledToEntry = viewModel::onScrolledToEntry
+                                        onScrolledToEntry = viewModel::onScrolledToEntry,
+                                        onCheckedChange = { entry -> viewModel.toggleEntryChecked(entry.entry) }
                                     )
                                  }
                             }

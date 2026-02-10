@@ -61,9 +61,9 @@ class EditCategoryActivity : ComponentActivity() {
                 } else {
                     EditCategoryScreen(
                         initialCategory = category,
-                        onSave = { name, aliases, showAll, color ->
+                        onSave = { name, aliases, showAll, color, checkable ->
                             val orderIndex = category?.orderIndex ?: (highestOrderIndex + 1)
-                            viewModel.saveCategory(name, aliases, showAll, orderIndex, color)
+                            viewModel.saveCategory(name, aliases, showAll, orderIndex, color, checkable)
                             finish()
                         },
                         onNavigateUp = { finish() }
@@ -90,13 +90,14 @@ class EditCategoryActivity : ComponentActivity() {
 @Composable
 fun EditCategoryScreen(
     initialCategory: Category?,
-    onSave: (String, String, Boolean, String) -> Unit,
+    onSave: (String, String, Boolean, String, Boolean) -> Unit,
     onNavigateUp: () -> Unit
 ) {
     var name by remember { mutableStateOf(initialCategory?.category ?: "") }
     var aliases by remember { mutableStateOf(initialCategory?.aliases ?: "") }
     var showAll by remember { mutableStateOf(initialCategory?.showAll ?: false) }
     var color by remember { mutableStateOf(initialCategory?.color ?: "#FFFFFF") }
+    var checkable by remember { mutableStateOf(initialCategory?.checkable ?: false) }
     var showColorPickerDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -113,7 +114,7 @@ fun EditCategoryScreen(
         floatingActionButton = {
             FloatingActionButton(onClick = {
                 if (name.isNotBlank()) {
-                    onSave(name, aliases, showAll, color)
+                    onSave(name, aliases, showAll, color, checkable)
                 }
             }) {
                 Icon(Icons.Default.Done, contentDescription = "Save Category")
@@ -179,6 +180,14 @@ fun EditCategoryScreen(
             ) {
                 Checkbox(checked = showAll, onCheckedChange = { showAll = it })
                 Text("Show all entries in this category")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Checkbox(checked = checkable, onCheckedChange = { checkable = it })
+                Text("Checkable (Checklist mode)")
             }
         }
     }

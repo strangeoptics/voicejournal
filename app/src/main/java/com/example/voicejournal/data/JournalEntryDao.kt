@@ -73,6 +73,9 @@ interface JournalEntryDao {
     @Update
     suspend fun update(entry: JournalEntry)
 
+    @Query("UPDATE journal_entries SET checked = :isChecked WHERE id = :id")
+    suspend fun updateChecked(id: UUID, isChecked: Boolean)
+
     @Delete
     suspend fun delete(entry: JournalEntry)
 

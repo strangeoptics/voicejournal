@@ -20,6 +20,7 @@ data class JournalEntryExport(
     val start_datetime: Long,
     var stop_datetime: Long? = null,
     val hasImage: Boolean,
+    val checked: Boolean = false,
     val categories: List<String>
 )
 

@@ -14,5 +14,6 @@ data class JournalEntry(
     val content: String,
     val start_datetime: Long,
     var stop_datetime: Long? = null,
-    val hasImage: Boolean = false
+    val hasImage: Boolean = false,
+    val checked: Boolean = false
 )

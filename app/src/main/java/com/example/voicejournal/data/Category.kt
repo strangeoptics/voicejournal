@@ -19,5 +19,6 @@ data class Category(
     val aliases: String,     // A comma-separated list of aliases
     val showAll: Boolean = false,
     val orderIndex: Int = 0,
-    val color: String = "#FFFFFF" // Default color white
+    val color: String = "#FFFFFF", // Default color white
+    val checkable: Boolean = false
 )

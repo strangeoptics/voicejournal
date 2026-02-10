@@ -197,8 +197,9 @@ class MainViewModel(
         combine(
             selectedCategory,
             categoriesFlow,
-            _scrollToEntryId
-        ) { selectedCat, categories, entryId ->
+            _scrollToEntryId,
+            _refreshTrigger // Just to trigger
+        ) { selectedCat, categories, entryId, _ ->
             Triple(categories.find { it.category == selectedCat }, entryId, selectedCat)
         }.flatMapLatest { (category, entryId, selectedCat) ->
             repository.getEntriesPager(category?.id, entryId)
@@ -488,6 +489,18 @@ class MainViewModel(
                     _refreshTrigger.emit(Unit)
                 }
             }
+        }
+    }
+
+    fun toggleEntryChecked(entry: JournalEntry) {
+        viewModelScope.launch {
+            val newCheckedState = !entry.checked
+            repository.updateEntryChecked(entry.id, newCheckedState)
+            // No need to emit refreshTrigger if we use Flow from DB and update only one item?
+            // But if the list comes from Pager, invalidating it might be needed.
+            // However, with Room PagingSource, invalidation happens automatically on table change.
+            // But verify: updateChecked is an @Query.
+            // So PagingSource should invalidate.
         }
     }
 }

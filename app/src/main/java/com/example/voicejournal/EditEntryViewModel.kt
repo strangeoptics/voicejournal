@@ -1,5 +1,6 @@
 package com.example.voicejournal
 
+import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -17,6 +18,7 @@ import java.util.UUID
 
 class EditEntryViewModel(
     private val repository: JournalRepository,
+    private val sharedPreferences: SharedPreferences,
     private val entryId: UUID?,
     private val categoryId: String?
 ) : ViewModel() {
@@ -27,7 +29,15 @@ class EditEntryViewModel(
     val allCategories: StateFlow<List<Category>> = repository.allCategories
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val _speechService = MutableStateFlow("Android Speech Recognizer")
+    val speechService: StateFlow<String> = _speechService.asStateFlow()
+
+    private val _googleCloudApiKey = MutableStateFlow("")
+    val googleCloudApiKey: StateFlow<String> = _googleCloudApiKey.asStateFlow()
     init {
+        _speechService.value = sharedPreferences.getString("speech_service", "Android Speech Recognizer") ?: "Android Speech Recognizer"
+        _googleCloudApiKey.value = sharedPreferences.getString("google_cloud_api_key", "") ?: ""
+
         viewModelScope.launch {
             if (entryId != null) {
                 _entry.value = repository.getEntryById(entryId)
@@ -83,13 +93,14 @@ class EditEntryViewModel(
 
 class EditEntryViewModelFactory(
     private val repository: JournalRepository,
+    private val sharedPreferences: SharedPreferences,
     private val entryId: UUID?,
     private val categoryId: String?
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(EditEntryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return EditEntryViewModel(repository, entryId, categoryId) as T
+            return EditEntryViewModel(repository, sharedPreferences, entryId, categoryId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

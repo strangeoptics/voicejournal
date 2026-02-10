@@ -24,6 +24,7 @@ The entries are grouped by day.
 
 ### Data Persistence
 - **Local Database:** **Room Persistence Library** for storing `JournalEntry` and `Category` objects in a local SQLite database.
+- Zero Data Loss Policy, Version Increment, Mandatory Migration Classes
 
 ### Dependency Injection (DI)
 - **DI Framework:** **Hilt** to simplify dependency injection throughout the project.

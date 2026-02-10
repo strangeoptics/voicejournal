@@ -1,10 +1,16 @@
 package com.example.voicejournal
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.speech.SpeechRecognizer
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -16,17 +22,25 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.di.Injector
 import com.example.voicejournal.ui.theme.VoicejournalTheme
+import com.example.voicejournal.util.SpeechRecognitionManager
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -44,26 +58,95 @@ class EditEntryActivity : ComponentActivity() {
     }
 
     private val viewModel: EditEntryViewModel by viewModels {
-        EditEntryViewModelFactory(Injector.provideJournalRepository(this), entryId, categoryId)
+        EditEntryViewModelFactory(
+            Injector.provideJournalRepository(this),
+            getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE),
+            entryId,
+            categoryId
+        )
     }
+
+    private lateinit var speechRecognitionManager: SpeechRecognitionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
             VoicejournalTheme {
                 val entry by viewModel.entry.collectAsState()
                 val allCategories by viewModel.allCategories.collectAsState()
+                var textState by remember { mutableStateOf(TextFieldValue(entry?.entry?.content ?: "")) }
+
+                // Initialize SpeechRecognitionManager here, where we can use composable functions
+                speechRecognitionManager = SpeechRecognitionManager(
+                    context = this,
+                    onTextRecognized = { recognizedText ->
+                        val selection = textState.selection
+                        val originalText = textState.text
+
+                        val newText: String
+                        val newCursorPos: Int
+
+                        if (selection.length > 0) {
+                            // 1. Selection exists: replace
+                            newText = originalText.replaceRange(selection.start, selection.end, recognizedText)
+                            newCursorPos = selection.start + recognizedText.length
+                        } else if (selection.start >= originalText.length) {
+                            // 2. Cursor at the very end: append
+                            newText = if (originalText.isNotEmpty()) {
+                                originalText + "\n" + recognizedText
+                            } else {
+                                recognizedText
+                            }
+                            newCursorPos = newText.length
+                        } else {
+                            // 3. Cursor is in the middle or at the start: insert
+                            newText = originalText.replaceRange(selection.start, selection.end, recognizedText)
+                            newCursorPos = selection.start + recognizedText.length
+                        }
+
+                        textState = TextFieldValue(newText, selection = TextRange(newCursorPos))
+                    },
+                    scope = lifecycleScope,
+                    onError = { error ->
+                        runOnUiThread {
+                            val errorMessage = when (error) {
+                                SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
+                                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions"
+                                SpeechRecognizer.ERROR_NETWORK -> "Network error or invalid API key"
+                                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
+                                SpeechRecognizer.ERROR_NO_MATCH -> "No speech was recognized"
+                                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer is busy"
+                                SpeechRecognizer.ERROR_SERVER -> "Server error"
+                                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input"
+                                else -> "An unknown error occurred ($error)"
+                            }
+                            Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
+                        }
+                    }
+                )
 
                 entry?.let {
+                    // Update textState when entry is loaded
+                    LaunchedEffect(it) {
+                        if (textState.text.isEmpty()) {
+                            textState = TextFieldValue(it.entry.content, selection = TextRange(it.entry.content.length))
+                        }
+                    }
+
                     EditEntryScreen(
                         entry = it,
                         isNewEntry = entryId == null,
                         allCategories = allCategories,
+                        textValue = textState,
+                        onTextValueChange = { newTextState -> textState = newTextState },
                         onSave = { updatedCategories, content, start_datetime, stop_datetime, hasImage ->
                             viewModel.saveEntry(updatedCategories, content, start_datetime, stop_datetime, hasImage)
                             finish()
                         },
-                        onNavigateUp = { finish() }
+                        onNavigateUp = { finish() },
+                        speechRecognitionManager = speechRecognitionManager,
+                        viewModel = viewModel
                     )
                 } ?: run {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -71,6 +154,13 @@ class EditEntryActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (::speechRecognitionManager.isInitialized) {
+            speechRecognitionManager.destroy()
         }
     }
 
@@ -97,10 +187,13 @@ fun EditEntryScreen(
     entry: EntryWithCategories,
     isNewEntry: Boolean,
     allCategories: List<Category>,
+    textValue: TextFieldValue,
+    onTextValueChange: (TextFieldValue) -> Unit,
     onSave: (List<String>, String, Long, Long?, Boolean) -> Unit,
-    onNavigateUp: () -> Unit
+    onNavigateUp: () -> Unit,
+    speechRecognitionManager: SpeechRecognitionManager,
+    viewModel: EditEntryViewModel
 ) {
-    var text by remember { mutableStateOf(entry.entry.content) }
     var hasImage by remember { mutableStateOf(entry.entry.hasImage) }
     val selectedCategories = remember { mutableStateOf(entry.categories.map { it.category }) }
     var startDateTime by remember {
@@ -226,6 +319,23 @@ fun EditEntryScreen(
         )
     }
 
+    val context = LocalContext.current
+    val isRecording by speechRecognitionManager.isRecording.collectAsState()
+
+    val speechService by viewModel.speechService.collectAsState()
+    val googleCloudApiKey by viewModel.googleCloudApiKey.collectAsState()
+
+    val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+        onResult = { isGranted ->
+            if (isGranted) {
+                speechRecognitionManager.startListening(
+                    service = speechService,
+                    apiKey = googleCloudApiKey
+                )
+            }
+        }
+    )
 
     Scaffold(
         topBar = {
@@ -235,6 +345,26 @@ fun EditEntryScreen(
                     IconButton(onClick = onNavigateUp) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        if (isRecording) {
+                            speechRecognitionManager.stopListening()
+                        } else {
+                            when (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)) {
+                                PackageManager.PERMISSION_GRANTED -> speechRecognitionManager.startListening(
+                                    service = speechService,
+                                    apiKey = googleCloudApiKey
+                                )
+                                else -> recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        }
+                    }) {
+                        Icon(
+                            imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
+                            contentDescription = if (isRecording) "Stop Recording" else "Start Recording"
+                        )
+                    }
                 }
             )
         },
@@ -242,7 +372,7 @@ fun EditEntryScreen(
             FloatingActionButton(onClick = {
                 val newStartDatetime = startDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
                 val newStopDatetime = stopDateTime?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
-                onSave(selectedCategories.value, text, newStartDatetime, newStopDatetime, hasImage)
+                onSave(selectedCategories.value, textValue.text, newStartDatetime, newStopDatetime, hasImage)
             }) {
                 Icon(Icons.Default.Done, contentDescription = "Save Entry")
             }
@@ -258,8 +388,8 @@ fun EditEntryScreen(
             val configuration = LocalConfiguration.current
             val screenHeight = configuration.screenHeightDp.dp
             OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
+                value = textValue,
+                onValueChange = onTextValueChange,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(screenHeight / 3),

@@ -365,17 +365,15 @@ fun EditEntryScreen(
                             contentDescription = if (isRecording) "Stop Recording" else "Start Recording"
                         )
                     }
+                    IconButton(onClick = {
+                        val newStartDatetime = startDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        val newStopDatetime = stopDateTime?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+                        onSave(selectedCategories.value, textValue.text, newStartDatetime, newStopDatetime, hasImage)
+                    }) {
+                        Icon(Icons.Default.Done, contentDescription = "Save Entry")
+                    }
                 }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = {
-                val newStartDatetime = startDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                val newStopDatetime = stopDateTime?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
-                onSave(selectedCategories.value, textValue.text, newStartDatetime, newStopDatetime, hasImage)
-            }) {
-                Icon(Icons.Default.Done, contentDescription = "Save Entry")
-            }
         }
     ) { padding ->
         Column(

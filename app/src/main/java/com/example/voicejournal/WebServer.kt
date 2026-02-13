@@ -65,6 +65,7 @@ class WebServer(private val db: AppDatabase) {
                             start_datetime = entryWithCategories.entry.start_datetime,
                             stop_datetime = entryWithCategories.entry.stop_datetime,
                             hasImage = entryWithCategories.entry.hasImage,
+                            checked = entryWithCategories.entry.checked,
                             categoryIds = entryWithCategories.categories.map { it.id }
                         )
                     }
@@ -89,6 +90,7 @@ class WebServer(private val db: AppDatabase) {
                             start_datetime = entryWithCategories.entry.start_datetime,
                             stop_datetime = entryWithCategories.entry.stop_datetime,
                             hasImage = entryWithCategories.entry.hasImage,
+                            checked = entryWithCategories.entry.checked,
                             categoryIds = entryWithCategories.categories.map { it.id }
                         )
                     }
@@ -119,6 +121,7 @@ class WebServer(private val db: AppDatabase) {
                         start_datetime = entry.entry.start_datetime,
                         stop_datetime = entry.entry.stop_datetime,
                         hasImage = entry.entry.hasImage,
+                        checked = entry.entry.checked,
                         categoryIds = entry.categories.map { it.id }
                     )
                     call.respond(dto)
@@ -130,7 +133,8 @@ class WebServer(private val db: AppDatabase) {
                         content = createDto.content,
                         start_datetime = createDto.start_datetime,
                         stop_datetime = createDto.stop_datetime,
-                        hasImage = createDto.hasImage
+                        hasImage = createDto.hasImage,
+                        checked = createDto.checked
                     )
 
                     val categories = db.categoryDao().getCategoriesByIds(createDto.categoryIds)
@@ -145,6 +149,7 @@ class WebServer(private val db: AppDatabase) {
                             start_datetime = newEntry.entry.start_datetime,
                             stop_datetime = newEntry.entry.stop_datetime,
                             hasImage = newEntry.entry.hasImage,
+                            checked = newEntry.entry.checked,
                             categoryIds = newEntry.categories.map { it.id }
                         )
                         call.respond(HttpStatusCode.Created, dto)
@@ -178,7 +183,8 @@ class WebServer(private val db: AppDatabase) {
                         content = journalEntryDto.content,
                         start_datetime = journalEntryDto.start_datetime,
                         stop_datetime = journalEntryDto.stop_datetime,
-                        hasImage = journalEntryDto.hasImage
+                        hasImage = journalEntryDto.hasImage,
+                        checked = journalEntryDto.checked
                     )
                     val categories = db.categoryDao().getCategoriesByIds(journalEntryDto.categoryIds)
 

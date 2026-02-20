@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width // <- Added this import
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -61,9 +61,9 @@ class EditCategoryActivity : ComponentActivity() {
                 } else {
                     EditCategoryScreen(
                         initialCategory = category,
-                        onSave = { name, aliases, showAll, color, checkable ->
+                        onSave = { name, aliases, showAll, color, checkable, showDate ->
                             val orderIndex = category?.orderIndex ?: (highestOrderIndex + 1)
-                            viewModel.saveCategory(name, aliases, showAll, orderIndex, color, checkable)
+                            viewModel.saveCategory(name, aliases, showAll, orderIndex, color, checkable, showDate)
                             finish()
                         },
                         onNavigateUp = { finish() }
@@ -90,7 +90,7 @@ class EditCategoryActivity : ComponentActivity() {
 @Composable
 fun EditCategoryScreen(
     initialCategory: Category?,
-    onSave: (String, String, Boolean, String, Boolean) -> Unit,
+    onSave: (String, String, Boolean, String, Boolean, Boolean) -> Unit,
     onNavigateUp: () -> Unit
 ) {
     var name by remember { mutableStateOf(initialCategory?.category ?: "") }
@@ -98,6 +98,7 @@ fun EditCategoryScreen(
     var showAll by remember { mutableStateOf(initialCategory?.showAll ?: false) }
     var color by remember { mutableStateOf(initialCategory?.color ?: "#FFFFFF") }
     var checkable by remember { mutableStateOf(initialCategory?.checkable ?: false) }
+    var showDate by remember { mutableStateOf(initialCategory?.showDate ?: true) }
     var showColorPickerDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -114,7 +115,7 @@ fun EditCategoryScreen(
         floatingActionButton = {
             FloatingActionButton(onClick = {
                 if (name.isNotBlank()) {
-                    onSave(name, aliases, showAll, color, checkable)
+                    onSave(name, aliases, showAll, color, checkable, showDate)
                 }
             }) {
                 Icon(Icons.Default.Done, contentDescription = "Save Category")
@@ -188,6 +189,14 @@ fun EditCategoryScreen(
             ) {
                 Checkbox(checked = checkable, onCheckedChange = { checkable = it })
                 Text("Checkable (Checklist mode)")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Checkbox(checked = showDate, onCheckedChange = { showDate = it })
+                Text("Show Date")
             }
         }
     }

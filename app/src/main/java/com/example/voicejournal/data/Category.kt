@@ -20,5 +20,7 @@ data class Category(
     val showAll: Boolean = false,
     val orderIndex: Int = 0,
     val color: String = "#FFFFFF", // Default color white
-    val checkable: Boolean = false
+    val checkable: Boolean = false,
+    @ColumnInfo(defaultValue = "1")
+    val showDate: Boolean = true
 )

@@ -370,6 +370,12 @@ class MainViewModel(
         }
     }
 
+    fun updateCategory(category: Category) {
+        viewModelScope.launch {
+            repository.updateCategory(category)
+        }
+    }
+
     fun deleteCategory(category: Category) {
         viewModelScope.launch {
             repository.deleteCategory(category.id)

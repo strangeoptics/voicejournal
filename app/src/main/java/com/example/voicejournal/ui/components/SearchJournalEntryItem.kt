@@ -44,6 +44,8 @@ fun SearchJournalEntryItem(
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
+    val shouldShowDate = entryWithCategories.categories.isEmpty() || entryWithCategories.categories.any { it.showDate }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -98,10 +100,12 @@ fun SearchJournalEntryItem(
                         .weight(1f)
                         .padding(top = 4.dp, end = 8.dp)
                 )
-                Text(
-                    text = timeText,
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                if (shouldShowDate) {
+                    Text(
+                        text = timeText,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
             if (showCategoryTags) {
                 Row(

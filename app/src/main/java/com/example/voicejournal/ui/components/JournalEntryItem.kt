@@ -45,6 +45,7 @@ fun JournalEntryItem(
     var isExpanded by remember { mutableStateOf(false) }
 
     val isCheckable = entryWithCategories.categories.any { it.checkable }
+    val shouldShowDate = entryWithCategories.categories.isEmpty() || entryWithCategories.categories.any { it.showDate }
 
     Card(
         modifier = Modifier
@@ -113,10 +114,12 @@ fun JournalEntryItem(
                                 .weight(1f)
                                 .padding(top = 4.dp, end = 8.dp)
                         )
-                        Text(
-                            text = timeText,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                        if (shouldShowDate) {
+                            Text(
+                                text = timeText,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
                     }
                 }
             }

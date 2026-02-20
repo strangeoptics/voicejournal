@@ -265,6 +265,7 @@ class MainActivity : ComponentActivity() {
 
                 ModalNavigationDrawer(
                     drawerState = drawerState,
+                    gesturesEnabled = drawerState.isOpen,
                     drawerContent = {
                         AppDrawer(
                             isDeveloperModeEnabled = isDeveloperModeEnabled,

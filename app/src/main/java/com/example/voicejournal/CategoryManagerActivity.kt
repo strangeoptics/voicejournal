@@ -35,12 +35,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.unit.dp
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.ui.theme.VoicejournalTheme
@@ -124,64 +129,84 @@ fun CategoryManagerScreen(
                     } else {
                         false
                     }
-                }
+                },
+                positionalThreshold = { it * 0.60f }
             )
-            SwipeToDismissBox(
-                state = dismissState,
-                backgroundContent = {
-                    val color = when (dismissState.dismissDirection) {
-                        SwipeToDismissBoxValue.StartToEnd -> Color.Red
-                        else -> Color.Transparent
-                    }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(color)
-                            .padding(horizontal = 20.dp),
-                        contentAlignment = Alignment.CenterStart
-                    ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "Delete",
-                            tint = Color.White
-                        )
-                    }
+
+            // Reset dismiss state when the category is re-composed (e.g. after undo)
+            LaunchedEffect(category) {
+                if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) {
+                    dismissState.snapTo(SwipeToDismissBoxValue.Settled)
                 }
-            ) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .combinedClickable(
-                            onClick = { /* No action on simple click */ },
-                            onLongClick = { onCategoryLongClick(category) }
-                        )
+            }
+
+            val currentViewConfiguration = LocalViewConfiguration.current
+            val customViewConfiguration = remember(currentViewConfiguration) {
+                object : ViewConfiguration by currentViewConfiguration {
+                    override val touchSlop: Float
+                        get() = currentViewConfiguration.touchSlop * 2.5f
+                }
+            }
+
+            CompositionLocalProvider(LocalViewConfiguration provides customViewConfiguration) {
+                SwipeToDismissBox(
+                    state = dismissState,
+                    enableDismissFromEndToStart = false,
+                    backgroundContent = {
+                        val color = when (dismissState.dismissDirection) {
+                            SwipeToDismissBoxValue.StartToEnd -> Color.Red
+                            else -> Color.Transparent
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(color)
+                                .padding(horizontal = 20.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Delete",
+                                tint = Color.White
+                            )
+                        }
+                    }
                 ) {
-                    Row(
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .combinedClickable(
+                                onClick = { /* No action on simple click */ },
+                                onLongClick = { onCategoryLongClick(category) }
+                            )
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = category.category,
-                                style = MaterialTheme.typography.titleLarge,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                            Text(
-                                text = category.aliases,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                        if (category.showAll) {
-                            Text("All", modifier = Modifier.padding(start = 8.dp))
-                        }
-                        Column {
-                            IconButton(onClick = { onMoveCategory(category, true) }, enabled = categories.first() != category) {
-                                Icon(Icons.Default.ArrowUpward, contentDescription = "Move Up")
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = category.category,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                Text(
+                                    text = category.aliases,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
                             }
-                            IconButton(onClick = { onMoveCategory(category, false) }, enabled = categories.last() != category) {
-                                Icon(Icons.Default.ArrowDownward, contentDescription = "Move Down")
+                            if (category.showAll) {
+                                Text("All", modifier = Modifier.padding(start = 8.dp))
+                            }
+                            Column {
+                                IconButton(onClick = { onMoveCategory(category, true) }, enabled = categories.first() != category) {
+                                    Icon(Icons.Default.ArrowUpward, contentDescription = "Move Up")
+                                }
+                                IconButton(onClick = { onMoveCategory(category, false) }, enabled = categories.last() != category) {
+                                    Icon(Icons.Default.ArrowDownward, contentDescription = "Move Down")
+                                }
                             }
                         }
                     }

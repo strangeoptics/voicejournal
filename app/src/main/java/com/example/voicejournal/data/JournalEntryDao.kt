@@ -25,6 +25,10 @@ interface JournalEntryDao {
     fun getEntriesPagingSourceForCategory(categoryId: Int): PagingSource<Int, EntryWithCategories>
 
     @Transaction
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC")
+    fun getDeletedEntriesPagingSource(): PagingSource<Int, EntryWithCategories>
+
+    @Transaction
     @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL")
     suspend fun getAllEntriesWithCategories(): List<EntryWithCategories>
 
@@ -43,6 +47,10 @@ interface JournalEntryDao {
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL AND id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC LIMIT :limit OFFSET :offset")
     suspend fun getPaginatedEntriesForCategory(categoryId: Int, limit: Int, offset: Int): List<EntryWithCategories>
+
+    @Transaction
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC LIMIT :limit OFFSET :offset")
+    suspend fun getPaginatedDeletedEntries(limit: Int, offset: Int): List<EntryWithCategories>
 
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE id = :entryId AND deletedAt IS NULL")
@@ -148,4 +156,7 @@ interface JournalEntryDao {
 
     @Query("SELECT COUNT(*) FROM journal_entries WHERE deletedAt IS NULL AND id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) AND start_datetime > (SELECT start_datetime FROM journal_entries WHERE id = :entryId)")
     suspend fun getPositionOfEntryInCategory(entryId: UUID, categoryId: Int): Int
+
+    @Query("SELECT COUNT(*) FROM journal_entries WHERE deletedAt IS NOT NULL AND start_datetime > (SELECT start_datetime FROM journal_entries WHERE id = :entryId)")
+    suspend fun getPositionOfDeletedEntry(entryId: UUID): Int
 }

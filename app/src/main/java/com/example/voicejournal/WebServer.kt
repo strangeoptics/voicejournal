@@ -1,7 +1,9 @@
 package com.example.voicejournal
 
 import com.example.voicejournal.data.AppDatabase
+import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.CreateJournalEntryDto
+import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalEntryDto
 import io.ktor.http.HttpHeaders
@@ -31,6 +33,17 @@ class WebServer(private val db: AppDatabase) {
     val isRunning: Boolean
         get() = server != null
 
+    private val virtualDeletedCategory = Category(
+        id = JournalConstants.CATEGORY_DELETED_ID,
+        category = "Gelöscht",
+        aliases = "",
+        showAll = true,
+        orderIndex = Int.MAX_VALUE,
+        color = "#FFCDD2",
+        checkable = false,
+        showDate = true
+    )
+
     fun start() {
         if (isRunning) return
         server = embeddedServer(Netty, port = 8080) {
@@ -49,7 +62,7 @@ class WebServer(private val db: AppDatabase) {
             }
             routing {
                 get("/categories") {
-                    val categories = db.categoryDao().getAllCategoriesList()
+                    val categories = db.categoryDao().getAllCategoriesList() + virtualDeletedCategory
                     call.respond(categories)
                 }
                 get("/journalentries") {
@@ -82,7 +95,11 @@ class WebServer(private val db: AppDatabase) {
                     val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 10
                     val offset = (page - 1) * pageSize
 
-                    val entries = db.journalEntryDao().getPaginatedEntriesForCategory(id, pageSize, offset)
+                    val entries = if (id == JournalConstants.CATEGORY_DELETED_ID) {
+                        db.journalEntryDao().getPaginatedDeletedEntries(pageSize, offset)
+                    } else {
+                        db.journalEntryDao().getPaginatedEntriesForCategory(id, pageSize, offset)
+                    }
                     val dtos = entries.map { entryWithCategories ->
                         JournalEntryDto(
                             id = entryWithCategories.entry.id,

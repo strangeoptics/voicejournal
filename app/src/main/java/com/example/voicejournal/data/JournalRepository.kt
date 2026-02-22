@@ -7,6 +7,7 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -20,6 +21,10 @@ import java.time.format.DateTimeFormatter
 import java.util.UUID
 import java.util.regex.Pattern
 
+object JournalConstants {
+    const val CATEGORY_DELETED_ID = -1
+}
+
 class JournalRepository(
     private val entryDao: JournalEntryDao,
     private val categoryDao: CategoryDao,
@@ -27,14 +32,29 @@ class JournalRepository(
     private val context: Context
 ) {
 
-    val allCategories = categoryDao.getAllCategories()
+    private val virtualDeletedCategory = Category(
+        id = JournalConstants.CATEGORY_DELETED_ID,
+        category = "Gelöscht",
+        aliases = "",
+        showAll = true,
+        orderIndex = Int.MAX_VALUE, // Put it at the end
+        color = "#FFCDD2", // Light red
+        checkable = false,
+        showDate = true
+    )
+
+    val allCategories: Flow<List<Category>> = categoryDao.getAllCategories().map { categories ->
+        categories + virtualDeletedCategory
+    }
 
     suspend fun getEntriesPager(
         categoryId: Int?,
         initialEntryId: UUID?
     ): Flow<PagingData<EntryWithCategories>> {
         val initialKey = initialEntryId?.let {
-            if (categoryId != null && categoryId != -1) {
+            if (categoryId == JournalConstants.CATEGORY_DELETED_ID) {
+                entryDao.getPositionOfDeletedEntry(it)
+            } else if (categoryId != null && categoryId != -1) {
                 entryDao.getPositionOfEntryInCategory(it, categoryId)
             } else {
                 entryDao.getPositionOfEntry(it)
@@ -49,7 +69,9 @@ class JournalRepository(
             ),
             initialKey = initialKey,
             pagingSourceFactory = {
-                if (categoryId != null && categoryId != -1) {
+                if (categoryId == JournalConstants.CATEGORY_DELETED_ID) {
+                    entryDao.getDeletedEntriesPagingSource()
+                } else if (categoryId != null && categoryId != -1) {
                     entryDao.getEntriesPagingSourceForCategory(categoryId)
                 } else {
                     entryDao.getEntriesPagingSource()
@@ -166,15 +188,28 @@ class JournalRepository(
 
     fun getEntriesWithCategoriesSince(since: Long) = entryDao.getEntriesWithCategoriesSince(since)
 
-    suspend fun insertCategory(category: Category) = categoryDao.insertCategory(category)
+    suspend fun insertCategory(category: Category) {
+        if (category.id != JournalConstants.CATEGORY_DELETED_ID) categoryDao.insertCategory(category)
+    }
 
-    suspend fun updateCategory(category: Category) = categoryDao.updateCategory(category)
+    suspend fun updateCategory(category: Category) {
+        if (category.id != JournalConstants.CATEGORY_DELETED_ID) categoryDao.updateCategory(category)
+    }
 
-    suspend fun updateCategories(categories: List<Category>) = categoryDao.updateCategories(categories)
+    suspend fun updateCategories(categories: List<Category>) {
+        val filtered = categories.filter { it.id != JournalConstants.CATEGORY_DELETED_ID }
+        categoryDao.updateCategories(filtered)
+    }
 
-    suspend fun insert(entry: JournalEntry, categories: List<Category>) = entryDao.insertWithCategories(entry, categories, categoryDao)
+    suspend fun insert(entry: JournalEntry, categories: List<Category>) {
+        val filtered = categories.filter { it.id != JournalConstants.CATEGORY_DELETED_ID }
+        entryDao.insertWithCategories(entry, filtered, categoryDao)
+    }
 
-    suspend fun update(entry: JournalEntry, categories: List<Category>) = entryDao.updateWithCategories(entry, categories, categoryDao)
+    suspend fun update(entry: JournalEntry, categories: List<Category>) {
+        val filtered = categories.filter { it.id != JournalConstants.CATEGORY_DELETED_ID }
+        entryDao.updateWithCategories(entry, filtered, categoryDao)
+    }
     
     suspend fun updateJournalEntry(entry: JournalEntry) = entryDao.update(entry)
     
@@ -195,10 +230,12 @@ class JournalRepository(
 
     suspend fun updateAliasesForCategory(categoryId: Int, aliases: List<String>) {
         val aliasesString = aliases.joinToString(",")
-        categoryDao.updateAliasesForCategory(categoryId, aliasesString)
+        if (categoryId != JournalConstants.CATEGORY_DELETED_ID) categoryDao.updateAliasesForCategory(categoryId, aliasesString)
     }
 
-    suspend fun deleteCategory(categoryId: Int) = categoryDao.deleteCategory(categoryId)
+    suspend fun deleteCategory(categoryId: Int) {
+        if (categoryId != JournalConstants.CATEGORY_DELETED_ID) categoryDao.deleteCategory(categoryId)
+    }
 
     suspend fun deleteAll() = entryDao.deleteAll() // Should also delete categories? For now, it doesn't.
 
@@ -212,6 +249,7 @@ class JournalRepository(
     }
 
     suspend fun getLatestEntryDatetimeForCategory(categoryId: Int): Long? {
+        if (categoryId == JournalConstants.CATEGORY_DELETED_ID) return null
         return entryDao.getLatestEntryDatetimeForCategory(categoryId)
     }
 
@@ -221,6 +259,11 @@ class JournalRepository(
 
     fun getEntriesWithCategoriesInDateRange(startDateMillis: Long, endDateMillis: Long): Flow<List<EntryWithCategories>> {
         return entryDao.getEntriesWithCategoriesInDateRange(startDateMillis, endDateMillis)
+    }
+
+    suspend fun getAllCategoriesList(): List<Category> {
+        val dbList = categoryDao.getAllCategoriesList()
+        return dbList + virtualDeletedCategory
     }
 }
 

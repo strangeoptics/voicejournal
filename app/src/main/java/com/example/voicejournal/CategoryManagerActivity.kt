@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.unit.dp
 import com.example.voicejournal.data.Category
+import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 
 class CategoryManagerActivity : ComponentActivity() {
@@ -89,14 +90,20 @@ class CategoryManagerActivity : ComponentActivity() {
                         modifier = Modifier.padding(padding),
                         categories = categories,
                         onCategoryLongClick = { category ->
-                            val intent = EditCategoryActivity.newIntent(context, category.id)
-                            context.startActivity(intent)
+                            if (category.id != JournalConstants.CATEGORY_DELETED_ID) {
+                                val intent = EditCategoryActivity.newIntent(context, category.id)
+                                context.startActivity(intent)
+                            }
                         },
                         onDeleteCategory = { category ->
-                            viewModel.deleteCategory(category)
+                            if (category.id != JournalConstants.CATEGORY_DELETED_ID) {
+                                viewModel.deleteCategory(category)
+                            }
                         },
                         onMoveCategory = { category, moveUp ->
-                            viewModel.moveCategory(category, moveUp)
+                            if (category.id != JournalConstants.CATEGORY_DELETED_ID) {
+                                viewModel.moveCategory(category, moveUp)
+                            }
                         }
                     )
                 }
@@ -121,9 +128,10 @@ fun CategoryManagerScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(categories, key = { it.id }) { category ->
+            val isVirtualDeleted = category.id == JournalConstants.CATEGORY_DELETED_ID
             val dismissState = rememberSwipeToDismissBoxState(
                 confirmValueChange = {
-                    if (it == SwipeToDismissBoxValue.StartToEnd) {
+                    if (it == SwipeToDismissBoxValue.StartToEnd && !isVirtualDeleted) {
                         onDeleteCategory(category)
                         true
                     } else {
@@ -134,7 +142,7 @@ fun CategoryManagerScreen(
             )
 
             // Reset dismiss state when the category is re-composed (e.g. after undo)
-            LaunchedEffect(category) {
+            LaunchedEffect(System.identityHashCode(category)) {
                 if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) {
                     dismissState.snapTo(SwipeToDismissBoxValue.Settled)
                 }
@@ -152,8 +160,10 @@ fun CategoryManagerScreen(
                 SwipeToDismissBox(
                     state = dismissState,
                     enableDismissFromEndToStart = false,
+                    // If it is virtual, we do not want to allow swipe to delete, so we set gesturesEnabled to false.
+                    gesturesEnabled = !isVirtualDeleted,
                     backgroundContent = {
-                        val color = when (dismissState.dismissDirection) {
+                        val color = when (dismissState.targetValue) {
                             SwipeToDismissBoxValue.StartToEnd -> Color.Red
                             else -> Color.Transparent
                         }
@@ -201,10 +211,10 @@ fun CategoryManagerScreen(
                                 Text("All", modifier = Modifier.padding(start = 8.dp))
                             }
                             Column {
-                                IconButton(onClick = { onMoveCategory(category, true) }, enabled = categories.first() != category) {
+                                IconButton(onClick = { onMoveCategory(category, true) }, enabled = !isVirtualDeleted && categories.first() != category) {
                                     Icon(Icons.Default.ArrowUpward, contentDescription = "Move Up")
                                 }
-                                IconButton(onClick = { onMoveCategory(category, false) }, enabled = categories.last() != category) {
+                                IconButton(onClick = { onMoveCategory(category, false) }, enabled = !isVirtualDeleted && categories.last() != category) {
                                     Icon(Icons.Default.ArrowDownward, contentDescription = "Move Down")
                                 }
                             }

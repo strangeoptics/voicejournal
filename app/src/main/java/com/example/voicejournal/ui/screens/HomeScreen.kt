@@ -176,9 +176,11 @@ fun HomeScreen(
 
 
                         val isSelected = selectedEntry == entryWithCategories
+                        val isDeletedCategory = selectedCategory == "Gelöscht"
+                        
                         val dismissState = rememberSwipeToDismissBoxState(
                             confirmValueChange = { value ->
-                                if (value == SwipeToDismissBoxValue.StartToEnd) {
+                                if (value == SwipeToDismissBoxValue.StartToEnd && !isDeletedCategory) {
                                     onDeleteEntry(entryWithCategories)
                                     // Wir geben bewusst false zurück, damit das UI das Item visuell *sofort* wieder zurückschnappen lässt.
                                     // Währenddessen sorgt die Datenbank dafür, dass das Item ohnehin durch den invalidierten Paging-Stream
@@ -203,6 +205,7 @@ fun HomeScreen(
                             SwipeToDismissBox(
                                 state = dismissState,
                                 enableDismissFromEndToStart = false,
+                                gesturesEnabled = !isDeletedCategory,
                                 backgroundContent = {
                                     val color = when (dismissState.targetValue) {
                                         SwipeToDismissBoxValue.StartToEnd -> Color.Red

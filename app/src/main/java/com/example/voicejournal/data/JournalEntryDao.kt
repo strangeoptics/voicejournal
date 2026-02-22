@@ -2,7 +2,6 @@ package com.example.voicejournal.data
 
 import androidx.paging.PagingSource
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -14,46 +13,46 @@ import java.util.UUID
 @Dao
 interface JournalEntryDao {
     @Transaction
-    @Query("SELECT * FROM journal_entries ORDER BY start_datetime DESC")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL ORDER BY start_datetime DESC")
     fun getEntriesWithCategories(): Flow<List<EntryWithCategories>>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries ORDER BY start_datetime DESC")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL ORDER BY start_datetime DESC")
     fun getEntriesPagingSource(): PagingSource<Int, EntryWithCategories>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL AND id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC")
     fun getEntriesPagingSourceForCategory(categoryId: Int): PagingSource<Int, EntryWithCategories>
 
-
     @Transaction
-    @Query("SELECT * FROM journal_entries")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL")
     suspend fun getAllEntriesWithCategories(): List<EntryWithCategories>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries ORDER BY start_datetime DESC LIMIT :limit OFFSET :offset")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL ORDER BY start_datetime DESC LIMIT :limit OFFSET :offset")
     suspend fun getPaginatedEntriesWithCategories(limit: Int, offset: Int): List<EntryWithCategories>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE start_datetime >= :since ORDER BY start_datetime DESC")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL AND start_datetime >= :since ORDER BY start_datetime DESC")
     fun getEntriesWithCategoriesSince(since: Long): Flow<List<EntryWithCategories>>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL AND id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC")
     suspend fun getEntriesForCategory(categoryId: Int): List<EntryWithCategories>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC LIMIT :limit OFFSET :offset")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL AND id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC LIMIT :limit OFFSET :offset")
     suspend fun getPaginatedEntriesForCategory(categoryId: Int, limit: Int, offset: Int): List<EntryWithCategories>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE id = :entryId")
+    @Query("SELECT * FROM journal_entries WHERE id = :entryId AND deletedAt IS NULL")
     suspend fun getEntryById(entryId: UUID): EntryWithCategories?
 
     @Transaction
     @Query("""
         SELECT * FROM journal_entries 
         WHERE
+            deletedAt IS NULL AND
             stop_datetime IS NOT NULL AND
             (
                 -- Entries that start within the window
@@ -76,8 +75,18 @@ interface JournalEntryDao {
     @Query("UPDATE journal_entries SET checked = :isChecked WHERE id = :id")
     suspend fun updateChecked(id: UUID, isChecked: Boolean)
 
-    @Delete
-    suspend fun delete(entry: JournalEntry)
+    @Query("UPDATE journal_entries SET deletedAt = :timestamp WHERE id = :id")
+    suspend fun softDelete(id: UUID, timestamp: Long)
+
+    @Query("UPDATE journal_entries SET deletedAt = NULL WHERE id = :id")
+    suspend fun restoreEntry(id: UUID)
+
+    @Transaction
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC LIMIT 1")
+    suspend fun getLatestDeletedEntry(): EntryWithCategories?
+
+    @Query("SELECT COUNT(id) FROM journal_entries WHERE deletedAt IS NOT NULL")
+    fun getDeletedEntriesCount(): Flow<Int>
 
     @Query("DELETE FROM journal_entries")
     suspend fun deleteAll()
@@ -119,24 +128,24 @@ interface JournalEntryDao {
         }
     }
 
-    @Query("SELECT MAX(je.start_datetime) FROM journal_entries AS je INNER JOIN journal_entry_category_cross_ref AS jecr ON je.id = jecr.entryId WHERE jecr.categoryId = :categoryId")
+    @Query("SELECT MAX(je.start_datetime) FROM journal_entries AS je INNER JOIN journal_entry_category_cross_ref AS jecr ON je.id = jecr.entryId WHERE jecr.categoryId = :categoryId AND je.deletedAt IS NULL")
     suspend fun getLatestEntryDatetimeForCategory(categoryId: Int): Long?
 
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE start_datetime >= :startDateMillis AND start_datetime < :endDateMillis AND id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL AND start_datetime >= :startDateMillis AND start_datetime < :endDateMillis AND id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC")
     fun getEntriesWithCategoriesInDateRangeForCategory(categoryId: Int, startDateMillis: Long, endDateMillis: Long): Flow<List<EntryWithCategories>>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE start_datetime >= :startDateMillis AND start_datetime < :endDateMillis ORDER BY start_datetime DESC")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL AND start_datetime >= :startDateMillis AND start_datetime < :endDateMillis ORDER BY start_datetime DESC")
     fun getEntriesWithCategoriesInDateRange(startDateMillis: Long, endDateMillis: Long): Flow<List<EntryWithCategories>>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE LOWER(content) LIKE '%' || LOWER(:query) || '%' ORDER BY start_datetime DESC")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL AND LOWER(content) LIKE '%' || LOWER(:query) || '%' ORDER BY start_datetime DESC")
     fun searchEntries(query: String): Flow<List<EntryWithCategories>>
 
-    @Query("SELECT COUNT(*) FROM journal_entries WHERE start_datetime > (SELECT start_datetime FROM journal_entries WHERE id = :entryId)")
+    @Query("SELECT COUNT(*) FROM journal_entries WHERE deletedAt IS NULL AND start_datetime > (SELECT start_datetime FROM journal_entries WHERE id = :entryId)")
     suspend fun getPositionOfEntry(entryId: UUID): Int
 
-    @Query("SELECT COUNT(*) FROM journal_entries WHERE id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) AND start_datetime > (SELECT start_datetime FROM journal_entries WHERE id = :entryId)")
+    @Query("SELECT COUNT(*) FROM journal_entries WHERE deletedAt IS NULL AND id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) AND start_datetime > (SELECT start_datetime FROM journal_entries WHERE id = :entryId)")
     suspend fun getPositionOfEntryInCategory(entryId: UUID, categoryId: Int): Int
 }

@@ -180,20 +180,16 @@ fun HomeScreen(
                             confirmValueChange = { value ->
                                 if (value == SwipeToDismissBoxValue.StartToEnd) {
                                     onDeleteEntry(entryWithCategories)
-                                    true
+                                    // Wir geben bewusst false zurück, damit das UI das Item visuell *sofort* wieder zurückschnappen lässt.
+                                    // Währenddessen sorgt die Datenbank dafür, dass das Item ohnehin durch den invalidierten Paging-Stream
+                                    // aus der Liste entfernt wird. So umgehen wir vollständig das Problem mit den gecachten States (und roten Flächen) bei "Undo".
+                                    false
                                 } else {
                                     false
                                 }
                             },
                             positionalThreshold = { it * 0.60f }
                         )
-
-                        // Reset dismiss state when the entry is re-composed (e.g. after undo)
-                        LaunchedEffect(entryWithCategories) {
-                            if (dismissState.currentValue != SwipeToDismissBoxValue.Settled) {
-                                dismissState.snapTo(SwipeToDismissBoxValue.Settled)
-                            }
-                        }
 
                         val currentViewConfiguration = LocalViewConfiguration.current
                         val customViewConfiguration = remember(currentViewConfiguration) {
@@ -208,7 +204,7 @@ fun HomeScreen(
                                 state = dismissState,
                                 enableDismissFromEndToStart = false,
                                 backgroundContent = {
-                                    val color = when (dismissState.dismissDirection) {
+                                    val color = when (dismissState.targetValue) {
                                         SwipeToDismissBoxValue.StartToEnd -> Color.Red
                                         else -> Color.Transparent
                                     }

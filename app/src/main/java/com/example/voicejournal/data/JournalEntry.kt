@@ -15,5 +15,6 @@ data class JournalEntry(
     val start_datetime: Long,
     var stop_datetime: Long? = null,
     val hasImage: Boolean = false,
-    val checked: Boolean = false
+    val checked: Boolean = false,
+    val deletedAt: Long? = null
 )

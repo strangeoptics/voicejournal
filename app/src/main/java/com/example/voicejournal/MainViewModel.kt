@@ -107,8 +107,7 @@ class MainViewModel(
     private val _refreshTrigger = MutableSharedFlow<Unit>(replay = 1)
 
 
-    private val _recentlyDeleted = MutableStateFlow<List<EntryWithCategories>>(emptyList())
-    val canUndo: StateFlow<Boolean> = _recentlyDeleted.map { it.isNotEmpty() }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val canUndo: StateFlow<Boolean> = repository.getDeletedEntriesCount().map { it > 0 }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
 
     val categoriesFlow: StateFlow<List<Category>> = repository.allCategories
@@ -264,12 +263,6 @@ class MainViewModel(
 
     fun onDeleteEntry(entry: EntryWithCategories) {
         viewModelScope.launch {
-            val currentDeleted = _recentlyDeleted.value.toMutableList()
-            currentDeleted.add(entry)
-            if (currentDeleted.size > 3) {
-                currentDeleted.removeAt(0)
-            }
-            _recentlyDeleted.value = currentDeleted
             repository.delete(entry.entry)
             _refreshTrigger.emit(Unit)
         }
@@ -277,12 +270,8 @@ class MainViewModel(
 
     fun onUndoDelete() {
         viewModelScope.launch {
-            val lastDeleted = _recentlyDeleted.value.lastOrNull()
-            if (lastDeleted != null) {
-                repository.insert(lastDeleted.entry, lastDeleted.categories)
-                _recentlyDeleted.value = _recentlyDeleted.value.dropLast(1)
-                _refreshTrigger.emit(Unit)
-            }
+            repository.restoreLatestDeletedEntry()
+            _refreshTrigger.emit(Unit)
         }
     }
 

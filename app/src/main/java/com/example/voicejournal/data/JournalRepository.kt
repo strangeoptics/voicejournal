@@ -180,7 +180,18 @@ class JournalRepository(
     
     suspend fun updateEntryChecked(entryId: UUID, checked: Boolean) = entryDao.updateChecked(entryId, checked)
 
-    suspend fun delete(entry: JournalEntry) = entryDao.delete(entry)
+    suspend fun delete(entry: JournalEntry) {
+        entryDao.softDelete(entry.id, System.currentTimeMillis())
+    }
+
+    suspend fun restoreLatestDeletedEntry() {
+        val latestDeleted = entryDao.getLatestDeletedEntry()
+        if (latestDeleted != null) {
+            entryDao.restoreEntry(latestDeleted.entry.id)
+        }
+    }
+
+    fun getDeletedEntriesCount(): Flow<Int> = entryDao.getDeletedEntriesCount()
 
     suspend fun updateAliasesForCategory(categoryId: Int, aliases: List<String>) {
         val aliasesString = aliases.joinToString(",")

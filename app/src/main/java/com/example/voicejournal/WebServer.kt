@@ -210,7 +210,7 @@ class WebServer(private val db: AppDatabase) {
                         return@delete
                     }
 
-                    db.journalEntryDao().delete(entryWithCategories.entry)
+                    db.journalEntryDao().softDelete(entryWithCategories.entry.id, System.currentTimeMillis())
                     call.respond(HttpStatusCode.NoContent)
                 }
             }

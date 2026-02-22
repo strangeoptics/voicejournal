@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
@@ -42,11 +43,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -126,6 +129,7 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val category by viewModel.selectedCategory.collectAsState()
                 val selectedEntry by viewModel.selectedEntry.collectAsState()
+                val selectedEntryIds by viewModel.selectedEntryIds.collectAsState()
                 val selectedDate by viewModel.selectedDate.collectAsState()
                 val isGpsTrackingEnabled by viewModel.isGpsTrackingEnabled.collectAsState()
                 val canUndo by viewModel.canUndo.collectAsState()
@@ -327,40 +331,71 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxSize(),
                             topBar = {
                                 TopAppBar(
-                                    title = { Text("Voice Journal") },
+                                    title = {
+                                        if (selectedEntryIds.isNotEmpty()) {
+                                            Text("${selectedEntryIds.size} ausgewählt")
+                                        } else {
+                                            Text("Voice Journal")
+                                        }
+                                    },
                                     navigationIcon = {
-                                        IconButton(onClick = {
-                                            scope.launch { drawerState.open() }
-                                        }) {
-                                            Icon(Icons.Filled.MoreVert, contentDescription = "Navigation Menu")
+                                        if (selectedEntryIds.isNotEmpty()) {
+                                            IconButton(onClick = { viewModel.clearSelection() }) {
+                                                Icon(Icons.Filled.Close, contentDescription = "Auswahl aufheben")
+                                            }
+                                        } else {
+                                            IconButton(onClick = {
+                                                scope.launch { drawerState.open() }
+                                            }) {
+                                                Icon(Icons.Filled.MoreVert, contentDescription = "Navigation Menu")
+                                            }
                                         }
                                     },
                                     actions = {
-                                        IconButton(onClick = { viewModel.toggleShowCategoryTags() }) {
-                                            Icon(
-                                                imageVector = if (showCategoryTags) Icons.AutoMirrored.Filled.Label else Icons.AutoMirrored.Filled.LabelOff,
-                                                contentDescription = "Toggle Category Tags"
-                                            )
-                                        }
-                                        if (hasGpsTrackForSelectedDate) {
-                                            IconButton(onClick = { openGoogleMapsWithTrack(gpsTrackPoints) }) {
-                                                Icon(Icons.Filled.Map, contentDescription = "Show GPS Track on Map")
+                                        if (selectedEntryIds.isNotEmpty()) {
+                                            IconButton(onClick = {
+                                                scope.launch {
+                                                    val text = viewModel.getEntriesForSharing(selectedEntryIds)
+                                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                        type = "text/plain"
+                                                        putExtra(Intent.EXTRA_TEXT, text)
+                                                    }
+                                                    startActivity(Intent.createChooser(shareIntent, "Einträge teilen"))
+                                                    viewModel.clearSelection()
+                                                }
+                                            }) {
+                                                Icon(Icons.Filled.Share, contentDescription = "Teilen")
+                                            }
+                                        } else {
+                                            IconButton(onClick = { viewModel.toggleShowCategoryTags() }) {
+                                                Icon(
+                                                    imageVector = if (showCategoryTags) Icons.AutoMirrored.Filled.Label else Icons.AutoMirrored.Filled.LabelOff,
+                                                    contentDescription = "Toggle Category Tags"
+                                                )
+                                            }
+                                            if (hasGpsTrackForSelectedDate) {
+                                                IconButton(onClick = { openGoogleMapsWithTrack(gpsTrackPoints) }) {
+                                                    Icon(Icons.Filled.Map, contentDescription = "Show GPS Track on Map")
+                                                }
+                                            }
+                                            if (canUndo) {
+                                                IconButton(onClick = viewModel::onUndoDelete) {
+                                                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
+                                                }
+                                            }
+                                            IconButton(onClick = {
+                                                val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                                                val clip = ClipData.newPlainText("VoiceJournal", textToShow)
+                                                clipboardManager.setPrimaryClip(clip)
+                                                Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
+                                            }) {
+                                                Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopiert")
                                             }
                                         }
-                                        if (canUndo) {
-                                            IconButton(onClick = viewModel::onUndoDelete) {
-                                                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
-                                            }
-                                        }
-                                        IconButton(onClick = {
-                                            val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                                            val clip = ClipData.newPlainText("VoiceJournal", textToShow)
-                                            clipboardManager.setPrimaryClip(clip)
-                                            Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
-                                        }) {
-                                            Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopiert")
-                                        }
-                                    }
+                                    },
+                                    colors = TopAppBarDefaults.topAppBarColors(
+                                        containerColor = if (selectedEntryIds.isNotEmpty()) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+                                    )
                                  )
                             },
                             floatingActionButton = {
@@ -459,6 +494,8 @@ class MainActivity : ComponentActivity() {
                                         onCategoryChange = viewModel::onCategoryChange,
                                         onDeleteEntry = viewModel::onDeleteEntry,
                                         selectedEntry = selectedEntry,
+                                        selectedEntryIds = selectedEntryIds,
+                                        onToggleEntrySelection = viewModel::toggleEntrySelection,
                                         selectedDate = selectedDate,
                                         onDateSelected = viewModel::onDateSelected,
                                         onEntrySelected = viewModel::onEntrySelected,

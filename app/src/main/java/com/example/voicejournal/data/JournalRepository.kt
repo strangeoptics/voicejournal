@@ -87,6 +87,8 @@ class JournalRepository(
 
     suspend fun getEntryById(entryId: UUID): EntryWithCategories? = entryDao.getEntryById(entryId)
 
+    suspend fun getEntriesByIds(ids: Set<UUID>): List<EntryWithCategories> = entryDao.getEntriesByIds(ids)
+
     suspend fun importJournal(uri: Uri) = withContext(Dispatchers.IO) {
         context.contentResolver.openInputStream(uri)?.use { inputStream ->
             BufferedReader(InputStreamReader(inputStream)).use { reader ->

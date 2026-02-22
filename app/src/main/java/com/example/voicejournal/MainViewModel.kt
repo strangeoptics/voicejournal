@@ -71,6 +71,9 @@ class MainViewModel(
     private val _editingEntry = MutableStateFlow<EntryWithCategories?>(null)
     val editingEntry: StateFlow<EntryWithCategories?> = _editingEntry.asStateFlow()
 
+    private val _selectedEntryIds = MutableStateFlow<Set<UUID>>(emptySet())
+    val selectedEntryIds: StateFlow<Set<UUID>> = _selectedEntryIds.asStateFlow()
+
     private val _isGpsTrackingEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_GPS_TRACKING_ENABLED, false))
     val isGpsTrackingEnabled: StateFlow<Boolean> = _isGpsTrackingEnabled.asStateFlow()
 
@@ -209,11 +212,45 @@ class MainViewModel(
         MutableStateFlow(emptyList<EntryWithCategories>())
             .asStateFlow()
 
+    fun toggleEntrySelection(id: UUID) {
+        _selectedEntryIds.value = _selectedEntryIds.value.toMutableSet().apply {
+            if (contains(id)) remove(id) else add(id)
+        }
+    }
+
+    fun clearSelection() {
+        _selectedEntryIds.value = emptySet()
+    }
+
+    suspend fun getEntriesForSharing(ids: Set<UUID>): String {
+        val entries = repository.getEntriesByIds(ids)
+        val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm", Locale.getDefault())
+        return entries.joinToString(separator = "\n\n") { entryWithCats ->
+            val start = java.time.LocalDateTime.ofInstant(
+                java.time.Instant.ofEpochMilli(entryWithCats.entry.start_datetime),
+                ZoneId.systemDefault()
+            )
+            val stop = entryWithCats.entry.stop_datetime?.let {
+                java.time.LocalDateTime.ofInstant(
+                    java.time.Instant.ofEpochMilli(it),
+                    ZoneId.systemDefault()
+                )
+            }
+            val timeText = if (stop != null) {
+                "${start.format(formatter)} - ${stop.format(DateTimeFormatter.ofPattern("HH:mm"))}"
+            } else {
+                start.format(formatter)
+            }
+            "[$timeText]\n${entryWithCats.entry.content}"
+        }
+    }
+
 
     fun onCategoryChange(category: String) {
         _scrollToEntryId.value = null
         _selectedCategory.value = category
         _selectedEntry.value = null
+        clearSelection()
     }
     fun onDateSelected(date: LocalDate) {
         _selectedDate.value = if (_selectedDate.value == date) null else date
@@ -256,6 +293,7 @@ class MainViewModel(
     fun onDeleteEntry(entry: EntryWithCategories) {
         viewModelScope.launch {
             repository.delete(entry.entry)
+            _selectedEntryIds.value = _selectedEntryIds.value - entry.entry.id
             _refreshTrigger.emit(Unit)
         }
     }

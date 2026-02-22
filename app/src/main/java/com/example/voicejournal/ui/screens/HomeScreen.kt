@@ -64,6 +64,8 @@ fun HomeScreen(
     selectedCategory: String = "",
     truncationLength: Int,
     showCategoryTags: Boolean,
+    selectedEntryIds: Set<UUID> = emptySet(),
+    onToggleEntrySelection: (UUID) -> Unit = {},
     onCategoryChange: (String) -> Unit = {},
     onDeleteEntry: (EntryWithCategories) -> Unit = {},
     selectedEntry: EntryWithCategories? = null,
@@ -176,15 +178,14 @@ fun HomeScreen(
 
 
                         val isSelected = selectedEntry == entryWithCategories
+                        val isMultiSelected = selectedEntryIds.contains(entryWithCategories.entry.id)
+                        val isSelectionMode = selectedEntryIds.isNotEmpty()
                         val isDeletedCategory = selectedCategory == "Gelöscht"
                         
                         val dismissState = rememberSwipeToDismissBoxState(
                             confirmValueChange = { value ->
                                 if (value == SwipeToDismissBoxValue.StartToEnd && !isDeletedCategory) {
                                     onDeleteEntry(entryWithCategories)
-                                    // Wir geben bewusst false zurück, damit das UI das Item visuell *sofort* wieder zurückschnappen lässt.
-                                    // Währenddessen sorgt die Datenbank dafür, dass das Item ohnehin durch den invalidierten Paging-Stream
-                                    // aus der Liste entfernt wird. So umgehen wir vollständig das Problem mit den gecachten States (und roten Flächen) bei "Undo".
                                     false
                                 } else {
                                     false
@@ -229,10 +230,13 @@ fun HomeScreen(
                                 JournalEntryItem(
                                     entryWithCategories = entryWithCategories,
                                     isSelected = isSelected,
+                                    isMultiSelected = isMultiSelected,
+                                    isSelectionMode = isSelectionMode,
                                     showCategoryTags = showCategoryTags,
                                     truncationLength = truncationLength,
                                     onEntrySelected = onEntrySelected,
                                     onEditEntry = onEditEntry,
+                                    onToggleSelection = onToggleEntrySelection,
                                     onPhotoIconClicked = onPhotoIconClicked,
                                     onCheckedChange = { onCheckedChange(entryWithCategories) }
                                 )

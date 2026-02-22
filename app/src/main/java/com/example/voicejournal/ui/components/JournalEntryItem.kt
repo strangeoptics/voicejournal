@@ -23,22 +23,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.voicejournal.data.EntryWithCategories
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun JournalEntryItem(
     entryWithCategories: EntryWithCategories,
     isSelected: Boolean,
+    isMultiSelected: Boolean = false,
+    isSelectionMode: Boolean = false,
     showCategoryTags: Boolean,
     truncationLength: Int,
     onEntrySelected: (EntryWithCategories) -> Unit,
     onEditEntry: (EntryWithCategories) -> Unit,
+    onToggleSelection: (UUID) -> Unit = {},
     onPhotoIconClicked: (EntryWithCategories) -> Unit,
     onCheckedChange: (Boolean) -> Unit
 ) {
@@ -53,15 +58,25 @@ fun JournalEntryItem(
             .padding(vertical = 4.dp)
             .combinedClickable(
                 onClick = {
-                    onEntrySelected(entryWithCategories)
-                    if (entryWithCategories.entry.content.length > truncationLength) {
-                        isExpanded = !isExpanded
+                    if (isSelectionMode) {
+                        onToggleSelection(entryWithCategories.entry.id)
+                    } else {
+                        onEntrySelected(entryWithCategories)
+                        if (entryWithCategories.entry.content.length > truncationLength) {
+                            isExpanded = !isExpanded
+                        }
                     }
                 },
-                onLongClick = { onEditEntry(entryWithCategories) }
+                onLongClick = {
+                    onToggleSelection(entryWithCategories.entry.id)
+                }
             ),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = when {
+                isMultiSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                isSelected -> MaterialTheme.colorScheme.primaryContainer
+                else -> MaterialTheme.colorScheme.surfaceVariant
+            }
         )
     ) {
         Column(

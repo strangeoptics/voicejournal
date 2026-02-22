@@ -57,6 +57,10 @@ interface JournalEntryDao {
     suspend fun getEntryById(entryId: UUID): EntryWithCategories?
 
     @Transaction
+    @Query("SELECT * FROM journal_entries WHERE id IN (:ids) ORDER BY start_datetime ASC")
+    suspend fun getEntriesByIds(ids: Set<UUID>): List<EntryWithCategories>
+
+    @Transaction
     @Query("""
         SELECT * FROM journal_entries 
         WHERE

@@ -17,7 +17,7 @@ object NotificationHelper {
     fun showNotification(context: Context) {
         val intent = Intent(context, MainActivity::class.java).apply {
             action = NOTIFICATION_ACTION
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -40,7 +40,10 @@ object NotificationHelper {
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("Voice Journal")
             .setContentText("Ready to listen!")
+            .setContentIntent(pendingIntent)
             .addAction(R.drawable.ic_launcher_foreground, "Start Listening", pendingIntent)
+            .setOngoing(true)
+            .setAutoCancel(false)
             .build()
 
         notificationManager.notify(NOTIFICATION_ID, notification)

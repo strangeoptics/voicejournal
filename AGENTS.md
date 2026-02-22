@@ -17,6 +17,11 @@ Texts dictated via the `SpeechRecognitionManager` are saved as new `JournalEntry
 - The trigger word is automatically removed from the final entry content.
 - If no match is found, the entry is assigned to the currently selected category.
 
+### Persistent Voice Recording Notification
+To allow quick access to voice dictation, the app provides a persistent notification acting as a shortcut to trigger speech recognition. 
+- The notification is marked as `ongoing` and `autoCancel(false)`, keeping it permanently in the notification drawer while the app is active, without being swipeable or dismissed upon click.
+- Clicking the notification uses `Intent.FLAG_ACTIVITY_SINGLE_TOP` to cleanly reuse the existing `MainActivity` via `onNewIntent`.
+
 ## Project Context: Frameworks and Libraries
 
 ### Core Architecture

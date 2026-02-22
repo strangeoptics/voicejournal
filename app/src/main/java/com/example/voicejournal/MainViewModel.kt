@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -57,6 +59,11 @@ class MainViewModel(
         const val KEY_WEBSERVER_ENABLED = "webserver_enabled"
         const val KEY_DEVELOPER_MODE_ENABLED = "developer_mode_enabled"
         const val KEY_SHOW_CATEGORY_TAGS = "show_category_tags"
+
+        private val jsonFormat = Json {
+            prettyPrint = true
+            encodeDefaults = true
+        }
     }
 
     private val _selectedCategory = MutableStateFlow("")
@@ -245,6 +252,10 @@ class MainViewModel(
         }
     }
 
+    suspend fun getEntriesForSharingAsJson(ids: Set<UUID>): String {
+        val entries = repository.getEntriesByIds(ids).map { it.entry }
+        return jsonFormat.encodeToString(entries)
+    }
 
     fun onCategoryChange(category: String) {
         _scrollToEntryId.value = null

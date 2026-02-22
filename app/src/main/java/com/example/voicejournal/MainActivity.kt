@@ -39,6 +39,8 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -353,18 +355,46 @@ class MainActivity : ComponentActivity() {
                                     },
                                     actions = {
                                         if (selectedEntryIds.isNotEmpty()) {
-                                            IconButton(onClick = {
-                                                scope.launch {
-                                                    val text = viewModel.getEntriesForSharing(selectedEntryIds)
-                                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                        type = "text/plain"
-                                                        putExtra(Intent.EXTRA_TEXT, text)
-                                                    }
-                                                    startActivity(Intent.createChooser(shareIntent, "Einträge teilen"))
-                                                    viewModel.clearSelection()
+                                            var shareMenuExpanded by remember { mutableStateOf(false) }
+                                            Box {
+                                                IconButton(onClick = { shareMenuExpanded = true }) {
+                                                    Icon(Icons.Filled.Share, contentDescription = "Teilen")
                                                 }
-                                            }) {
-                                                Icon(Icons.Filled.Share, contentDescription = "Teilen")
+                                                DropdownMenu(
+                                                    expanded = shareMenuExpanded,
+                                                    onDismissRequest = { shareMenuExpanded = false }
+                                                ) {
+                                                    DropdownMenuItem(
+                                                        text = { Text("Als Text teilen") },
+                                                        onClick = {
+                                                            shareMenuExpanded = false
+                                                            scope.launch {
+                                                                val text = viewModel.getEntriesForSharing(selectedEntryIds)
+                                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                                    type = "text/plain"
+                                                                    putExtra(Intent.EXTRA_TEXT, text)
+                                                                }
+                                                                startActivity(Intent.createChooser(shareIntent, "Einträge teilen"))
+                                                                viewModel.clearSelection()
+                                                            }
+                                                        }
+                                                    )
+                                                    DropdownMenuItem(
+                                                        text = { Text("Als JSON teilen") },
+                                                        onClick = {
+                                                            shareMenuExpanded = false
+                                                            scope.launch {
+                                                                val json = viewModel.getEntriesForSharingAsJson(selectedEntryIds)
+                                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                                    type = "text/plain" // We use text/plain so it's shareable via messenger text fields
+                                                                    putExtra(Intent.EXTRA_TEXT, json)
+                                                                }
+                                                                startActivity(Intent.createChooser(shareIntent, "Einträge als JSON teilen"))
+                                                                viewModel.clearSelection()
+                                                            }
+                                                        }
+                                                    )
+                                                }
                                             }
                                         } else {
                                             IconButton(onClick = { viewModel.toggleShowCategoryTags() }) {

@@ -24,7 +24,9 @@ The entries are grouped by day.
 
 ### Data Persistence
 - **Local Database:** **Room Persistence Library** for storing `JournalEntry` and `Category` objects in a local SQLite database.
-- Zero Data Loss Policy, Version Increment, Mandatory Migration Classes
+- **Zero Data Loss Policy:** Version Increment, Mandatory Migration Classes. 
+  - Uses **Soft Delete** for Journal Entries (`deletedAt: Long?`). Hard deletions are avoided.
+  - A virtual, hardcoded read-only category ("Gelöscht", ID `-1`) acts as a recycle bin showing all soft-deleted entries.
 
 ### Dependency Injection (DI)
 - **DI Framework:** **Hilt** to simplify dependency injection throughout the project.

@@ -117,14 +117,6 @@ class MainViewModel(
         categories.map { it.category }.distinct()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val categoryKeywordsMap: StateFlow<Map<String, String>> = categoriesFlow.map { categories ->
-        categories.flatMap { category ->
-            category.aliases.split(',').map { alias ->
-                alias.trim().lowercase(Locale.ROOT) to category.category.lowercase(Locale.ROOT)
-            }
-        }.associate { it }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
-
     val gpsTrackPoints: StateFlow<List<GpsTrackPoint>> = selectedDate
         .flatMapLatest { date ->
             val startOfDay = (date ?: LocalDate.now()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -441,6 +433,7 @@ class MainViewModel(
             testEntries.forEach { (entry, categories) -> repository.insert(entry, categories) }
         }
     }
+    
     fun processRecognizedText(recognizedText: String) {
         viewModelScope.launch {
             val entryToUpdate = _selectedEntry.value
@@ -453,26 +446,15 @@ class MainViewModel(
                 _selectedEntry.value = null // Deselect after update
                 _refreshTrigger.emit(Unit)
             } else {
-                val currentCategoryKeywords = categoryKeywordsMap.value
-                val foundKeyword = currentCategoryKeywords.keys.find { keyword ->
-                    recognizedText.startsWith(keyword, ignoreCase = true) &&
-                            (recognizedText.length == keyword.length || recognizedText.getOrNull(keyword.length)?.isWhitespace() == true)
-                }
+                val categories = categoriesFlow.value
+                val currentCategoryName = _selectedCategory.value
+
+                val (targetCategory, contentToAdd) = parseRecognizedTextForCategory(recognizedText, categories, currentCategoryName)
+
                 val now = java.time.LocalDateTime.now()
                 val start_datetime = _selectedDate.value?.atTime(now.toLocalTime())?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
                     ?: System.currentTimeMillis()
                 _selectedDate.value = null
-
-                val (targetCategory, contentToAdd) = if (foundKeyword != null) {
-                    val categoryName = currentCategoryKeywords[foundKeyword]!!
-                    val content = recognizedText.substring(foundKeyword.length).trim()
-                    _selectedCategory.value = categoryName
-                    val category = categoriesFlow.value.find { it.category == categoryName } ?: Category(category = categoryName, aliases = "")
-                    category to content
-                } else {
-                    val category = categoriesFlow.value.find { it.category == _selectedCategory.value } ?: Category(category = _selectedCategory.value, aliases = "")
-                    category to recognizedText
-                }
 
                 if (contentToAdd.isNotEmpty()) {
                     val sanitizedContent = contentToAdd.replace("luisa", "Eloisa", ignoreCase = true)
@@ -481,10 +463,63 @@ class MainViewModel(
                         start_datetime = start_datetime
                     )
                     repository.insert(entry, listOf(targetCategory))
+                    
+                    if (_selectedCategory.value != targetCategory.category) {
+                        _selectedCategory.value = targetCategory.category
+                    }
                     _refreshTrigger.emit(Unit)
                 }
             }
         }
+    }
+
+    private fun parseRecognizedTextForCategory(
+        text: String,
+        categories: List<Category>,
+        currentCategoryName: String
+    ): Pair<Category, String> {
+        val trimmedText = text.trim()
+        val defaultCat = categories.find { it.category == currentCategoryName }
+            ?: Category(category = currentCategoryName, aliases = "")
+            
+        if (trimmedText.isEmpty()) {
+            return Pair(defaultCat, "")
+        }
+
+        // a) Extrahiere das erste Wort (ignoriere Satzzeichen und beachte Case-Insensitivity)
+        val wordRegex = Regex("^([^\\s\\p{Punct}]+)")
+        val matchResult = wordRegex.find(trimmedText)
+
+        if (matchResult != null) {
+            val firstWord = matchResult.groupValues[1].lowercase(Locale.ROOT)
+
+            // b) Prüfe ob dieses Wort category oder aliases entspricht
+            val matchedCategory = categories.find { category ->
+                val catName = category.category.lowercase(Locale.ROOT)
+                val aliases = category.aliases.split(',')
+                    .map { it.trim().lowercase(Locale.ROOT) }
+                    .filter { it.isNotEmpty() }
+                
+                firstWord == catName || aliases.contains(firstWord)
+            }
+
+            if (matchedCategory != null) {
+                // c) Entferne das Trigger-Wort aus dem Text
+                val removePrefixRegex = Regex("^[^\\s\\p{Punct}]+[\\s\\p{Punct}]*")
+                var remainingText = trimmedText.replaceFirst(removePrefixRegex, "").trim()
+                
+                // Capitalize the first letter of the remaining text
+                if (remainingText.isNotEmpty()) {
+                    remainingText = remainingText.replaceFirstChar { 
+                        if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() 
+                    }
+                }
+
+                return Pair(matchedCategory, remainingText)
+            }
+        }
+
+        return Pair(defaultCat, trimmedText)
     }
 
     fun toggleEntryChecked(entry: JournalEntry) {

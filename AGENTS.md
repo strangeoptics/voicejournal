@@ -9,6 +9,13 @@ Paging3 library.
 There is also a FastScroller (app\src\main\java\com\example\voicejournal\ui\components\FastScroller.kt).
 The entries are grouped by day.
 
+## Core Features
+
+### Voice Dictation & Smart Categorization
+Texts dictated via the `SpeechRecognitionManager` are saved as new `JournalEntry` objects. The app uses the **first word** of the recognized text as a smart category trigger:
+- If this word matches a category name (`Category.category`) or one of its comma-separated aliases (`Category.aliases`, case-insensitive), the new entry is automatically assigned to that specific category instead of the active one.
+- The trigger word is automatically removed from the final entry content.
+- If no match is found, the entry is assigned to the currently selected category.
 
 ## Project Context: Frameworks and Libraries
 

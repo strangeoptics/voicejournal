@@ -380,17 +380,35 @@ class MainActivity : ComponentActivity() {
                                                         }
                                                     )
                                                     DropdownMenuItem(
-                                                        text = { Text("Als JSON teilen") },
+                                                        text = { Text("Als .vj Datei exportieren") },
                                                         onClick = {
                                                             shareMenuExpanded = false
                                                             scope.launch {
-                                                                val json = viewModel.getEntriesForSharingAsJson(selectedEntryIds)
-                                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                                    type = "text/plain" // We use text/plain so it's shareable via messenger text fields
-                                                                    putExtra(Intent.EXTRA_TEXT, json)
+                                                                try {
+                                                                    val json = viewModel.getEntriesForSharingAsJson(selectedEntryIds)
+                                                                    
+                                                                    // Create temporary file with dynamic name to avoid caching issues in chat apps
+                                                                    val cacheDir = context.cacheDir
+                                                                    val file = java.io.File(cacheDir, "VoiceJournal_Export.vj")
+                                                                    file.writeText(json)
+                                                                    
+                                                                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                                                                        context,
+                                                                        "${context.packageName}.fileprovider",
+                                                                        file
+                                                                    )
+                                                                    
+                                                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                                                        type = "application/vj"
+                                                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                                    }
+                                                                    startActivity(Intent.createChooser(shareIntent, "Einträge exportieren"))
+                                                                } catch(e: Exception) {
+                                                                    Toast.makeText(context, "Export fehlgeschlagen", Toast.LENGTH_SHORT).show()
+                                                                } finally {
+                                                                    viewModel.clearSelection()
                                                                 }
-                                                                startActivity(Intent.createChooser(shareIntent, "Einträge als JSON teilen"))
-                                                                viewModel.clearSelection()
                                                             }
                                                         }
                                                     )

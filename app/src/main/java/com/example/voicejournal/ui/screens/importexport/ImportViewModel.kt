@@ -80,9 +80,16 @@ class ImportViewModel(
             _isLoading.value = true
             try {
                 withContext(Dispatchers.IO) {
-                    val newEntries = _entries.value.map { it.copy(id = UUID.randomUUID()) }
-                    newEntries.forEach { entry ->
-                        repository.insert(entry, listOf(category))
+                    _entries.value.forEach { entry ->
+                        // Prüfen, ob der Eintrag anhand der exportierten UUID bereits existiert
+                        val existing = repository.getEntryById(entry.id)
+                        if (existing != null) {
+                            // Wenn er existiert, aktualisieren wir den Content und weisen ihm ggf. die Ziel-Kategorie neu zu
+                            repository.update(entry, listOf(category))
+                        } else {
+                            // Andernfalls speichern wir ihn als neuen Eintrag (aber behalten die Original-ID)
+                            repository.insert(entry, listOf(category))
+                        }
                     }
                 }
                 onComplete()

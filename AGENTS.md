@@ -22,6 +22,11 @@ To allow quick access to voice dictation, the app provides a persistent notifica
 - The notification is marked as `ongoing` and `autoCancel(false)`, keeping it permanently in the notification drawer while the app is active, without being swipeable or dismissed upon click.
 - Clicking the notification uses `Intent.FLAG_ACTIVITY_SINGLE_TOP` to cleanly reuse the existing `MainActivity` via `onNewIntent`.
 
+### Multi-Select & Sharing
+Journal entries can be selected simultaneously by long-pressing an entry and tapping others in the list. The top app bar transforms into a contextual action bar. Users can share the selected entries via standard Android sharing intents in two formats:
+- **Plain Text**: A clean, readable string where each entry is prefixed by its date and time.
+- **JSON**: The full `JournalEntry` objects (without their linked categories) serialized into a structured JSON array.
+
 ## Project Context: Frameworks and Libraries
 
 ### Core Architecture

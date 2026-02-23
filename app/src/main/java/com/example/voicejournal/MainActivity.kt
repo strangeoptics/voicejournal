@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
@@ -355,6 +356,17 @@ class MainActivity : ComponentActivity() {
                                     },
                                     actions = {
                                         if (selectedEntryIds.isNotEmpty()) {
+                                            if (selectedEntryIds.size == 1) {
+                                                IconButton(onClick = {
+                                                    val entryId = selectedEntryIds.first()
+                                                    val intent = EditEntryActivity.newIntent(context, entryId)
+                                                    context.startActivity(intent)
+                                                    viewModel.clearSelection()
+                                                }) {
+                                                    Icon(Icons.Filled.Edit, contentDescription = "Eintrag bearbeiten")
+                                                }
+                                            }
+
                                             var shareMenuExpanded by remember { mutableStateOf(false) }
                                             Box {
                                                 IconButton(onClick = { shareMenuExpanded = true }) {
@@ -415,6 +427,16 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
                                         } else {
+                                            if (selectedEntry != null) {
+                                                IconButton(onClick = {
+                                                    val entryId = selectedEntry!!.entry.id
+                                                    val intent = EditEntryActivity.newIntent(context, entryId)
+                                                    context.startActivity(intent)
+                                                    viewModel.onEntrySelected(selectedEntry!!) // Auswahl im Hintergrund wieder aufheben
+                                                }) {
+                                                    Icon(Icons.Filled.Edit, contentDescription = "Eintrag bearbeiten")
+                                                }
+                                            }
                                             IconButton(onClick = { viewModel.toggleShowCategoryTags() }) {
                                                 Icon(
                                                     imageVector = if (showCategoryTags) Icons.AutoMirrored.Filled.Label else Icons.AutoMirrored.Filled.LabelOff,

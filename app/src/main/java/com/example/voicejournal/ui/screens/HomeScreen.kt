@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -68,6 +69,7 @@ fun HomeScreen(
     onToggleEntrySelection: (UUID) -> Unit = {},
     onCategoryChange: (String) -> Unit = {},
     onDeleteEntry: (EntryWithCategories) -> Unit = {},
+    onHardDeleteEntry: (EntryWithCategories) -> Unit = {},
     selectedEntry: EntryWithCategories? = null,
     selectedDate: LocalDate? = null,
     onDateSelected: (LocalDate) -> Unit = {},
@@ -184,8 +186,12 @@ fun HomeScreen(
                         
                         val dismissState = rememberSwipeToDismissBoxState(
                             confirmValueChange = { value ->
-                                if (value == SwipeToDismissBoxValue.StartToEnd && !isDeletedCategory) {
-                                    onDeleteEntry(entryWithCategories)
+                                if (value == SwipeToDismissBoxValue.StartToEnd) {
+                                    if (!isDeletedCategory) {
+                                        onDeleteEntry(entryWithCategories)
+                                    } else {
+                                        onHardDeleteEntry(entryWithCategories)
+                                    }
                                     false
                                 } else {
                                     false
@@ -206,7 +212,7 @@ fun HomeScreen(
                             SwipeToDismissBox(
                                 state = dismissState,
                                 enableDismissFromEndToStart = false,
-                                gesturesEnabled = !isDeletedCategory,
+                                gesturesEnabled = true, // Enabled for both standard and hard delete
                                 backgroundContent = {
                                     val color = when (dismissState.targetValue) {
                                         SwipeToDismissBoxValue.StartToEnd -> Color.Red
@@ -220,8 +226,8 @@ fun HomeScreen(
                                         contentAlignment = Alignment.CenterStart
                                     ) {
                                         Icon(
-                                            Icons.Default.Delete,
-                                            contentDescription = "Delete",
+                                            imageVector = if (isDeletedCategory) Icons.Default.DeleteForever else Icons.Default.Delete,
+                                            contentDescription = if (isDeletedCategory) "Hard Delete" else "Delete",
                                             tint = Color.White
                                         )
                                     }

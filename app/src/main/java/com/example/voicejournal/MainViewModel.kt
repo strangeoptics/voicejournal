@@ -316,6 +316,16 @@ class MainViewModel(
         }
     }
 
+    fun onHardDeleteEntry(entry: EntryWithCategories) {
+        viewModelScope.launch {
+            if (_selectedCategory.value == "Gelöscht" || entry.categories.any { it.id == -1 }) {
+                repository.hardDelete(entry.entry)
+                _selectedEntryIds.value = _selectedEntryIds.value - entry.entry.id
+                _refreshTrigger.emit(Unit)
+            }
+        }
+    }
+
     fun scrollToEntry(entryId: UUID) {
         viewModelScope.launch {
             val entry = repository.getEntryById(entryId)

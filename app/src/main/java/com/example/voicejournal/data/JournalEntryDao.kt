@@ -90,6 +90,9 @@ interface JournalEntryDao {
     @Query("UPDATE journal_entries SET deletedAt = :timestamp WHERE id = :id")
     suspend fun softDelete(id: UUID, timestamp: Long)
 
+    @Query("DELETE FROM journal_entries WHERE id = :id")
+    suspend fun hardDeleteById(id: UUID)
+
     @Query("UPDATE journal_entries SET deletedAt = NULL WHERE id = :id")
     suspend fun restoreEntry(id: UUID)
 

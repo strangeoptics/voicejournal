@@ -220,6 +220,10 @@ class JournalRepository(
     suspend fun delete(entry: JournalEntry) {
         entryDao.softDelete(entry.id, System.currentTimeMillis())
     }
+    
+    suspend fun hardDelete(entry: JournalEntry) {
+        entryDao.hardDeleteById(entry.id)
+    }
 
     suspend fun restoreLatestDeletedEntry() {
         val latestDeleted = entryDao.getLatestDeletedEntry()

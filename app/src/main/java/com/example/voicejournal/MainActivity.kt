@@ -563,6 +563,7 @@ class MainActivity : ComponentActivity() {
                                         selectedCategory = category,
                                         onCategoryChange = viewModel::onCategoryChange,
                                         onDeleteEntry = viewModel::onDeleteEntry,
+                                        onHardDeleteEntry = viewModel::onHardDeleteEntry,
                                         selectedEntry = selectedEntry,
                                         selectedEntryIds = selectedEntryIds,
                                         onToggleEntrySelection = viewModel::toggleEntrySelection,

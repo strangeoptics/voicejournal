@@ -232,6 +232,10 @@ class JournalRepository(
         }
     }
 
+    suspend fun restoreEntry(id: UUID) {
+        entryDao.restoreEntry(id)
+    }
+
     fun getDeletedEntriesCount(): Flow<Int> = entryDao.getDeletedEntriesCount()
 
     suspend fun updateAliasesForCategory(categoryId: Int, aliases: List<String>) {

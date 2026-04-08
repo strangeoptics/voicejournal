@@ -32,10 +32,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
@@ -150,8 +153,31 @@ class MainActivity : ComponentActivity() {
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
                 var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
+                var showHardDeleteSelectionDialog by remember { mutableStateOf(false) }
                 var isFabMenuExpanded by remember { mutableStateOf(false) }
 
+                if (showHardDeleteSelectionDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showHardDeleteSelectionDialog = false },
+                        title = { Text("Auswahl endgültig löschen") },
+                        text = { Text("Möchtest du diese ${selectedEntryIds.size} Einträge wirklich unwiderruflich löschen?") },
+                        confirmButton = {
+                            TextButton(
+                                onClick = {
+                                    viewModel.hardDeleteEntries(selectedEntryIds)
+                                    showHardDeleteSelectionDialog = false
+                                }
+                            ) {
+                                Text("Löschen")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showHardDeleteSelectionDialog = false }) {
+                                Text("Abbrechen")
+                            }
+                        }
+                    )
+                }
 
                 if (showDeleteConfirmationDialog) {
                     AlertDialog(
@@ -426,6 +452,24 @@ class MainActivity : ComponentActivity() {
                                                     )
                                                 }
                                             }
+                                            
+                                            // Delete / Restore buttons based on category
+                                            if (category == "Gelöscht") {
+                                                // Hard delete and Restore are possible
+                                                IconButton(onClick = { viewModel.restoreEntries(selectedEntryIds) }) {
+                                                    Icon(Icons.Filled.Restore, contentDescription = "Einträge wiederherstellen")
+                                                }
+                                                IconButton(onClick = { 
+                                                    showHardDeleteSelectionDialog = true
+                                                }) {
+                                                    Icon(Icons.Filled.DeleteForever, contentDescription = "Endgültig löschen")
+                                                }
+                                            } else {
+                                                // Normal delete
+                                                IconButton(onClick = { viewModel.deleteEntries(selectedEntryIds) }) {
+                                                    Icon(Icons.Filled.Delete, contentDescription = "Einträge löschen")
+                                                }
+                                            }
                                         } else {
                                             if (selectedEntry != null) {
                                                 IconButton(onClick = {
@@ -562,8 +606,6 @@ class MainActivity : ComponentActivity() {
                                         categories = categories,
                                         selectedCategory = category,
                                         onCategoryChange = viewModel::onCategoryChange,
-                                        onDeleteEntry = viewModel::onDeleteEntry,
-                                        onHardDeleteEntry = viewModel::onHardDeleteEntry,
                                         selectedEntry = selectedEntry,
                                         selectedEntryIds = selectedEntryIds,
                                         onToggleEntrySelection = viewModel::toggleEntrySelection,

@@ -301,10 +301,11 @@ class MainViewModel(
         }
     }
 
-    fun onDeleteEntry(entry: EntryWithCategories) {
+    fun deleteEntries(ids: Set<UUID>) {
         viewModelScope.launch {
-            repository.delete(entry.entry)
-            _selectedEntryIds.value = _selectedEntryIds.value - entry.entry.id
+            val entries = repository.getEntriesByIds(ids)
+            entries.forEach { repository.delete(it.entry) }
+            _selectedEntryIds.value = emptySet()
             _refreshTrigger.emit(Unit)
         }
     }
@@ -316,11 +317,22 @@ class MainViewModel(
         }
     }
 
-    fun onHardDeleteEntry(entry: EntryWithCategories) {
+    fun hardDeleteEntries(ids: Set<UUID>) {
         viewModelScope.launch {
-            if (_selectedCategory.value == "Gelöscht" || entry.categories.any { it.id == -1 }) {
-                repository.hardDelete(entry.entry)
-                _selectedEntryIds.value = _selectedEntryIds.value - entry.entry.id
+            if (_selectedCategory.value == "Gelöscht") {
+                val entries = repository.getEntriesByIds(ids)
+                entries.forEach { repository.hardDelete(it.entry) }
+                _selectedEntryIds.value = emptySet()
+                _refreshTrigger.emit(Unit)
+            }
+        }
+    }
+
+    fun restoreEntries(ids: Set<UUID>) {
+        viewModelScope.launch {
+            if (_selectedCategory.value == "Gelöscht") {
+                ids.forEach { repository.restoreEntry(it) }
+                _selectedEntryIds.value = emptySet()
                 _refreshTrigger.emit(Unit)
             }
         }

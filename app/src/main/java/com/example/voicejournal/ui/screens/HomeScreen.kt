@@ -25,11 +25,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -40,8 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalViewConfiguration
-import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
 import com.example.voicejournal.data.EntryWithCategories
@@ -68,8 +63,6 @@ fun HomeScreen(
     selectedEntryIds: Set<UUID> = emptySet(),
     onToggleEntrySelection: (UUID) -> Unit = {},
     onCategoryChange: (String) -> Unit = {},
-    onDeleteEntry: (EntryWithCategories) -> Unit = {},
-    onHardDeleteEntry: (EntryWithCategories) -> Unit = {},
     selectedEntry: EntryWithCategories? = null,
     selectedDate: LocalDate? = null,
     onDateSelected: (LocalDate) -> Unit = {},
@@ -182,72 +175,20 @@ fun HomeScreen(
                         val isSelected = selectedEntry == entryWithCategories
                         val isMultiSelected = selectedEntryIds.contains(entryWithCategories.entry.id)
                         val isSelectionMode = selectedEntryIds.isNotEmpty()
-                        val isDeletedCategory = selectedCategory == "Gelöscht"
-                        
-                        val dismissState = rememberSwipeToDismissBoxState(
-                            confirmValueChange = { value ->
-                                if (value == SwipeToDismissBoxValue.StartToEnd) {
-                                    if (!isDeletedCategory) {
-                                        onDeleteEntry(entryWithCategories)
-                                    } else {
-                                        onHardDeleteEntry(entryWithCategories)
-                                    }
-                                    false
-                                } else {
-                                    false
-                                }
-                            },
-                            positionalThreshold = { it * 0.60f }
+
+                        JournalEntryItem(
+                            entryWithCategories = entryWithCategories,
+                            isSelected = isSelected,
+                            isMultiSelected = isMultiSelected,
+                            isSelectionMode = isSelectionMode,
+                            showCategoryTags = showCategoryTags,
+                            truncationLength = truncationLength,
+                            onEntrySelected = onEntrySelected,
+                            onEditEntry = onEditEntry,
+                            onToggleSelection = onToggleEntrySelection,
+                            onPhotoIconClicked = onPhotoIconClicked,
+                            onCheckedChange = { onCheckedChange(entryWithCategories) }
                         )
-
-                        val currentViewConfiguration = LocalViewConfiguration.current
-                        val customViewConfiguration = remember(currentViewConfiguration) {
-                            object : ViewConfiguration by currentViewConfiguration {
-                                override val touchSlop: Float
-                                    get() = currentViewConfiguration.touchSlop * 2.5f
-                            }
-                        }
-
-                        CompositionLocalProvider(LocalViewConfiguration provides customViewConfiguration) {
-                            SwipeToDismissBox(
-                                state = dismissState,
-                                enableDismissFromEndToStart = false,
-                                gesturesEnabled = true, // Enabled for both standard and hard delete
-                                backgroundContent = {
-                                    val color = when (dismissState.targetValue) {
-                                        SwipeToDismissBoxValue.StartToEnd -> Color.Red
-                                        else -> Color.Transparent
-                                    }
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(color)
-                                            .padding(horizontal = 20.dp),
-                                        contentAlignment = Alignment.CenterStart
-                                    ) {
-                                        Icon(
-                                            imageVector = if (isDeletedCategory) Icons.Default.DeleteForever else Icons.Default.Delete,
-                                            contentDescription = if (isDeletedCategory) "Hard Delete" else "Delete",
-                                            tint = Color.White
-                                        )
-                                    }
-                                }
-                            ) {
-                                JournalEntryItem(
-                                    entryWithCategories = entryWithCategories,
-                                    isSelected = isSelected,
-                                    isMultiSelected = isMultiSelected,
-                                    isSelectionMode = isSelectionMode,
-                                    showCategoryTags = showCategoryTags,
-                                    truncationLength = truncationLength,
-                                    onEntrySelected = onEntrySelected,
-                                    onEditEntry = onEditEntry,
-                                    onToggleSelection = onToggleEntrySelection,
-                                    onPhotoIconClicked = onPhotoIconClicked,
-                                    onCheckedChange = { onCheckedChange(entryWithCategories) }
-                                )
-                            }
-                        }
                     }
                 }
             }

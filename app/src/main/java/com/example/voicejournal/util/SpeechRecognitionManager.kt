@@ -8,23 +8,28 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Bundle
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Base64
 import android.util.Log
 import androidx.core.app.ActivityCompat
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
 import java.util.Locale
 import kotlin.math.abs
@@ -38,6 +43,7 @@ class SpeechRecognitionManager(
 
     private val appContext: Context = context.applicationContext
     private var speechRecognizer: SpeechRecognizer? = null
+    private var recordingJob: Job? = null
     private val _isRecording = MutableStateFlow(false)
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
 
@@ -90,6 +96,9 @@ class SpeechRecognitionManager(
         silenceThreshold: Int = 500,
         silenceTimeRequired: Int = 2000
     ) {
+        if (_isRecording.value) {
+            return
+        }
         if (service == "GOOGLE_CLOUD" && !apiKey.isNullOrEmpty()) {
             startGoogleCloudListening(apiKey, maxRecordingTimeSeconds, silenceThreshold, silenceTimeRequired)
         } else {
@@ -99,24 +108,34 @@ class SpeechRecognitionManager(
 
     fun stopListening() {
         if (_isRecording.value) {
-            // For Google Cloud, this will stop the recording loop
+            // For Google Cloud, setting _isRecording to false exits the PCM read loop cleanly
             _isRecording.value = false
-            // For Android Recognizer
+            // For Android SpeechRecognizer
             scope.launch(Dispatchers.Main) {
                 speechRecognizer?.stopListening()
             }
         }
     }
 
-
     private fun startAndroidListening() {
+        val recognizer = speechRecognizer
+        if (recognizer == null) {
+            onError?.invoke(SpeechRecognizer.ERROR_CLIENT)
+            return
+        }
         _isRecording.value = true
         val speechRecognizerIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
         }
-        speechRecognizer?.startListening(speechRecognizerIntent)
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            recognizer.startListening(speechRecognizerIntent)
+        } else {
+            scope.launch(Dispatchers.Main) {
+                recognizer.startListening(speechRecognizerIntent)
+            }
+        }
     }
 
     private fun startGoogleCloudListening(
@@ -131,38 +150,67 @@ class SpeechRecognitionManager(
         }
 
         _isRecording.value = true
-        scope.launch(Dispatchers.IO) {
+        recordingJob = scope.launch(Dispatchers.IO) {
+            var audioRecord: AudioRecord? = null
+            val audioData = ByteArrayOutputStream()
             try {
                 val sampleRate = 16000
                 val channelConfig = AudioFormat.CHANNEL_IN_MONO
                 val audioFormat = AudioFormat.ENCODING_PCM_16BIT
                 val minBufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+                if (minBufferSize <= 0) {
+                    Log.e("SpeechRecognitionManager", "Invalid minBufferSize from AudioRecord: $minBufferSize")
+                    withContext(Dispatchers.Main) {
+                        onError?.invoke(SpeechRecognizer.ERROR_AUDIO)
+                    }
+                    return@launch
+                }
                 val bufferSize = minBufferSize * 2
 
-                val audioRecord = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, channelConfig, audioFormat, bufferSize)
+                val record = AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    sampleRate,
+                    channelConfig,
+                    audioFormat,
+                    bufferSize
+                )
+                audioRecord = record
 
-                val audioData = ByteArrayOutputStream()
+                if (record.state != AudioRecord.STATE_INITIALIZED) {
+                    Log.e("SpeechRecognitionManager", "AudioRecord failed to initialize (state=${record.state})")
+                    withContext(Dispatchers.Main) {
+                        onError?.invoke(SpeechRecognizer.ERROR_AUDIO)
+                    }
+                    return@launch
+                }
+
                 val buffer = ByteArray(bufferSize)
-
-                audioRecord.startRecording()
-
+                record.startRecording()
+                if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                    Log.e("SpeechRecognitionManager", "AudioRecord failed to start recording")
+                    withContext(Dispatchers.Main) {
+                        onError?.invoke(SpeechRecognizer.ERROR_AUDIO)
+                    }
+                    return@launch
+                }
 
                 val startTime = System.currentTimeMillis()
-                val maxRecordingTime = maxRecordingTimeSeconds * 1000 // Convert to milliseconds
-                var lastSoundTime = System.currentTimeMillis()
+                val maxRecordingTimeMs = maxRecordingTimeSeconds.coerceAtLeast(1) * 1000L
+                var lastSoundTime = startTime
 
-                while (_isRecording.value && (System.currentTimeMillis() - startTime < maxRecordingTime)) {
-                    val read = audioRecord.read(buffer, 0, buffer.size)
+                while (isActive && _isRecording.value && (System.currentTimeMillis() - startTime < maxRecordingTimeMs)) {
+                    val read = record.read(buffer, 0, buffer.size)
                     if (read > 0) {
                         audioData.write(buffer, 0, read)
 
                         var hasSound = false
                         var i = 0
-                        while (i < read) {
+                        // Ensure i + 1 < read so odd byte counts never cause IndexOutOfBoundsException
+                        while (i + 1 < read) {
                             val lowByte = buffer[i].toInt() and 0xFF
                             val highByte = buffer[i + 1].toInt()
-                            val sample = (highByte shl 8) or lowByte
-                            if (abs(sample.toShort().toInt()) > silenceThreshold) {
+                            val sample = ((highByte shl 8) or lowByte).toShort().toInt()
+                            if (abs(sample) > silenceThreshold) {
                                 hasSound = true
                                 break
                             }
@@ -171,39 +219,49 @@ class SpeechRecognitionManager(
 
                         if (hasSound) {
                             lastSoundTime = System.currentTimeMillis()
-                        } else {
-                            if (System.currentTimeMillis() - lastSoundTime > silenceTimeRequired) {
-                                break // Stop recording due to silence
-                            }
+                        } else if (System.currentTimeMillis() - lastSoundTime > silenceTimeRequired) {
+                            break // Stop recording due to silence
                         }
                     } else if (read < 0) {
                         Log.e("SpeechRecognitionManager", "AudioRecord read error: $read")
                         break
                     }
                 }
-
-                audioRecord.stop()
-                audioRecord.release()
-                _isRecording.value = false
-
-                if (audioData.size() == 0) {
-                    withContext(Dispatchers.Main) {
-                        onError?.invoke(SpeechRecognizer.ERROR_AUDIO)
-                    }
-                    return@launch
-                }
-
-                val audioBytes = audioData.toByteArray()
-                val base64Audio = Base64.encodeToString(audioBytes, Base64.NO_WRAP)
-
-                sendToGoogleCloud(base64Audio, apiKey)
-
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                Log.e("SpeechRecognitionManager", "Error during Google Cloud listening", e)
+                Log.e("SpeechRecognitionManager", "Error during Google Cloud audio recording", e)
                 withContext(Dispatchers.Main) {
-                    onError?.invoke(SpeechRecognizer.ERROR_NETWORK)
+                    onError?.invoke(SpeechRecognizer.ERROR_AUDIO)
+                }
+                return@launch
+            } finally {
+                _isRecording.value = false
+                audioRecord?.let { record ->
+                    if (record.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                        try {
+                            record.stop()
+                        } catch (e: IllegalStateException) {
+                            Log.w("SpeechRecognitionManager", "Error stopping AudioRecord", e)
+                        }
+                    }
+                    try {
+                        record.release()
+                    } catch (e: Exception) {
+                        Log.w("SpeechRecognitionManager", "Error releasing AudioRecord", e)
+                    }
                 }
             }
+
+            if (audioData.size() == 0) {
+                withContext(Dispatchers.Main) {
+                    onError?.invoke(SpeechRecognizer.ERROR_AUDIO)
+                }
+                return@launch
+            }
+
+            val base64Audio = Base64.encodeToString(audioData.toByteArray(), Base64.NO_WRAP)
+            sendToGoogleCloud(base64Audio, apiKey)
         }
     }
 
@@ -222,32 +280,46 @@ class SpeechRecognitionManager(
 
         try {
             val result = withContext(Dispatchers.IO) {
-                (url.openConnection() as HttpURLConnection).run {
-                    requestMethod = "POST"
-                    doOutput = true
-                    setRequestProperty("Content-Type", "application/json")
-                    outputStream.use { os ->
-                        OutputStreamWriter(os).use { osw ->
+                val connection = (url.openConnection() as HttpURLConnection)
+                try {
+                    connection.requestMethod = "POST"
+                    connection.connectTimeout = CONNECT_TIMEOUT_MS
+                    connection.readTimeout = READ_TIMEOUT_MS
+                    connection.doOutput = true
+                    connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+
+                    connection.outputStream.use { os ->
+                        OutputStreamWriter(os, Charsets.UTF_8).use { osw ->
                             osw.write(json.toString())
                         }
                     }
 
-                    if (responseCode == 200) {
-                        inputStream.bufferedReader().use { it.readText() }
+                    if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                        connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
                     } else {
-                        Log.e("SpeechRecognitionManager", "Google API Error: $responseCode - ${errorStream.bufferedReader().use { it.readText() }}")
+                        val errorBody = connection.errorStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+                        Log.e("SpeechRecognitionManager", "Google API Error: ${connection.responseCode} - $errorBody")
                         null
                     }
+                } finally {
+                    connection.disconnect()
                 }
             }
 
             if (result != null) {
                 val jsonResponse = JSONObject(result)
                 val results = jsonResponse.optJSONArray("results")
-                if (results != null && results.length() > 0) {
-                    val transcript = results.getJSONObject(0).getJSONArray("alternatives").getJSONObject(0).getString("transcript")
+                val transcript = results
+                    ?.optJSONObject(0)
+                    ?.optJSONArray("alternatives")
+                    ?.optJSONObject(0)
+                    ?.optString("transcript", "")
+                    ?.trim()
+                    .orEmpty()
+
+                if (transcript.isNotEmpty()) {
                     withContext(Dispatchers.Main) {
-                        onTextRecognized(capitalizeFirstLetter(transcript.trim()))
+                        onTextRecognized(capitalizeFirstLetter(transcript))
                     }
                 } else {
                     withContext(Dispatchers.Main) {
@@ -258,6 +330,13 @@ class SpeechRecognitionManager(
                 withContext(Dispatchers.Main) {
                     onError?.invoke(SpeechRecognizer.ERROR_NETWORK)
                 }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: SocketTimeoutException) {
+            Log.e("SpeechRecognitionManager", "Timeout sending audio to Google Cloud", e)
+            withContext(Dispatchers.Main) {
+                onError?.invoke(SpeechRecognizer.ERROR_NETWORK_TIMEOUT)
             }
         } catch (e: Exception) {
             Log.e("SpeechRecognitionManager", "Error sending to Google Cloud", e)
@@ -273,6 +352,8 @@ class SpeechRecognitionManager(
 
     fun destroy() {
         _isRecording.value = false
+        recordingJob?.cancel()
+        recordingJob = null
         speechRecognizer?.let { recognizer ->
             recognizer.setRecognitionListener(null)
             try {
@@ -285,5 +366,10 @@ class SpeechRecognitionManager(
             }
         }
         speechRecognizer = null
+    }
+
+    companion object {
+        private const val CONNECT_TIMEOUT_MS = 15_000
+        private const val READ_TIMEOUT_MS = 30_000
     }
 }

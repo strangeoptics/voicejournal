@@ -180,6 +180,9 @@ fun EditEntryScreen(
     val startDateTimeMillis by viewModel.startDateTime.collectAsState()
     val stopDateTimeMillis by viewModel.stopDateTime.collectAsState()
     val selectedCategories by viewModel.selectedCategories.collectAsState()
+    val isSaving by viewModel.isSaving.collectAsState()
+    val saveCompleted by viewModel.saveCompleted.collectAsState()
+    val saveError by viewModel.saveError.collectAsState()
 
     val startDateTime = remember(startDateTimeMillis) {
         LocalDateTime.ofInstant(Instant.ofEpochMilli(startDateTimeMillis), ZoneId.systemDefault())
@@ -302,6 +305,19 @@ fun EditEntryScreen(
     val context = LocalContext.current
     val isRecording by speechRecognitionManager.isRecording.collectAsState()
 
+    LaunchedEffect(saveCompleted) {
+        if (saveCompleted) {
+            onNavigateUp()
+        }
+    }
+
+    LaunchedEffect(saveError) {
+        saveError?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            viewModel.clearSaveError()
+        }
+    }
+
     val speechService by viewModel.speechService.collectAsState()
     val googleCloudApiKey by viewModel.googleCloudApiKey.collectAsState()
 
@@ -322,7 +338,7 @@ fun EditEntryScreen(
             TopAppBar(
                 title = { Text(if (isNewEntry) "New Entry" else "Edit Entry") },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateUp) {
+                    IconButton(onClick = onNavigateUp, enabled = !isSaving) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -345,10 +361,10 @@ fun EditEntryScreen(
                             contentDescription = if (isRecording) "Stop Recording" else "Start Recording"
                         )
                     }
-                    IconButton(onClick = {
-                        viewModel.saveEntry()
-                        onNavigateUp()
-                    }) {
+                    IconButton(
+                        onClick = { viewModel.saveEntry() },
+                        enabled = !isSaving
+                    ) {
                         Icon(Icons.Default.Done, contentDescription = "Save Entry")
                     }
                 }

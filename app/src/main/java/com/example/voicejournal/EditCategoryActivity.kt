@@ -3,6 +3,7 @@ package com.example.voicejournal
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -52,6 +53,22 @@ class EditCategoryActivity : ComponentActivity() {
         setContent {
             VoicejournalTheme {
                 val category by viewModel.category.collectAsState()
+                val isSaving by viewModel.isSaving.collectAsState()
+                val saveCompleted by viewModel.saveCompleted.collectAsState()
+                val saveError by viewModel.saveError.collectAsState()
+
+                LaunchedEffect(saveCompleted) {
+                    if (saveCompleted) {
+                        finish()
+                    }
+                }
+
+                LaunchedEffect(saveError) {
+                    saveError?.let { message ->
+                        Toast.makeText(this@EditCategoryActivity, message, Toast.LENGTH_LONG).show()
+                        viewModel.clearSaveError()
+                    }
+                }
 
                 // Handle the case where a category is being edited but not yet loaded
                 if (categoryId != -1 && category == null) {
@@ -61,10 +78,10 @@ class EditCategoryActivity : ComponentActivity() {
                 } else {
                     EditCategoryScreen(
                         initialCategory = category,
+                        isSaving = isSaving,
                         onSave = { name, aliases, showAll, color, checkable, showDate ->
                             val orderIndex = category?.orderIndex ?: (highestOrderIndex + 1)
                             viewModel.saveCategory(name, aliases, showAll, orderIndex, color, checkable, showDate)
-                            finish()
                         },
                         onNavigateUp = { finish() }
                     )
@@ -90,6 +107,7 @@ class EditCategoryActivity : ComponentActivity() {
 @Composable
 fun EditCategoryScreen(
     initialCategory: Category?,
+    isSaving: Boolean = false,
     onSave: (String, String, Boolean, String, Boolean, Boolean) -> Unit,
     onNavigateUp: () -> Unit
 ) {
@@ -106,7 +124,7 @@ fun EditCategoryScreen(
             TopAppBar(
                 title = { Text(if (initialCategory == null) "Add Category" else "Edit Category") },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateUp) {
+                    IconButton(onClick = onNavigateUp, enabled = !isSaving) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
@@ -114,7 +132,7 @@ fun EditCategoryScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = {
-                if (name.isNotBlank()) {
+                if (!isSaving && name.isNotBlank()) {
                     onSave(name, aliases, showAll, color, checkable, showDate)
                 }
             }) {

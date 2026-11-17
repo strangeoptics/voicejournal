@@ -10,11 +10,13 @@ import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.util.UUID
 
@@ -52,6 +54,15 @@ class EditEntryViewModel(
 
     private val _selectedCategories = MutableStateFlow<List<String>>(emptyList())
     val selectedCategories: StateFlow<List<String>> = _selectedCategories.asStateFlow()
+
+    private val _isSaving = MutableStateFlow(false)
+    val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
+
+    private val _saveCompleted = MutableStateFlow(false)
+    val saveCompleted: StateFlow<Boolean> = _saveCompleted.asStateFlow()
+
+    private val _saveError = MutableStateFlow<String?>(null)
+    val saveError: StateFlow<String?> = _saveError.asStateFlow()
 
     init {
         _speechService.value = sharedPreferences.getString("speech_service", "Android Speech Recognizer") ?: "Android Speech Recognizer"
@@ -120,37 +131,46 @@ class EditEntryViewModel(
         _selectedCategories.value = currentSelection
     }
 
+    fun clearSaveError() {
+        _saveError.value = null
+    }
+
     fun saveEntry() {
+        if (_isSaving.value || _saveCompleted.value) return
+        val currentEntrySnapshot = _entry.value ?: return
+
         val updatedCategories = _selectedCategories.value
         val updatedContent = _entryContent.value.text
         val updatedStartDatetime = _startDateTime.value
         val updatedStopDatetime = _stopDateTime.value
         val currentHasImage = _hasImage.value
-        
+
+        _isSaving.value = true
+        _saveError.value = null
+
         viewModelScope.launch {
-            val categories = updatedCategories.map { categoryName ->
-                allCategories.value.find { c -> c.category == categoryName } ?: Category(category = categoryName, aliases = "")
-            }
-            if (entryId == null) {
-                // Creating a new entry
-                val newEntry = _entry.value!!.entry.copy(
-                    content = updatedContent,
-                    start_datetime = updatedStartDatetime,
-                    stop_datetime = updatedStopDatetime,
-                    hasImage = currentHasImage
-                )
-                repository.insert(newEntry, categories)
-            } else {
-                // Updating an existing entry
-                _entry.value?.let { currentEntry ->
-                    val updatedEntry = currentEntry.entry.copy(
+            try {
+                withContext(NonCancellable) {
+                    val categories = updatedCategories.map { categoryName ->
+                        allCategories.value.find { c -> c.category == categoryName }
+                            ?: Category(category = categoryName, aliases = "")
+                    }
+                    val entryToPersist = currentEntrySnapshot.entry.copy(
                         content = updatedContent,
                         start_datetime = updatedStartDatetime,
                         stop_datetime = updatedStopDatetime,
                         hasImage = currentHasImage
                     )
-                    repository.update(updatedEntry, categories)
+                    if (entryId == null) {
+                        repository.insert(entryToPersist, categories)
+                    } else {
+                        repository.update(entryToPersist, categories)
+                    }
                 }
+                _saveCompleted.value = true
+            } catch (e: Exception) {
+                _isSaving.value = false
+                _saveError.value = e.localizedMessage ?: "Failed to save entry"
             }
         }
     }

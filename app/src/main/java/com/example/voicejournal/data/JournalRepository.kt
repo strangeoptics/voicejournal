@@ -5,15 +5,18 @@ import android.net.Uri
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.BufferedReader
 import java.io.FileOutputStream
+import java.io.IOException
 import java.io.InputStreamReader
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -26,11 +29,18 @@ object JournalConstants {
 }
 
 class JournalRepository(
+    private val database: AppDatabase,
     private val entryDao: JournalEntryDao,
     private val categoryDao: CategoryDao,
     private val gpsTrackPointDao: GpsTrackPointDao,
     private val context: Context
 ) {
+
+    private val importJson = Json { ignoreUnknownKeys = true }
+    private val exportJson = Json {
+        prettyPrint = true
+        encodeDefaults = true
+    }
 
     private val virtualDeletedCategory = Category(
         id = JournalConstants.CATEGORY_DELETED_ID,
@@ -89,17 +99,40 @@ class JournalRepository(
 
     suspend fun getEntriesByIds(ids: Set<UUID>): List<EntryWithCategories> = entryDao.getEntriesByIds(ids)
 
+    private suspend fun ensureCategoryExists(exportedCategory: Category) {
+        if (exportedCategory.id == JournalConstants.CATEGORY_DELETED_ID ||
+            exportedCategory.category.equals("Gelöscht", ignoreCase = true) ||
+            exportedCategory.category.isBlank()
+        ) {
+            return
+        }
+        val existing = categoryDao.getCategoryByName(exportedCategory.category)
+        if (existing == null) {
+            // Reset auto-generated ID to 0 to avoid primary key collisions across devices while preserving metadata
+            categoryDao.insertCategory(exportedCategory.copy(id = 0))
+        }
+    }
+
     suspend fun importJournal(uri: Uri) = withContext(Dispatchers.IO) {
-        context.contentResolver.openInputStream(uri)?.use { inputStream ->
-            BufferedReader(InputStreamReader(inputStream)).use { reader ->
-                val content = reader.readText()
-                try {
-                    val json = Json { ignoreUnknownKeys = true }
-                    if (content.contains("\"version\"")) {
-                        val version = json.decodeFromString<VersionCheck>(content).version
-                        if (version == 3) {
-                            val journalExport = json.decodeFromString<JournalExportV3>(content)
-                            journalExport.categories.forEach { categoryDao.insertCategory(it) }
+        val content = context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
+                reader.readText()
+            }
+        } ?: throw IOException("Die ausgewählte Datei konnte nicht geöffnet werden.")
+
+        val trimmed = content.trim().removePrefix("\uFEFF")
+        if (trimmed.isEmpty()) {
+            throw IllegalArgumentException("Die ausgewählte Datei ist leer.")
+        }
+
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+            try {
+                database.withTransaction {
+                    if (trimmed.startsWith("{") && trimmed.contains("\"version\"")) {
+                        val version = importJson.decodeFromString<VersionCheck>(trimmed).version
+                        if (version >= 3) {
+                            val journalExport = importJson.decodeFromString<JournalExportV3>(trimmed)
+                            journalExport.categories.forEach { ensureCategoryExists(it) }
                             journalExport.entries.forEach { entryExport ->
                                 val entry = JournalEntry(
                                     id = entryExport.id,
@@ -107,57 +140,126 @@ class JournalRepository(
                                     start_datetime = entryExport.start_datetime,
                                     stop_datetime = entryExport.stop_datetime,
                                     hasImage = entryExport.hasImage,
-                                    checked = entryExport.checked
+                                    checked = entryExport.checked,
+                                    deletedAt = null
                                 )
-                                val categories = entryExport.categories.map { categoryName ->
-                                    Category(category = categoryName, aliases = "")
-                                }
+                                val categories = entryExport.categories
+                                    .filter { it.isNotBlank() && !it.equals("Gelöscht", ignoreCase = true) }
+                                    .map { categoryName ->
+                                        Category(category = categoryName, aliases = "")
+                                    }
                                 entryDao.insertWithCategories(entry, categories, categoryDao)
                             }
-                        } else { // V2
-                            val journalExport = json.decodeFromString<JournalExport>(content)
-                            journalExport.categories.forEach { categoryDao.insertCategory(it) }
-                            journalExport.entries.forEach { entry ->
-                                val v2Entry = json.decodeFromString<JournalEntryV2>(Json.encodeToString(entry))
-                                val newEntry = JournalEntry(content = v2Entry.content, start_datetime = v2Entry.timestamp, hasImage = v2Entry.hasImage)
-                                val category = Category(category = v2Entry.title, aliases = "")
-                                entryDao.insertWithCategories(newEntry, listOf(category), categoryDao)
+                        } else {
+                            val journalExport = importJson.decodeFromString<JournalExport>(trimmed)
+                            journalExport.categories.forEach { ensureCategoryExists(it) }
+                            journalExport.entries.forEach { v2Entry ->
+                                val newEntry = JournalEntry(
+                                    content = v2Entry.content,
+                                    start_datetime = v2Entry.timestamp,
+                                    hasImage = v2Entry.hasImage
+                                )
+                                val categoryName = v2Entry.title.ifBlank { "journal" }
+                                entryDao.insertWithCategories(
+                                    newEntry,
+                                    listOf(Category(category = categoryName, aliases = "")),
+                                    categoryDao
+                                )
                             }
                         }
-                    } else { // V1 or legacy
-                        val entries = Json.decodeFromString<List<JournalEntryV2>>(content)
-                        entries.forEach { v2Entry ->
-                             val newEntry = JournalEntry(content = v2Entry.content, start_datetime = v2Entry.timestamp, hasImage = v2Entry.hasImage)
-                             val category = Category(category = v2Entry.title, aliases = "")
-                             entryDao.insertWithCategories(newEntry, listOf(category), categoryDao)
+                    } else if (trimmed.startsWith("[")) {
+                        if (trimmed.contains("\"start_datetime\"")) {
+                            val entries = importJson.decodeFromString<List<JournalEntry>>(trimmed)
+                            val fallbackCategory = Category(category = "journal", aliases = "")
+                            entries.forEach { imported ->
+                                val cleanEntry = imported.copy(deletedAt = null)
+                                val existing = entryDao.getEntryByIdIncludingDeleted(cleanEntry.id)
+                                if (existing != null && existing.categories.isNotEmpty()) {
+                                    entryDao.updateWithCategories(cleanEntry, existing.categories, categoryDao)
+                                } else {
+                                    entryDao.insertWithCategories(cleanEntry, listOf(fallbackCategory), categoryDao)
+                                }
+                            }
+                        } else {
+                            val entries = importJson.decodeFromString<List<JournalEntryV2>>(trimmed)
+                            entries.forEach { v2Entry ->
+                                val newEntry = JournalEntry(
+                                    content = v2Entry.content,
+                                    start_datetime = v2Entry.timestamp,
+                                    hasImage = v2Entry.hasImage
+                                )
+                                val categoryName = v2Entry.title.ifBlank { "journal" }
+                                entryDao.insertWithCategories(
+                                    newEntry,
+                                    listOf(Category(category = categoryName, aliases = "")),
+                                    categoryDao
+                                )
+                            }
                         }
+                    } else {
+                        throw IllegalArgumentException("Unbekanntes JSON-Backup-Format.")
                     }
-                } catch (e: Exception) {
-                    // Fallback to legacy text format
-                    parseLegacyFormat(content)
                 }
+            } catch (e: SerializationException) {
+                throw IllegalArgumentException("Ungültiges JSON-Backup-Format: ${e.message}", e)
+            }
+        } else {
+            val importedCount = database.withTransaction {
+                parseLegacyFormat(trimmed)
+            }
+            if (importedCount == 0) {
+                throw IllegalArgumentException("Keine gültigen Tagebucheinträge in der Datei gefunden.")
             }
         }
     }
 
-    private suspend fun parseLegacyFormat(content: String) {
+    private suspend fun parseLegacyFormat(content: String): Int {
         val pattern = Pattern.compile("\\[(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})\\] (.*)")
+        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+        var importedCount = 0
         content.lines().forEach { line ->
             val matcher = pattern.matcher(line)
             if (matcher.matches()) {
-                val dateTimeString = matcher.group(1)
-                val contentString = matcher.group(2)
-                val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                val start_datetime = LocalDateTime.parse(dateTimeString, formatter)
+                val dateTimeString = matcher.group(1) ?: return@forEach
+                val contentString = matcher.group(2) ?: ""
+                val startDatetime = LocalDateTime.parse(dateTimeString, formatter)
                     .atZone(ZoneId.systemDefault())
                     .toInstant()
                     .toEpochMilli()
 
                 val entry = JournalEntry(
                     content = contentString,
-                    start_datetime = start_datetime
+                    start_datetime = startDatetime
                 )
-                entryDao.insertWithCategories(entry, listOf(Category(category="journal", aliases = "")), categoryDao)
+                entryDao.insertWithCategories(
+                    entry,
+                    listOf(Category(category = "journal", aliases = "")),
+                    categoryDao
+                )
+                importedCount++
+            }
+        }
+        return importedCount
+    }
+
+    suspend fun importEntriesToCategory(entries: List<JournalEntry>, targetCategory: Category) = withContext(Dispatchers.IO) {
+        if (targetCategory.id == JournalConstants.CATEGORY_DELETED_ID ||
+            targetCategory.category.equals("Gelöscht", ignoreCase = true)
+        ) {
+            throw IllegalArgumentException("Einträge können nicht in die Kategorie 'Gelöscht' importiert werden.")
+        }
+        database.withTransaction {
+            entries.forEach { imported ->
+                val cleanEntry = imported.copy(deletedAt = null)
+                val existing = entryDao.getEntryByIdIncludingDeleted(cleanEntry.id)
+                if (existing != null) {
+                    val mergedCategories = (existing.categories + targetCategory)
+                        .filter { it.id != JournalConstants.CATEGORY_DELETED_ID && !it.category.equals("Gelöscht", ignoreCase = true) }
+                        .distinctBy { it.category }
+                    entryDao.updateWithCategories(cleanEntry, mergedCategories, categoryDao)
+                } else {
+                    entryDao.insertWithCategories(cleanEntry, listOf(targetCategory), categoryDao)
+                }
             }
         }
     }
@@ -177,13 +279,15 @@ class JournalRepository(
             )
         }
         val exportData = JournalExportV3(entries = exportEntries, categories = categories)
-        val jsonString = Json {
-            prettyPrint = true
-            encodeDefaults = true
-        }.encodeToString(exportData)
-        context.contentResolver.openFileDescriptor(uri, "w")?.use {
-            FileOutputStream(it.fileDescriptor).use { fos ->
-                fos.write(jsonString.toByteArray())
+        val jsonString = exportJson.encodeToString(exportData)
+
+        // Use "wt" (write + truncate) so overwriting an existing longer file never leaves trailing bytes
+        val pfd = context.contentResolver.openFileDescriptor(uri, "wt")
+            ?: throw IOException("Die Zieldatei konnte nicht zum Schreiben geöffnet werden.")
+        pfd.use { descriptor ->
+            FileOutputStream(descriptor.fileDescriptor).use { fos ->
+                fos.write(jsonString.toByteArray(Charsets.UTF_8))
+                fos.flush()
             }
         }
     }
@@ -247,7 +351,9 @@ class JournalRepository(
         if (categoryId != JournalConstants.CATEGORY_DELETED_ID) categoryDao.deleteCategory(categoryId)
     }
 
-    suspend fun deleteAll() = entryDao.deleteAll() // Should also delete categories? For now, it doesn't.
+    suspend fun deleteAll() {
+        entryDao.softDeleteAll(System.currentTimeMillis())
+    }
 
     // GPS Track Point methods
     suspend fun insertGpsPoint(point: GpsTrackPoint) {
@@ -279,12 +385,3 @@ class JournalRepository(
 
 @kotlinx.serialization.Serializable
 private data class VersionCheck(val version: Int)
-
-@kotlinx.serialization.Serializable
-private data class JournalEntryV2(
-    val id: Int = 0,
-    val title: String,
-    val content: String,
-    val timestamp: Long,
-    val hasImage: Boolean = false
-)

@@ -46,6 +46,13 @@ android {
             pickFirsts += "META-INF/io.netty.versions.properties"
         }
     }
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {

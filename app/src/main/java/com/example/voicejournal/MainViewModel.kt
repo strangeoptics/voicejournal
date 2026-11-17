@@ -458,18 +458,18 @@ class MainViewModel(
 
     suspend fun importJournal(uri: Uri) {
         repository.importJournal(uri)
+        _refreshTrigger.emit(Unit)
     }
 
     fun deleteAllData() {
         viewModelScope.launch {
             repository.deleteAll()
+            _refreshTrigger.emit(Unit)
         }
     }
 
     fun addTestData() {
         viewModelScope.launch {
-            repository.deleteAll()
-
             fun startDatetimeFromString(dateTimeString: String): Long {
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
                 val localDateTime = java.time.LocalDateTime.parse(dateTimeString, formatter)
@@ -502,6 +502,7 @@ class MainViewModel(
                 JournalEntry(content = "Another app idea from two days ago.", start_datetime = startDatetimeFromString("${twoDaysAgo}T20:00:00")) to listOf(eloisa)
             )
             testEntries.forEach { (entry, categories) -> repository.insert(entry, categories) }
+            _refreshTrigger.emit(Unit)
         }
     }
     

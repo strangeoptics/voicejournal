@@ -6,22 +6,25 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.voicejournal.data.Category
+import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
 import com.example.voicejournal.di.Injector
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.io.BufferedReader
+import java.io.IOException
 import java.io.InputStreamReader
-import java.util.UUID
 
 class ImportViewModel(
     private val repository: JournalRepository,
@@ -37,6 +40,7 @@ class ImportViewModel(
     val error: StateFlow<String?> = _error.asStateFlow()
 
     val categories: StateFlow<List<Category>> = repository.allCategories
+        .map { list -> list.filter { it.id != JournalConstants.CATEGORY_DELETED_ID } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _selectedCategory = MutableStateFlow<Category?>(null)
@@ -45,7 +49,9 @@ class ImportViewModel(
     private val jsonFormat = Json { ignoreUnknownKeys = true }
 
     fun selectCategory(category: Category) {
-        _selectedCategory.value = category
+        if (category.id != JournalConstants.CATEGORY_DELETED_ID) {
+            _selectedCategory.value = category
+        }
     }
 
     fun loadFile(uri: Uri) {
@@ -54,12 +60,14 @@ class ImportViewModel(
             _error.value = null
             try {
                 val parsedEntries = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                        BufferedReader(InputStreamReader(inputStream)).use { reader ->
+                    val stream = context.contentResolver.openInputStream(uri)
+                        ?: throw IOException("Datei konnte nicht geöffnet werden.")
+                    stream.use { inputStream ->
+                        BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
                             val content = reader.readText()
                             jsonFormat.decodeFromString<List<JournalEntry>>(content)
                         }
-                    } ?: emptyList()
+                    }
                 }
                 _entries.value = parsedEntries
             } catch (e: Exception) {
@@ -75,22 +83,14 @@ class ImportViewModel(
     }
 
     fun saveEntries(onComplete: () -> Unit) {
+        if (_isLoading.value) return
+        val category = _selectedCategory.value ?: return
         viewModelScope.launch {
-            val category = _selectedCategory.value ?: return@launch
             _isLoading.value = true
+            _error.value = null
             try {
-                withContext(Dispatchers.IO) {
-                    _entries.value.forEach { entry ->
-                        // Prüfen, ob der Eintrag anhand der exportierten UUID bereits existiert
-                        val existing = repository.getEntryById(entry.id)
-                        if (existing != null) {
-                            // Wenn er existiert, aktualisieren wir den Content und weisen ihm ggf. die Ziel-Kategorie neu zu
-                            repository.update(entry, listOf(category))
-                        } else {
-                            // Andernfalls speichern wir ihn als neuen Eintrag (aber behalten die Original-ID)
-                            repository.insert(entry, listOf(category))
-                        }
-                    }
+                withContext(NonCancellable) {
+                    repository.importEntriesToCategory(_entries.value, category)
                 }
                 onComplete()
             } catch (e: Exception) {

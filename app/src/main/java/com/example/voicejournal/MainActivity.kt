@@ -185,8 +185,8 @@ class MainActivity : ComponentActivity() {
                 if (showDeleteConfirmationDialog) {
                     AlertDialog(
                         onDismissRequest = { showDeleteConfirmationDialog = false },
-                        title = { Text("Delete All Data") },
-                        text = { Text("Are you sure you want to delete all journal entries and categories? This action cannot be undone.") },
+                        title = { Text("Alle Einträge löschen") },
+                        text = { Text("Möchtest du wirklich alle aktiven Tagebucheinträge in den Papierkorb (\"Gelöscht\") verschieben?") },
                         confirmButton = {
                             TextButton(
                                 onClick = {
@@ -194,12 +194,12 @@ class MainActivity : ComponentActivity() {
                                     showDeleteConfirmationDialog = false
                                 }
                             ) {
-                                Text("Delete")
+                                Text("Verschieben")
                             }
                         },
                         dismissButton = {
                             TextButton(onClick = { showDeleteConfirmationDialog = false }) {
-                                Text("Cancel")
+                                Text("Abbrechen")
                             }
                         }
                     )

@@ -5,10 +5,19 @@ import java.util.UUID
 
 // For V2 and below
 @Serializable
+data class JournalEntryV2(
+    val id: Int = 0,
+    val title: String,
+    val content: String,
+    val timestamp: Long,
+    val hasImage: Boolean = false
+)
+
+@Serializable
 data class JournalExport(
     val version: Int = 2,
-    val entries: List<JournalEntry>, // Note: JournalEntry for V2 had a `title` field for category
-    val categories: List<Category>
+    val entries: List<JournalEntryV2>,
+    val categories: List<Category> = emptyList()
 )
 
 // For V3

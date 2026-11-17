@@ -57,6 +57,10 @@ interface JournalEntryDao {
     suspend fun getEntryById(entryId: UUID): EntryWithCategories?
 
     @Transaction
+    @Query("SELECT * FROM journal_entries WHERE id = :entryId")
+    suspend fun getEntryByIdIncludingDeleted(entryId: UUID): EntryWithCategories?
+
+    @Transaction
     @Query("SELECT * FROM journal_entries WHERE id IN (:ids) ORDER BY start_datetime ASC")
     suspend fun getEntriesByIds(ids: Set<UUID>): List<EntryWithCategories>
 
@@ -78,11 +82,18 @@ interface JournalEntryDao {
     """)
     fun getEntriesForCalendar(startTime: Long, endTime: Long): Flow<List<EntryWithCategories>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(entry: JournalEntry)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertOrIgnore(entry: JournalEntry): Long
 
     @Update
     suspend fun update(entry: JournalEntry)
+
+    @Transaction
+    suspend fun insert(entry: JournalEntry) {
+        if (insertOrIgnore(entry) == -1L) {
+            update(entry)
+        }
+    }
 
     @Query("UPDATE journal_entries SET checked = :isChecked WHERE id = :id")
     suspend fun updateChecked(id: UUID, isChecked: Boolean)
@@ -103,10 +114,10 @@ interface JournalEntryDao {
     @Query("SELECT COUNT(id) FROM journal_entries WHERE deletedAt IS NOT NULL")
     fun getDeletedEntriesCount(): Flow<Int>
 
-    @Query("DELETE FROM journal_entries")
-    suspend fun deleteAll()
+    @Query("UPDATE journal_entries SET deletedAt = :timestamp WHERE deletedAt IS NULL")
+    suspend fun softDeleteAll(timestamp: Long = System.currentTimeMillis())
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertJournalEntryCategoryCrossRef(crossRef: JournalEntryCategoryCrossRef)
 
     @Query("DELETE FROM journal_entry_category_cross_ref WHERE entryId = :entryId")
@@ -116,10 +127,14 @@ interface JournalEntryDao {
     suspend fun insertWithCategories(entry: JournalEntry, categories: List<Category>, categoryDao: CategoryDao) {
         insert(entry)
         categories.forEach { category ->
+            if (category.id == JournalConstants.CATEGORY_DELETED_ID || category.category == "Gelöscht") {
+                return@forEach
+            }
             var cat = categoryDao.getCategoryByName(category.category)
             if (cat == null) {
-                val newId = categoryDao.insertCategory(category)
-                cat = category.copy(id = newId.toInt())
+                val newId = categoryDao.insertCategory(category.copy(id = 0))
+                cat = categoryDao.getCategoryByName(category.category)
+                    ?: category.copy(id = newId.toInt())
             }
             insertJournalEntryCategoryCrossRef(
                 JournalEntryCategoryCrossRef(entry.id, cat.id)
@@ -132,10 +147,14 @@ interface JournalEntryDao {
         update(entry)
         deleteCrossRefsForEntry(entry.id)
         categories.forEach { category ->
-             var cat = categoryDao.getCategoryByName(category.category)
+            if (category.id == JournalConstants.CATEGORY_DELETED_ID || category.category == "Gelöscht") {
+                return@forEach
+            }
+            var cat = categoryDao.getCategoryByName(category.category)
             if (cat == null) {
-                val newId = categoryDao.insertCategory(category)
-                cat = category.copy(id = newId.toInt())
+                val newId = categoryDao.insertCategory(category.copy(id = 0))
+                cat = categoryDao.getCategoryByName(category.category)
+                    ?: category.copy(id = newId.toInt())
             }
             insertJournalEntryCategoryCrossRef(
                 JournalEntryCategoryCrossRef(entry.id, cat.id)

@@ -1,7 +1,6 @@
 package com.example.voicejournal
 
 import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import androidx.core.content.edit
@@ -363,10 +362,11 @@ class MainViewModel(
     fun saveWebServerEnabled(isEnabled: Boolean) {
         sharedPreferences.edit { putBoolean(KEY_WEBSERVER_ENABLED, isEnabled) }
 
-        val intent = Intent(applicationContext, WebServerService::class.java).apply {
-            action = if (isEnabled) WebServerService.ACTION_START else WebServerService.ACTION_STOP
+        if (isEnabled) {
+            WebServerService.start(applicationContext)
+        } else {
+            WebServerService.stop(applicationContext)
         }
-        applicationContext.startService(intent)
     }
 
     fun saveGpsInterval(interval: Int) {

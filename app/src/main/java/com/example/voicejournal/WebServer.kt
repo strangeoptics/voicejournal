@@ -28,6 +28,7 @@ import java.util.UUID
 
 class WebServer(private val db: AppDatabase) {
 
+    @Volatile
     private var server: ApplicationEngine? = null
 
     val isRunning: Boolean
@@ -44,6 +45,7 @@ class WebServer(private val db: AppDatabase) {
         showDate = true
     )
 
+    @Synchronized
     fun start() {
         if (isRunning) return
         server = embeddedServer(Netty, port = 8080) {
@@ -234,6 +236,7 @@ class WebServer(private val db: AppDatabase) {
         }.start(wait = false)
     }
 
+    @Synchronized
     fun stop() {
         server?.stop(1000, 2000)
         server = null

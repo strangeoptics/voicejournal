@@ -103,6 +103,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (viewModel.isWebServerEnabled.value) {
+            WebServerService.start(this)
+        }
         handleIntent(intent)
 
         speechRecognitionManager = SpeechRecognitionManager(

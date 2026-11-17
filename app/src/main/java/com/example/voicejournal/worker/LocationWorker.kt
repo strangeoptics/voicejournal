@@ -36,7 +36,7 @@ class LocationWorker(
 
     companion object {
         const val WORK_NAME = "LocationWorker"
-        const val NOTIFICATION_ID = 1
+        const val NOTIFICATION_ID = 3
         const val NOTIFICATION_CHANNEL_ID = "LocationTrackingChannel"
     }
 

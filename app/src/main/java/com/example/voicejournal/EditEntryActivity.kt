@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -37,7 +38,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.voicejournal.data.Category
-import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.di.Injector
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.SpeechRecognitionManager
@@ -75,12 +75,11 @@ class EditEntryActivity : ComponentActivity() {
             VoicejournalTheme {
                 val entry by viewModel.entry.collectAsState()
                 val allCategories by viewModel.allCategories.collectAsState()
-                var textState by remember { mutableStateOf(TextFieldValue(entry?.entry?.content ?: "")) }
-
                 // Initialize SpeechRecognitionManager here, where we can use composable functions
                 speechRecognitionManager = SpeechRecognitionManager(
                     context = this,
                     onTextRecognized = { recognizedText ->
+                        val textState = viewModel.entryContent.value
                         val selection = textState.selection
                         val originalText = textState.text
 
@@ -105,7 +104,7 @@ class EditEntryActivity : ComponentActivity() {
                             newCursorPos = selection.start + recognizedText.length
                         }
 
-                        textState = TextFieldValue(newText, selection = TextRange(newCursorPos))
+                        viewModel.updateContent(TextFieldValue(newText, selection = TextRange(newCursorPos)))
                     },
                     scope = lifecycleScope,
                     onError = { error ->
@@ -127,23 +126,9 @@ class EditEntryActivity : ComponentActivity() {
                 )
 
                 entry?.let {
-                    // Update textState when entry is loaded
-                    LaunchedEffect(it) {
-                        if (textState.text.isEmpty()) {
-                            textState = TextFieldValue(it.entry.content, selection = TextRange(it.entry.content.length))
-                        }
-                    }
-
                     EditEntryScreen(
-                        entry = it,
                         isNewEntry = entryId == null,
                         allCategories = allCategories,
-                        textValue = textState,
-                        onTextValueChange = { newTextState -> textState = newTextState },
-                        onSave = { updatedCategories, content, start_datetime, stop_datetime, hasImage ->
-                            viewModel.saveEntry(updatedCategories, content, start_datetime, stop_datetime, hasImage)
-                            finish()
-                        },
                         onNavigateUp = { finish() },
                         speechRecognitionManager = speechRecognitionManager,
                         viewModel = viewModel
@@ -184,44 +169,35 @@ class EditEntryActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditEntryScreen(
-    entry: EntryWithCategories,
     isNewEntry: Boolean,
     allCategories: List<Category>,
-    textValue: TextFieldValue,
-    onTextValueChange: (TextFieldValue) -> Unit,
-    onSave: (List<String>, String, Long, Long?, Boolean) -> Unit,
     onNavigateUp: () -> Unit,
     speechRecognitionManager: SpeechRecognitionManager,
     viewModel: EditEntryViewModel
 ) {
-    var hasImage by remember { mutableStateOf(entry.entry.hasImage) }
-    val selectedCategories = remember { mutableStateOf(entry.categories.map { it.category }) }
-    var startDateTime by remember {
-        mutableStateOf(
-            LocalDateTime.ofInstant(
-                Instant.ofEpochMilli(entry.entry.start_datetime),
-                ZoneId.systemDefault()
-            )
-        )
+    val entryContent by viewModel.entryContent.collectAsState()
+    val hasImage by viewModel.hasImage.collectAsState()
+    val startDateTimeMillis by viewModel.startDateTime.collectAsState()
+    val stopDateTimeMillis by viewModel.stopDateTime.collectAsState()
+    val selectedCategories by viewModel.selectedCategories.collectAsState()
+
+    val startDateTime = remember(startDateTimeMillis) {
+        LocalDateTime.ofInstant(Instant.ofEpochMilli(startDateTimeMillis), ZoneId.systemDefault())
     }
-    var stopDateTime by remember {
-        mutableStateOf(
-            entry.entry.stop_datetime?.let {
-                LocalDateTime.ofInstant(
-                    Instant.ofEpochMilli(it),
-                    ZoneId.systemDefault()
-                )
-            }
-        )
+    
+    val stopDateTime = remember(stopDateTimeMillis) {
+        stopDateTimeMillis?.let {
+            LocalDateTime.ofInstant(Instant.ofEpochMilli(it), ZoneId.systemDefault())
+        }
     }
 
-    var showStartDatePicker by remember { mutableStateOf(false) }
-    var showStartTimePicker by remember { mutableStateOf(false) }
-    var showStopDatePicker by remember { mutableStateOf(false) }
-    var showStopTimePicker by remember { mutableStateOf(false) }
+    var showStartDatePicker by rememberSaveable { mutableStateOf(false) }
+    var showStartTimePicker by rememberSaveable { mutableStateOf(false) }
+    var showStopDatePicker by rememberSaveable { mutableStateOf(false) }
+    var showStopTimePicker by rememberSaveable { mutableStateOf(false) }
 
     val startDatePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = startDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        initialSelectedDateMillis = startDateTimeMillis
     )
     val startTimePickerState = rememberTimePickerState(
         initialHour = startDateTime.hour,
@@ -229,7 +205,7 @@ fun EditEntryScreen(
         is24Hour = true
     )
     val stopDatePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = stopDateTime?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+        initialSelectedDateMillis = stopDateTimeMillis
     )
     val stopTimePickerState = rememberTimePickerState(
         initialHour = stopDateTime?.hour ?: 0,
@@ -244,7 +220,8 @@ fun EditEntryScreen(
                 TextButton(onClick = {
                     startDatePickerState.selectedDateMillis?.let { millis ->
                         val selectedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-                        startDateTime = startDateTime.with(selectedDate)
+                        val newDateTime = startDateTime.with(selectedDate)
+                        viewModel.updateStartDateTime(newDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
                     }
                     showStartDatePicker = false
                 }) { Text("OK") }
@@ -268,7 +245,8 @@ fun EditEntryScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    startDateTime = startDateTime.withHour(startTimePickerState.hour).withMinute(startTimePickerState.minute)
+                    val newDateTime = startDateTime.withHour(startTimePickerState.hour).withMinute(startTimePickerState.minute)
+                    viewModel.updateStartDateTime(newDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
                     showStartTimePicker = false
                 }) { Text("OK") }
             },
@@ -285,7 +263,8 @@ fun EditEntryScreen(
                 TextButton(onClick = {
                     stopDatePickerState.selectedDateMillis?.let { millis ->
                         val selectedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-                        stopDateTime = stopDateTime?.with(selectedDate) ?: LocalDateTime.now().with(selectedDate)
+                        val newDateTime = stopDateTime?.with(selectedDate) ?: LocalDateTime.now().with(selectedDate)
+                        viewModel.updateStopDateTime(newDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
                     }
                     showStopDatePicker = false
                 }) { Text("OK") }
@@ -309,7 +288,8 @@ fun EditEntryScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    stopDateTime = (stopDateTime ?: LocalDateTime.now()).withHour(stopTimePickerState.hour).withMinute(stopTimePickerState.minute)
+                    val newDateTime = (stopDateTime ?: LocalDateTime.now()).withHour(stopTimePickerState.hour).withMinute(stopTimePickerState.minute)
+                    viewModel.updateStopDateTime(newDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
                     showStopTimePicker = false
                 }) { Text("OK") }
             },
@@ -366,9 +346,8 @@ fun EditEntryScreen(
                         )
                     }
                     IconButton(onClick = {
-                        val newStartDatetime = startDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                        val newStopDatetime = stopDateTime?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
-                        onSave(selectedCategories.value, textValue.text, newStartDatetime, newStopDatetime, hasImage)
+                        viewModel.saveEntry()
+                        onNavigateUp()
                     }) {
                         Icon(Icons.Default.Done, contentDescription = "Save Entry")
                     }
@@ -386,8 +365,8 @@ fun EditEntryScreen(
             val configuration = LocalConfiguration.current
             val screenHeight = configuration.screenHeightDp.dp
             OutlinedTextField(
-                value = textValue,
-                onValueChange = onTextValueChange,
+                value = entryContent,
+                onValueChange = { viewModel.updateContent(it) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(screenHeight / 3),
@@ -470,7 +449,7 @@ fun EditEntryScreen(
                     interactionSource = stopTimeInteractionSource,
                     trailingIcon = { Icon(Icons.Default.Schedule, contentDescription = "Select Stop Time") }
                 )
-                IconButton(onClick = { stopDateTime = null }) {
+                IconButton(onClick = { viewModel.updateStopDateTime(null) }) {
                     Icon(Icons.Default.Clear, contentDescription = "Clear Stop Time")
                 }
             }
@@ -478,7 +457,7 @@ fun EditEntryScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = hasImage, onCheckedChange = { hasImage = it })
+                Checkbox(checked = hasImage, onCheckedChange = { viewModel.updateHasImage(it) })
                 Text("Has Image")
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -488,15 +467,9 @@ fun EditEntryScreen(
             allCategories.forEach { category ->
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Checkbox(
-                        checked = selectedCategories.value.contains(category.category),
-                        onCheckedChange = {
-                            val currentSelection = selectedCategories.value.toMutableList()
-                            if (it) {
-                                currentSelection.add(category.category)
-                            } else {
-                                currentSelection.remove(category.category)
-                            }
-                            selectedCategories.value = currentSelection
+                        checked = selectedCategories.contains(category.category),
+                        onCheckedChange = { isChecked ->
+                            viewModel.toggleCategory(category.category, isChecked)
                         }
                     )
                     Text(category.category)

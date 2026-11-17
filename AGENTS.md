@@ -27,6 +27,12 @@ Journal entries can be selected simultaneously by long-pressing an entry and tap
 - **Plain Text**: A clean, readable string where each entry is prefixed by its date and time.
 - **JSON**: The full `JournalEntry` objects (without their linked categories) serialized into a structured JSON array.
 
+### Resilient Entry Editing (MVVM & State Management)
+The `EditEntryActivity` and its corresponding UI (`EditEntryScreen`) are designed to fully survive configuration changes (like screen rotations) without data loss. 
+- **ViewModel StateHolder**: All editable states (text content, timestamps, category selections, media attachments) are strictly managed within the `EditEntryViewModel` using `StateFlow`.
+- **Cursor Preservation**: The text input utilizes `TextFieldValue` to retain the exact cursor position and selection state during text entry and voice dictation insertions.
+- **UI State Recovery**: UI-only states, such as the visibility of date and time picker dialogs, are preserved across screen rotations using Compose's `rememberSaveable`.
+
 ## Project Context: Frameworks and Libraries
 
 ### Core Architecture

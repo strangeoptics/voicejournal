@@ -1,6 +1,8 @@
 package com.example.voicejournal
 
 import android.content.SharedPreferences
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -34,20 +36,45 @@ class EditEntryViewModel(
 
     private val _googleCloudApiKey = MutableStateFlow("")
     val googleCloudApiKey: StateFlow<String> = _googleCloudApiKey.asStateFlow()
+
+    // Form States
+    private val _entryContent = MutableStateFlow(TextFieldValue(""))
+    val entryContent: StateFlow<TextFieldValue> = _entryContent.asStateFlow()
+
+    private val _hasImage = MutableStateFlow(false)
+    val hasImage: StateFlow<Boolean> = _hasImage.asStateFlow()
+
+    private val _startDateTime = MutableStateFlow(Instant.now().toEpochMilli())
+    val startDateTime: StateFlow<Long> = _startDateTime.asStateFlow()
+
+    private val _stopDateTime = MutableStateFlow<Long?>(null)
+    val stopDateTime: StateFlow<Long?> = _stopDateTime.asStateFlow()
+
+    private val _selectedCategories = MutableStateFlow<List<String>>(emptyList())
+    val selectedCategories: StateFlow<List<String>> = _selectedCategories.asStateFlow()
+
     init {
         _speechService.value = sharedPreferences.getString("speech_service", "Android Speech Recognizer") ?: "Android Speech Recognizer"
         _googleCloudApiKey.value = sharedPreferences.getString("google_cloud_api_key", "") ?: ""
 
         viewModelScope.launch {
             if (entryId != null) {
-                _entry.value = repository.getEntryById(entryId)
+                val dbEntry = repository.getEntryById(entryId)
+                _entry.value = dbEntry
+                dbEntry?.let {
+                    _entryContent.value = TextFieldValue(it.entry.content, selection = TextRange(it.entry.content.length))
+                    _startDateTime.value = it.entry.start_datetime
+                    _stopDateTime.value = it.entry.stop_datetime
+                    _hasImage.value = it.entry.hasImage
+                    _selectedCategories.value = it.categories.map { cat -> cat.category }
+                }
             } else {
                 val initialCategory = if (categoryId != null) {
                     listOf(Category(category = categoryId, aliases = ""))
                 } else {
                     emptyList()
                 }
-                _entry.value = EntryWithCategories(
+                val newEntry = EntryWithCategories(
                     entry = JournalEntry(
                         id = UUID.randomUUID(),
                         content = "",
@@ -57,11 +84,49 @@ class EditEntryViewModel(
                     ),
                     categories = initialCategory
                 )
+                _entry.value = newEntry
+                _entryContent.value = TextFieldValue(newEntry.entry.content)
+                _startDateTime.value = newEntry.entry.start_datetime
+                _stopDateTime.value = newEntry.entry.stop_datetime
+                _hasImage.value = newEntry.entry.hasImage
+                _selectedCategories.value = newEntry.categories.map { cat -> cat.category }
             }
         }
     }
 
-    fun saveEntry(updatedCategories: List<String>, updatedContent: String, updatedStartDatetime: Long, updatedStopDatetime: Long?, hasImage: Boolean) {
+    fun updateContent(newContent: TextFieldValue) {
+        _entryContent.value = newContent
+    }
+
+    fun updateHasImage(hasImage: Boolean) {
+        _hasImage.value = hasImage
+    }
+
+    fun updateStartDateTime(timeInMillis: Long) {
+        _startDateTime.value = timeInMillis
+    }
+
+    fun updateStopDateTime(timeInMillis: Long?) {
+        _stopDateTime.value = timeInMillis
+    }
+
+    fun toggleCategory(category: String, isSelected: Boolean) {
+        val currentSelection = _selectedCategories.value.toMutableList()
+        if (isSelected) {
+            currentSelection.add(category)
+        } else {
+            currentSelection.remove(category)
+        }
+        _selectedCategories.value = currentSelection
+    }
+
+    fun saveEntry() {
+        val updatedCategories = _selectedCategories.value
+        val updatedContent = _entryContent.value.text
+        val updatedStartDatetime = _startDateTime.value
+        val updatedStopDatetime = _stopDateTime.value
+        val currentHasImage = _hasImage.value
+        
         viewModelScope.launch {
             val categories = updatedCategories.map { categoryName ->
                 allCategories.value.find { c -> c.category == categoryName } ?: Category(category = categoryName, aliases = "")
@@ -72,7 +137,7 @@ class EditEntryViewModel(
                     content = updatedContent,
                     start_datetime = updatedStartDatetime,
                     stop_datetime = updatedStopDatetime,
-                    hasImage = hasImage
+                    hasImage = currentHasImage
                 )
                 repository.insert(newEntry, categories)
             } else {
@@ -82,7 +147,7 @@ class EditEntryViewModel(
                         content = updatedContent,
                         start_datetime = updatedStartDatetime,
                         stop_datetime = updatedStopDatetime,
-                        hasImage = hasImage
+                        hasImage = currentHasImage
                     )
                     repository.update(updatedEntry, categories)
                 }

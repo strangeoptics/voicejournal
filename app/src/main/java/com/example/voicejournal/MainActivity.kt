@@ -106,31 +106,32 @@ class MainActivity : ComponentActivity() {
         if (viewModel.isWebServerEnabled.value) {
             WebServerService.start(this)
         }
-        handleIntent(intent)
-
         speechRecognitionManager = SpeechRecognitionManager(
-            context = this,
+            context = applicationContext,
             onTextRecognized = { recognizedText ->
                 viewModel.processRecognizedText(recognizedText)
             },
             scope = lifecycleScope,
             onError = { error ->
                 runOnUiThread {
-                    val errorMessage = when (error) {
-                        SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions"
-                        SpeechRecognizer.ERROR_NETWORK -> "Network error or invalid API key"
-                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
-                        SpeechRecognizer.ERROR_NO_MATCH -> "No speech was recognized"
-                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer is busy"
-                        SpeechRecognizer.ERROR_SERVER -> "Server error"
-                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input"
-                        else -> "An unknown error occurred ($error)"
+                    if (!isFinishing && !isDestroyed) {
+                        val errorMessage = when (error) {
+                            SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions"
+                            SpeechRecognizer.ERROR_NETWORK -> "Network error or invalid API key"
+                            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
+                            SpeechRecognizer.ERROR_NO_MATCH -> "No speech was recognized"
+                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer is busy"
+                            SpeechRecognizer.ERROR_SERVER -> "Server error"
+                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input"
+                            else -> "An unknown error occurred ($error)"
+                        }
+                        Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
                     }
-                    Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
                 }
             }
         )
+        handleIntent(intent)
 
         setContent {
             VoicejournalTheme {
@@ -657,8 +658,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        if (::speechRecognitionManager.isInitialized) {
+            speechRecognitionManager.destroy()
+        }
         super.onDestroy()
-        speechRecognitionManager.destroy()
     }
 
     override fun onNewIntent(intent: Intent) {

@@ -71,59 +71,62 @@ class EditEntryActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        speechRecognitionManager = SpeechRecognitionManager(
+            context = applicationContext,
+            onTextRecognized = { recognizedText ->
+                val textState = viewModel.entryContent.value
+                val originalText = textState.text
+                val selMin = textState.selection.min.coerceIn(0, originalText.length)
+                val selMax = textState.selection.max.coerceIn(selMin, originalText.length)
+
+                val newText: String
+                val newCursorPos: Int
+
+                if (selMax > selMin) {
+                    // 1. Selection exists (including reverse selection): replace selected range
+                    newText = originalText.replaceRange(selMin, selMax, recognizedText)
+                    newCursorPos = selMin + recognizedText.length
+                } else if (selMin >= originalText.length) {
+                    // 2. Cursor at the very end: append on a new line
+                    newText = if (originalText.isNotEmpty()) {
+                        originalText + "\n" + recognizedText
+                    } else {
+                        recognizedText
+                    }
+                    newCursorPos = newText.length
+                } else {
+                    // 3. Cursor is in the middle or at the start: insert at cursor
+                    newText = originalText.replaceRange(selMin, selMax, recognizedText)
+                    newCursorPos = selMin + recognizedText.length
+                }
+
+                viewModel.updateContent(TextFieldValue(newText, selection = TextRange(newCursorPos)))
+            },
+            scope = lifecycleScope,
+            onError = { error ->
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) {
+                        val errorMessage = when (error) {
+                            SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions"
+                            SpeechRecognizer.ERROR_NETWORK -> "Network error or invalid API key"
+                            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
+                            SpeechRecognizer.ERROR_NO_MATCH -> "No speech was recognized"
+                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer is busy"
+                            SpeechRecognizer.ERROR_SERVER -> "Server error"
+                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input"
+                            else -> "An unknown error occurred ($error)"
+                        }
+                        Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        )
+
         setContent {
             VoicejournalTheme {
                 val entry by viewModel.entry.collectAsState()
                 val allCategories by viewModel.allCategories.collectAsState()
-                // Initialize SpeechRecognitionManager here, where we can use composable functions
-                speechRecognitionManager = SpeechRecognitionManager(
-                    context = this,
-                    onTextRecognized = { recognizedText ->
-                        val textState = viewModel.entryContent.value
-                        val selection = textState.selection
-                        val originalText = textState.text
-
-                        val newText: String
-                        val newCursorPos: Int
-
-                        if (selection.length > 0) {
-                            // 1. Selection exists: replace
-                            newText = originalText.replaceRange(selection.start, selection.end, recognizedText)
-                            newCursorPos = selection.start + recognizedText.length
-                        } else if (selection.start >= originalText.length) {
-                            // 2. Cursor at the very end: append
-                            newText = if (originalText.isNotEmpty()) {
-                                originalText + "\n" + recognizedText
-                            } else {
-                                recognizedText
-                            }
-                            newCursorPos = newText.length
-                        } else {
-                            // 3. Cursor is in the middle or at the start: insert
-                            newText = originalText.replaceRange(selection.start, selection.end, recognizedText)
-                            newCursorPos = selection.start + recognizedText.length
-                        }
-
-                        viewModel.updateContent(TextFieldValue(newText, selection = TextRange(newCursorPos)))
-                    },
-                    scope = lifecycleScope,
-                    onError = { error ->
-                        runOnUiThread {
-                            val errorMessage = when (error) {
-                                SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
-                                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions"
-                                SpeechRecognizer.ERROR_NETWORK -> "Network error or invalid API key"
-                                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
-                                SpeechRecognizer.ERROR_NO_MATCH -> "No speech was recognized"
-                                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer is busy"
-                                SpeechRecognizer.ERROR_SERVER -> "Server error"
-                                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input"
-                                else -> "An unknown error occurred ($error)"
-                            }
-                            Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
-                        }
-                    }
-                )
 
                 entry?.let {
                     EditEntryScreen(
@@ -142,11 +145,18 @@ class EditEntryActivity : ComponentActivity() {
         }
     }
 
+    override fun onStop() {
+        super.onStop()
+        if (::speechRecognitionManager.isInitialized) {
+            speechRecognitionManager.stopListening()
+        }
+    }
+
     override fun onDestroy() {
-        super.onDestroy()
         if (::speechRecognitionManager.isInitialized) {
             speechRecognitionManager.destroy()
         }
+        super.onDestroy()
     }
 
     companion object {

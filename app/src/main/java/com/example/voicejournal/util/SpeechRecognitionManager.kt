@@ -30,12 +30,13 @@ import java.util.Locale
 import kotlin.math.abs
 
 class SpeechRecognitionManager(
-    private val context: Context,
+    context: Context,
     private val onTextRecognized: (String) -> Unit,
     private val scope: CoroutineScope,
     private val onError: ((Int) -> Unit)? = null
 ) {
 
+    private val appContext: Context = context.applicationContext
     private var speechRecognizer: SpeechRecognizer? = null
     private val _isRecording = MutableStateFlow(false)
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
@@ -45,8 +46,8 @@ class SpeechRecognitionManager(
     }
 
     private fun setupSpeechRecognizer() {
-        if (SpeechRecognizer.isRecognitionAvailable(context)) {
-            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+        if (SpeechRecognizer.isRecognitionAvailable(appContext)) {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(appContext)
             speechRecognizer?.setRecognitionListener(object : RecognitionListener {
                 override fun onResults(results: Bundle?) {
                     _isRecording.value = false
@@ -124,7 +125,7 @@ class SpeechRecognitionManager(
         silenceThreshold: Int,
         silenceTimeRequired: Int
     ) {
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        if (ActivityCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             onError?.invoke(SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS)
             return
         }
@@ -271,8 +272,18 @@ class SpeechRecognitionManager(
     }
 
     fun destroy() {
-        speechRecognizer?.destroy()
-        speechRecognizer = null
         _isRecording.value = false
+        speechRecognizer?.let { recognizer ->
+            recognizer.setRecognitionListener(null)
+            try {
+                recognizer.cancel()
+            } catch (_: Exception) {
+            }
+            try {
+                recognizer.destroy()
+            } catch (_: Exception) {
+            }
+        }
+        speechRecognizer = null
     }
 }

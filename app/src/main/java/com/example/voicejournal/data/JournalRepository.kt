@@ -15,11 +15,11 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import com.example.voicejournal.util.TimeZoneUtils
 import java.io.BufferedReader
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStreamReader
-import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -164,11 +164,7 @@ class JournalRepository(
         if (JournalConstants.isVirtualDeletedName(categoryName)) {
             val deleted = entryDao.getPaginatedDeletedEntries(500, 0)
             return if (selectedDate != null) {
-                deleted.filter {
-                    Instant.ofEpochMilli(it.entry.start_datetime)
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDate() == selectedDate
-                }
+                deleted.filter { it.entry.localDate() == selectedDate }
             } else {
                 deleted
             }
@@ -181,13 +177,13 @@ class JournalRepository(
         }
 
         if (selectedDate != null) {
-            val startMillis = selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            val endMillis = selectedDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            return if (category != null) {
-                entryDao.getEntriesWithCategoriesInDateRangeForCategory(category.id, startMillis, endMillis).first()
+            val (queryStartMillis, queryEndMillis) = TimeZoneUtils.utcQueryBoundsForLocalDates(selectedDate)
+            val candidates = if (category != null) {
+                entryDao.getEntriesWithCategoriesInDateRangeForCategory(category.id, queryStartMillis, queryEndMillis).first()
             } else {
-                entryDao.getEntriesWithCategoriesInDateRange(startMillis, endMillis).first()
+                entryDao.getEntriesWithCategoriesInDateRange(queryStartMillis, queryEndMillis).first()
             }
+            return candidates.filter { it.entry.localDate() == selectedDate }
         }
 
         return if (category != null) {
@@ -195,6 +191,12 @@ class JournalRepository(
         } else {
             entryDao.getPaginatedEntriesWithCategories(500, 0)
         }
+    }
+
+    fun getEntriesForLocalDate(selectedDate: LocalDate): Flow<List<EntryWithCategories>> {
+        val (queryStartMillis, queryEndMillis) = TimeZoneUtils.utcQueryBoundsForLocalDates(selectedDate)
+        return entryDao.getEntriesWithCategoriesInDateRange(queryStartMillis, queryEndMillis)
+            .map { entries -> entries.filter { it.entry.localDate() == selectedDate } }
     }
 
     private suspend fun ensureCategoryExists(exportedCategory: Category) {
@@ -239,7 +241,8 @@ class JournalRepository(
                                     stop_datetime = entryExport.stop_datetime,
                                     hasImage = entryExport.hasImage,
                                     checked = entryExport.checked,
-                                    deletedAt = null
+                                    deletedAt = null,
+                                    zoneId = TimeZoneUtils.sanitizeZoneId(entryExport.zoneId)
                                 )
                                 val categories = entryExport.categories
                                     .filter { it.isNotBlank() && !it.equals("Gelöscht", ignoreCase = true) }
@@ -270,7 +273,10 @@ class JournalRepository(
                             val entries = importJson.decodeFromString<List<JournalEntry>>(trimmed)
                             val fallbackCategory = Category(category = "journal", aliases = "")
                             entries.forEach { imported ->
-                                val cleanEntry = imported.copy(deletedAt = null)
+                                val cleanEntry = imported.copy(
+                                    deletedAt = null,
+                                    zoneId = TimeZoneUtils.sanitizeZoneId(imported.zoneId)
+                                )
                                 val existing = entryDao.getEntryByIdIncludingDeleted(cleanEntry.id)
                                 if (existing != null && existing.categories.isNotEmpty()) {
                                     entryDao.updateWithCategories(cleanEntry, existing.categories, categoryDao)
@@ -320,14 +326,16 @@ class JournalRepository(
             if (matcher.matches()) {
                 val dateTimeString = matcher.group(1) ?: return@forEach
                 val contentString = matcher.group(2) ?: ""
+                val defaultZone = ZoneId.systemDefault()
                 val startDatetime = LocalDateTime.parse(dateTimeString, formatter)
-                    .atZone(ZoneId.systemDefault())
+                    .atZone(defaultZone)
                     .toInstant()
                     .toEpochMilli()
 
                 val entry = JournalEntry(
                     content = contentString,
-                    start_datetime = startDatetime
+                    start_datetime = startDatetime,
+                    zoneId = defaultZone.id
                 )
                 entryDao.insertWithCategories(
                     entry,
@@ -348,7 +356,10 @@ class JournalRepository(
         }
         database.withTransaction {
             entries.forEach { imported ->
-                val cleanEntry = imported.copy(deletedAt = null)
+                val cleanEntry = imported.copy(
+                    deletedAt = null,
+                    zoneId = TimeZoneUtils.sanitizeZoneId(imported.zoneId)
+                )
                 val existing = entryDao.getEntryByIdIncludingDeleted(cleanEntry.id)
                 if (existing != null) {
                     val mergedCategories = (existing.categories + targetCategory)
@@ -373,7 +384,8 @@ class JournalRepository(
                 stop_datetime = it.entry.stop_datetime,
                 hasImage = it.entry.hasImage,
                 checked = it.entry.checked,
-                categories = it.categories.map { c -> c.category }
+                categories = it.categories.map { c -> c.category },
+                zoneId = it.entry.zoneId
             )
         }
         val exportData = JournalExportV3(entries = exportEntries, categories = categories)
@@ -426,6 +438,16 @@ class JournalRepository(
     suspend fun updateJournalEntry(entry: JournalEntry) = entryDao.update(entry)
     
     suspend fun updateEntryChecked(entryId: UUID, checked: Boolean) = entryDao.updateChecked(entryId, checked)
+
+    suspend fun updateEntriesZoneId(ids: Set<UUID>, zoneId: String?) {
+        if (ids.isEmpty()) return
+        val sanitized = TimeZoneUtils.sanitizeZoneId(zoneId)
+        database.withTransaction {
+            ids.chunked(JournalConstants.SQLITE_MAX_BIND_PARAMS).forEach { chunk ->
+                entryDao.updateZoneIdByIds(chunk, sanitized)
+            }
+        }
+    }
 
     suspend fun delete(entry: JournalEntry) {
         entryDao.softDelete(entry.id, System.currentTimeMillis())

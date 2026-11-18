@@ -11,7 +11,7 @@ import java.util.UUID
 
 @Database(
     entities = [JournalEntry::class, Category::class, GpsTrackPoint::class, JournalEntryCategoryCrossRef::class],
-    version = 17,
+    version = 18,
     exportSchema = true
 )
 @TypeConverters(UuidConverter::class)
@@ -263,6 +263,12 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `journal_entries` ADD COLUMN `zoneId` TEXT DEFAULT NULL")
+            }
+        }
+
         val ALL_MIGRATIONS = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -279,7 +285,8 @@ abstract class AppDatabase : RoomDatabase() {
             MIGRATION_13_14,
             MIGRATION_14_15,
             MIGRATION_15_16,
-            MIGRATION_16_17
+            MIGRATION_16_17,
+            MIGRATION_17_18
         )
 
         fun getDatabase(context: Context): AppDatabase {

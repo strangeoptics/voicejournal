@@ -77,17 +77,18 @@ import androidx.navigation.compose.rememberNavController
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.data.JournalConstants
+import com.example.voicejournal.data.localDate
 import com.example.voicejournal.ui.components.AppDrawer
+import com.example.voicejournal.ui.components.TimeZonePickerDialog
+import com.example.voicejournal.ui.components.public
 import com.example.voicejournal.ui.screens.HomeScreen
 import com.example.voicejournal.ui.screens.search.SearchActivity
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.NotificationHelper
 import com.example.voicejournal.util.SpeechRecognitionManager
 import kotlinx.coroutines.launch
-import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
@@ -159,7 +160,20 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
                 var showHardDeleteSelectionDialog by remember { mutableStateOf(false) }
+                var showBatchTimeZoneDialog by remember { mutableStateOf(false) }
                 var isFabMenuExpanded by remember { mutableStateOf(false) }
+
+                if (showBatchTimeZoneDialog) {
+                    TimeZonePickerDialog(
+                        selectedZoneId = null,
+                        onZoneSelected = { chosenZoneId ->
+                            viewModel.updateEntriesZoneId(selectedEntryIds, chosenZoneId)
+                            showBatchTimeZoneDialog = false
+                            Toast.makeText(context, "Zeitzone aktualisiert", Toast.LENGTH_SHORT).show()
+                        },
+                        onDismiss = { showBatchTimeZoneDialog = false }
+                    )
+                }
 
                 if (showHardDeleteSelectionDialog) {
                     AlertDialog(
@@ -399,6 +413,10 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
 
+                                            IconButton(onClick = { showBatchTimeZoneDialog = true }) {
+                                                Icon(public, contentDescription = "Zeitzone ändern")
+                                            }
+
                                             var shareMenuExpanded by remember { mutableStateOf(false) }
                                             Box {
                                                 IconButton(onClick = { shareMenuExpanded = true }) {
@@ -635,7 +653,7 @@ class MainActivity : ComponentActivity() {
                                             openGooglePhotos(date)
                                         },
                                         onPhotoIconClicked = { entryWithCategories ->
-                                            val date = LocalDateTime.ofInstant(Instant.ofEpochMilli(entryWithCategories.entry.start_datetime), ZoneId.systemDefault()).toLocalDate()
+                                            val date = entryWithCategories.entry.localDate()
                                             openGooglePhotos(date)
                                         },
                                         truncationLength = truncationLength,

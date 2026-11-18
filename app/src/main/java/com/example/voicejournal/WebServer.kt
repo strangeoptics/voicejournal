@@ -6,6 +6,8 @@ import com.example.voicejournal.data.CreateJournalEntryDto
 import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalEntryDto
+import com.example.voicejournal.util.TimeZoneUtils
+import java.time.ZoneId
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -81,7 +83,8 @@ class WebServer(private val db: AppDatabase) {
                             stop_datetime = entryWithCategories.entry.stop_datetime,
                             hasImage = entryWithCategories.entry.hasImage,
                             checked = entryWithCategories.entry.checked,
-                            categoryIds = entryWithCategories.categories.map { it.id }
+                            categoryIds = entryWithCategories.categories.map { it.id },
+                            zoneId = entryWithCategories.entry.zoneId
                         )
                     }
                     call.respond(dtos)
@@ -110,7 +113,8 @@ class WebServer(private val db: AppDatabase) {
                             stop_datetime = entryWithCategories.entry.stop_datetime,
                             hasImage = entryWithCategories.entry.hasImage,
                             checked = entryWithCategories.entry.checked,
-                            categoryIds = entryWithCategories.categories.map { it.id }
+                            categoryIds = entryWithCategories.categories.map { it.id },
+                            zoneId = entryWithCategories.entry.zoneId
                         )
                     }
                     call.respond(dtos)
@@ -141,7 +145,8 @@ class WebServer(private val db: AppDatabase) {
                         stop_datetime = entry.entry.stop_datetime,
                         hasImage = entry.entry.hasImage,
                         checked = entry.entry.checked,
-                        categoryIds = entry.categories.map { it.id }
+                        categoryIds = entry.categories.map { it.id },
+                        zoneId = entry.entry.zoneId
                     )
                     call.respond(dto)
                 }
@@ -153,7 +158,8 @@ class WebServer(private val db: AppDatabase) {
                         start_datetime = createDto.start_datetime,
                         stop_datetime = createDto.stop_datetime,
                         hasImage = createDto.hasImage,
-                        checked = createDto.checked
+                        checked = createDto.checked,
+                        zoneId = TimeZoneUtils.sanitizeZoneId(createDto.zoneId) ?: ZoneId.systemDefault().id
                     )
 
                     val categories = db.categoryDao().getCategoriesByIds(createDto.categoryIds)
@@ -169,7 +175,8 @@ class WebServer(private val db: AppDatabase) {
                             stop_datetime = newEntry.entry.stop_datetime,
                             hasImage = newEntry.entry.hasImage,
                             checked = newEntry.entry.checked,
-                            categoryIds = newEntry.categories.map { it.id }
+                            categoryIds = newEntry.categories.map { it.id },
+                            zoneId = newEntry.entry.zoneId
                         )
                         call.respond(HttpStatusCode.Created, dto)
                     } else {
@@ -197,13 +204,20 @@ class WebServer(private val db: AppDatabase) {
                         return@put
                     }
 
+                    val resolvedZoneId = if (journalEntryDto.zoneId != null) {
+                        TimeZoneUtils.sanitizeZoneId(journalEntryDto.zoneId)
+                    } else {
+                        existingEntry.entry.zoneId
+                    }
+
                     val entry = JournalEntry(
                         id = id,
                         content = journalEntryDto.content,
                         start_datetime = journalEntryDto.start_datetime,
                         stop_datetime = journalEntryDto.stop_datetime,
                         hasImage = journalEntryDto.hasImage,
-                        checked = journalEntryDto.checked
+                        checked = journalEntryDto.checked,
+                        zoneId = resolvedZoneId
                     )
                     val categories = db.categoryDao().getCategoriesByIds(journalEntryDto.categoryIds)
 

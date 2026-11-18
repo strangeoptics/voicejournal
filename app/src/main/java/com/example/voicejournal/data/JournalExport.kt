@@ -30,7 +30,8 @@ data class JournalEntryExport(
     var stop_datetime: Long? = null,
     val hasImage: Boolean,
     val checked: Boolean = false,
-    val categories: List<String>
+    val categories: List<String>,
+    val zoneId: String? = null
 )
 
 @Serializable

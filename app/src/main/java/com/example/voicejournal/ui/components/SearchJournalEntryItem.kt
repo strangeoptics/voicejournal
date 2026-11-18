@@ -25,10 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.voicejournal.data.EntryWithCategories
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import com.example.voicejournal.data.resolvedZoneId
+import com.example.voicejournal.util.TimeZoneUtils
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -68,22 +66,11 @@ fun SearchJournalEntryItem(
                 .padding(8.dp)
                 .fillMaxWidth()
         ) {
-            val startDate = LocalDateTime.ofInstant(
-                Instant.ofEpochMilli(entryWithCategories.entry.start_datetime),
-                ZoneId.systemDefault()
+            val timeText = TimeZoneUtils.formatEntryTimeText(
+                startMillis = entryWithCategories.entry.start_datetime,
+                stopMillis = entryWithCategories.entry.stop_datetime,
+                entryZone = entryWithCategories.entry.resolvedZoneId()
             )
-            val stopDate = entryWithCategories.entry.stop_datetime?.let {
-                LocalDateTime.ofInstant(
-                    Instant.ofEpochMilli(it),
-                    ZoneId.systemDefault()
-                )
-            }
-            val formatter = DateTimeFormatter.ofPattern("HH:mm")
-            val timeText = if (stopDate != null) {
-                "${startDate.format(formatter)} - ${stopDate.format(formatter)}"
-            } else {
-                startDate.format(formatter)
-            }
             val content = entryWithCategories.entry.content
             val textToShow = if (!isExpanded && truncationLength > 0 && content.length > truncationLength) {
                 "${content.take(truncationLength)}..."

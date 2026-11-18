@@ -101,6 +101,9 @@ interface JournalEntryDao {
     @Query("UPDATE journal_entries SET checked = :isChecked WHERE id = :id")
     suspend fun updateChecked(id: UUID, isChecked: Boolean)
 
+    @Query("UPDATE journal_entries SET zoneId = :zoneId WHERE id IN (:ids)")
+    suspend fun updateZoneIdByIds(ids: Collection<UUID>, zoneId: String?)
+
     @Query("UPDATE journal_entries SET deletedAt = :timestamp WHERE id = :id")
     suspend fun softDelete(id: UUID, timestamp: Long)
 

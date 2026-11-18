@@ -39,11 +39,13 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.di.Injector
+import com.example.voicejournal.ui.components.TimeZonePickerDialog
+import com.example.voicejournal.ui.components.public
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.SpeechRecognitionManager
+import com.example.voicejournal.util.TimeZoneUtils
 import java.time.Instant
 import java.time.LocalDateTime
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
@@ -190,18 +192,23 @@ fun EditEntryScreen(
     val hasImage by viewModel.hasImage.collectAsState()
     val startDateTimeMillis by viewModel.startDateTime.collectAsState()
     val stopDateTimeMillis by viewModel.stopDateTime.collectAsState()
+    val zoneId by viewModel.zoneId.collectAsState()
     val selectedCategories by viewModel.selectedCategories.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
     val saveCompleted by viewModel.saveCompleted.collectAsState()
     val saveError by viewModel.saveError.collectAsState()
 
-    val startDateTime = remember(startDateTimeMillis) {
-        LocalDateTime.ofInstant(Instant.ofEpochMilli(startDateTimeMillis), ZoneId.systemDefault())
+    val activeZone = remember(zoneId) {
+        TimeZoneUtils.resolveZoneId(zoneId)
     }
-    
-    val stopDateTime = remember(stopDateTimeMillis) {
+
+    val startDateTime = remember(startDateTimeMillis, activeZone) {
+        LocalDateTime.ofInstant(Instant.ofEpochMilli(startDateTimeMillis), activeZone)
+    }
+
+    val stopDateTime = remember(stopDateTimeMillis, activeZone) {
         stopDateTimeMillis?.let {
-            LocalDateTime.ofInstant(Instant.ofEpochMilli(it), ZoneId.systemDefault())
+            LocalDateTime.ofInstant(Instant.ofEpochMilli(it), activeZone)
         }
     }
 
@@ -209,33 +216,20 @@ fun EditEntryScreen(
     var showStartTimePicker by rememberSaveable { mutableStateOf(false) }
     var showStopDatePicker by rememberSaveable { mutableStateOf(false) }
     var showStopTimePicker by rememberSaveable { mutableStateOf(false) }
-
-    val startDatePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = startDateTimeMillis
-    )
-    val startTimePickerState = rememberTimePickerState(
-        initialHour = startDateTime.hour,
-        initialMinute = startDateTime.minute,
-        is24Hour = true
-    )
-    val stopDatePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = stopDateTimeMillis
-    )
-    val stopTimePickerState = rememberTimePickerState(
-        initialHour = stopDateTime?.hour ?: 0,
-        initialMinute = stopDateTime?.minute ?: 0,
-        is24Hour = true
-    )
+    var showTimeZonePicker by rememberSaveable { mutableStateOf(false) }
 
     if (showStartDatePicker) {
+        val startDatePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = TimeZoneUtils.localDateToDatePickerMillis(startDateTime.toLocalDate())
+        )
         DatePickerDialog(
             onDismissRequest = { showStartDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     startDatePickerState.selectedDateMillis?.let { millis ->
-                        val selectedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                        val selectedDate = TimeZoneUtils.datePickerMillisToLocalDate(millis)
                         val newDateTime = startDateTime.with(selectedDate)
-                        viewModel.updateStartDateTime(newDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
+                        viewModel.updateStartDateTime(newDateTime.atZone(activeZone).toInstant().toEpochMilli())
                     }
                     showStartDatePicker = false
                 }) { Text("OK") }
@@ -249,6 +243,11 @@ fun EditEntryScreen(
     }
 
     if (showStartTimePicker) {
+        val startTimePickerState = rememberTimePickerState(
+            initialHour = startDateTime.hour,
+            initialMinute = startDateTime.minute,
+            is24Hour = true
+        )
         AlertDialog(
             onDismissRequest = { showStartTimePicker = false },
             title = { Text("Select Time") },
@@ -260,7 +259,7 @@ fun EditEntryScreen(
             confirmButton = {
                 TextButton(onClick = {
                     val newDateTime = startDateTime.withHour(startTimePickerState.hour).withMinute(startTimePickerState.minute)
-                    viewModel.updateStartDateTime(newDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
+                    viewModel.updateStartDateTime(newDateTime.atZone(activeZone).toInstant().toEpochMilli())
                     showStartTimePicker = false
                 }) { Text("OK") }
             },
@@ -271,14 +270,18 @@ fun EditEntryScreen(
     }
 
     if (showStopDatePicker) {
+        val initialStopDate = stopDateTime?.toLocalDate() ?: LocalDateTime.now(activeZone).toLocalDate()
+        val stopDatePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = TimeZoneUtils.localDateToDatePickerMillis(initialStopDate)
+        )
         DatePickerDialog(
             onDismissRequest = { showStopDatePicker = false },
             confirmButton = {
                 TextButton(onClick = {
                     stopDatePickerState.selectedDateMillis?.let { millis ->
-                        val selectedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
-                        val newDateTime = stopDateTime?.with(selectedDate) ?: LocalDateTime.now().with(selectedDate)
-                        viewModel.updateStopDateTime(newDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
+                        val selectedDate = TimeZoneUtils.datePickerMillisToLocalDate(millis)
+                        val newDateTime = (stopDateTime ?: LocalDateTime.now(activeZone)).with(selectedDate)
+                        viewModel.updateStopDateTime(newDateTime.atZone(activeZone).toInstant().toEpochMilli())
                     }
                     showStopDatePicker = false
                 }) { Text("OK") }
@@ -292,6 +295,12 @@ fun EditEntryScreen(
     }
 
     if (showStopTimePicker) {
+        val initialStopDateTime = stopDateTime ?: LocalDateTime.now(activeZone)
+        val stopTimePickerState = rememberTimePickerState(
+            initialHour = initialStopDateTime.hour,
+            initialMinute = initialStopDateTime.minute,
+            is24Hour = true
+        )
         AlertDialog(
             onDismissRequest = { showStopTimePicker = false },
             title = { Text("Select Time") },
@@ -302,14 +311,28 @@ fun EditEntryScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val newDateTime = (stopDateTime ?: LocalDateTime.now()).withHour(stopTimePickerState.hour).withMinute(stopTimePickerState.minute)
-                    viewModel.updateStopDateTime(newDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
+                    val newDateTime = (stopDateTime ?: LocalDateTime.now(activeZone))
+                        .withHour(stopTimePickerState.hour)
+                        .withMinute(stopTimePickerState.minute)
+                    viewModel.updateStopDateTime(newDateTime.atZone(activeZone).toInstant().toEpochMilli())
                     showStopTimePicker = false
                 }) { Text("OK") }
             },
             dismissButton = {
                 TextButton(onClick = { showStopTimePicker = false }) { Text("Cancel") }
             }
+        )
+    }
+
+    if (showTimeZonePicker) {
+        TimeZonePickerDialog(
+            selectedZoneId = zoneId,
+            referenceMillis = startDateTimeMillis,
+            onZoneSelected = { selected ->
+                viewModel.updateZoneId(selected)
+                showTimeZonePicker = false
+            },
+            onDismiss = { showTimeZonePicker = false }
         )
     }
 
@@ -481,7 +504,29 @@ fun EditEntryScreen(
                     Icon(Icons.Default.Clear, contentDescription = "Clear Stop Time")
                 }
             }
-            
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            val timeZoneInteractionSource = remember { MutableInteractionSource() }
+            LaunchedEffect(timeZoneInteractionSource) {
+                timeZoneInteractionSource.interactions.collect { interaction ->
+                    if (interaction is PressInteraction.Release) { showTimeZonePicker = true }
+                }
+            }
+            val zoneDisplayText = remember(zoneId, activeZone, startDateTimeMillis) {
+                val formatted = TimeZoneUtils.formatZoneLabel(activeZone, startDateTimeMillis)
+                if (zoneId == null) "System ($formatted)" else formatted
+            }
+            OutlinedTextField(
+                value = zoneDisplayText,
+                onValueChange = {},
+                label = { Text("Time Zone") },
+                readOnly = true,
+                modifier = Modifier.fillMaxWidth(),
+                interactionSource = timeZoneInteractionSource,
+                trailingIcon = { Icon(public, contentDescription = "Select Time Zone") }
+            )
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {

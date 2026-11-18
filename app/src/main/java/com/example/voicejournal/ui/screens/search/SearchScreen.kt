@@ -33,9 +33,8 @@ import androidx.compose.ui.unit.dp
 import com.example.voicejournal.EditEntryActivity
 import com.example.voicejournal.MainActivity
 import com.example.voicejournal.data.EntryWithCategories
+import com.example.voicejournal.data.localDate
 import com.example.voicejournal.ui.components.SearchJournalEntryItem
-import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -96,10 +95,7 @@ fun SearchScreen(
 @Composable
 fun SearchResultsList(entries: List<EntryWithCategories>) {
     val groupedEntries = entries.groupBy {
-        // Group by day using java.time
-        Instant.ofEpochMilli(it.entry.start_datetime)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
+        it.entry.localDate()
     }
     val context = LocalContext.current
 

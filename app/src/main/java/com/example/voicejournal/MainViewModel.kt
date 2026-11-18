@@ -16,8 +16,12 @@ import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
+import com.example.voicejournal.data.resolvedZoneId
+import com.example.voicejournal.data.startLocalDateTime
+import com.example.voicejournal.data.stopLocalDateTime
 import com.example.voicejournal.di.Injector
 import com.example.voicejournal.util.SecureApiKeyStore
+import com.example.voicejournal.util.TimeZoneUtils
 import com.example.voicejournal.worker.LocationWorker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -188,9 +192,20 @@ class MainViewModel(
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val gpsTrackPoints: StateFlow<List<GpsTrackPoint>> = selectedDate
         .flatMapLatest { date ->
-            val startOfDay = (date ?: LocalDate.now()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            val endOfDay = (date ?: LocalDate.now()).atTime(LocalTime.MAX).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-            repository.getTrackPointsForDay(startOfDay, endOfDay)
+            val targetDate = date ?: LocalDate.now()
+            repository.getEntriesForLocalDate(targetDate).flatMapLatest { entriesOnDate ->
+                val dayZone = entriesOnDate
+                    .mapNotNull { it.entry.zoneId }
+                    .groupingBy { it }
+                    .eachCount()
+                    .maxByOrNull { it.value }
+                    ?.key
+                    ?.let { TimeZoneUtils.resolveZoneId(it) }
+                    ?: ZoneId.systemDefault()
+                val startOfDay = targetDate.atStartOfDay(dayZone).toInstant().toEpochMilli()
+                val endOfDay = targetDate.atTime(LocalTime.MAX).atZone(dayZone).toInstant().toEpochMilli()
+                repository.getTrackPointsForDay(startOfDay, endOfDay)
+            }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -295,23 +310,26 @@ class MainViewModel(
 
     private fun formatEntriesAsText(entries: List<EntryWithCategories>): String {
         val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm", Locale.getDefault())
+        val viewerZone = ZoneId.systemDefault()
         return entries.joinToString(separator = "\n\n") { entryWithCats ->
-            val start = java.time.LocalDateTime.ofInstant(
-                java.time.Instant.ofEpochMilli(entryWithCats.entry.start_datetime),
-                ZoneId.systemDefault()
-            )
-            val stop = entryWithCats.entry.stop_datetime?.let {
-                java.time.LocalDateTime.ofInstant(
-                    java.time.Instant.ofEpochMilli(it),
-                    ZoneId.systemDefault()
-                )
-            }
-            val timeText = if (stop != null) {
+            val entry = entryWithCats.entry
+            val entryZone = entry.resolvedZoneId(viewerZone)
+            val start = entry.startLocalDateTime(viewerZone)
+            val stop = entry.stopLocalDateTime(viewerZone)
+            val baseTimeText = if (stop != null) {
                 "${start.format(formatter)} - ${stop.format(DateTimeFormatter.ofPattern("HH:mm"))}"
             } else {
                 start.format(formatter)
             }
-            "[$timeText]\n${entryWithCats.entry.content}"
+            val startInstant = java.time.Instant.ofEpochMilli(entry.start_datetime)
+            val entryOffset = entryZone.rules.getOffset(startInstant)
+            val viewerOffset = viewerZone.rules.getOffset(startInstant)
+            val timeText = if (entryOffset != viewerOffset) {
+                "$baseTimeText (${TimeZoneUtils.formatUtcOffset(entryOffset)})"
+            } else {
+                baseTimeText
+            }
+            "[$timeText]\n${entry.content}"
         }
     }
 
@@ -387,6 +405,15 @@ class MainViewModel(
         if (ids.isEmpty()) return
         viewModelScope.launch {
             repository.deleteEntries(ids)
+            _selectedEntryIds.value = emptySet()
+            _refreshTrigger.emit(Unit)
+        }
+    }
+
+    fun updateEntriesZoneId(ids: Set<UUID>, zoneId: String?) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            repository.updateEntriesZoneId(ids, zoneId)
             _selectedEntryIds.value = emptySet()
             _refreshTrigger.emit(Unit)
         }
@@ -564,15 +591,16 @@ class MainViewModel(
 
     fun addTestData() {
         viewModelScope.launch {
+            val defaultZone = ZoneId.systemDefault()
             fun startDatetimeFromString(dateTimeString: String): Long {
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
                 val localDateTime = java.time.LocalDateTime.parse(dateTimeString, formatter)
-                return localDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                return localDateTime.atZone(defaultZone).toInstant().toEpochMilli()
             }
 
-            val today = LocalDate.now().toString()
-            val yesterday = LocalDate.now().minusDays(1).toString()
-            val twoDaysAgo = LocalDate.now().minusDays(2).toString()
+            val today = LocalDate.now(defaultZone).toString()
+            val yesterday = LocalDate.now(defaultZone).minusDays(1).toString()
+            val twoDaysAgo = LocalDate.now(defaultZone).minusDays(2).toString()
 
             val journal = Category(category = "journal", aliases = "")
             val todo = Category(category = "todo", aliases = "")
@@ -581,19 +609,19 @@ class MainViewModel(
             val eloisa = Category(category = "eloisa", aliases = "")
 
             val testEntries: List<Pair<JournalEntry, List<Category>>> = listOf(
-                JournalEntry(content = "Habe beim Ausschalten versehentlich den dritten Wecker diesen Monat zerdrückt...", start_datetime = startDatetimeFromString("${today}T06:15:00"), stop_datetime = startDatetimeFromString("${today}T06:20:00")) to listOf(journal),
-                JournalEntry(content = "Nach drei Tassen schwarzem Kaffee...", start_datetime = startDatetimeFromString("${today}T07:00:00")) to listOf(journal),
-                JournalEntry(content = "Die Verfolgungsjagd auf der Autobahn war erfolgreich...", start_datetime = startDatetimeFromString("${today}T09:30:00"), hasImage = true) to listOf(journal),
-                JournalEntry(content = "Während im Fernsehen Berichte über meine Heldentaten laufen...", start_datetime = startDatetimeFromString("${today}T21:00:00")) to listOf(journal),
-                JournalEntry(content = "This is a test todo item from today.", start_datetime = startDatetimeFromString("${today}T12:00:00"), stop_datetime = startDatetimeFromString("${today}T12:30:00")) to listOf(todo),
-                JournalEntry(content = "Milk, eggs, bread.", start_datetime = startDatetimeFromString("${today}T14:00:00")) to listOf(kaufen),
-                JournalEntry(content = "A great new app idea from today.", start_datetime = startDatetimeFromString("${today}T16:00:00")) to listOf(baumarkt),
-                JournalEntry(content = "Mittagspause mit zwei Dönern...", start_datetime = startDatetimeFromString("${yesterday}T12:30:00"), hasImage = true) to listOf(journal),
-                JournalEntry(content = "Ein kleinerer Schurke wollte die U-Bahn sabotieren...", start_datetime = startDatetimeFromString("${yesterday}T10:00:00")) to listOf(journal),
-                JournalEntry(content = "Todo item from yesterday.", start_datetime = startDatetimeFromString("${yesterday}T15:00:00")) to listOf(todo),
-                JournalEntry(content = "Apples, bananas.", start_datetime = startDatetimeFromString("${yesterday}T17:00:00")) to listOf(kaufen),
-                JournalEntry(content = "Journal entry from two days ago.", start_datetime = startDatetimeFromString("${twoDaysAgo}T18:00:00")) to listOf(journal),
-                JournalEntry(content = "Another app idea from two days ago.", start_datetime = startDatetimeFromString("${twoDaysAgo}T20:00:00")) to listOf(eloisa)
+                JournalEntry(content = "Habe beim Ausschalten versehentlich den dritten Wecker diesen Monat zerdrückt...", start_datetime = startDatetimeFromString("${today}T06:15:00"), stop_datetime = startDatetimeFromString("${today}T06:20:00"), zoneId = defaultZone.id) to listOf(journal),
+                JournalEntry(content = "Nach drei Tassen schwarzem Kaffee...", start_datetime = startDatetimeFromString("${today}T07:00:00"), zoneId = defaultZone.id) to listOf(journal),
+                JournalEntry(content = "Die Verfolgungsjagd auf der Autobahn war erfolgreich...", start_datetime = startDatetimeFromString("${today}T09:30:00"), hasImage = true, zoneId = defaultZone.id) to listOf(journal),
+                JournalEntry(content = "Während im Fernsehen Berichte über meine Heldentaten laufen...", start_datetime = startDatetimeFromString("${today}T21:00:00"), zoneId = defaultZone.id) to listOf(journal),
+                JournalEntry(content = "This is a test todo item from today.", start_datetime = startDatetimeFromString("${today}T12:00:00"), stop_datetime = startDatetimeFromString("${today}T12:30:00"), zoneId = defaultZone.id) to listOf(todo),
+                JournalEntry(content = "Milk, eggs, bread.", start_datetime = startDatetimeFromString("${today}T14:00:00"), zoneId = defaultZone.id) to listOf(kaufen),
+                JournalEntry(content = "A great new app idea from today.", start_datetime = startDatetimeFromString("${today}T16:00:00"), zoneId = defaultZone.id) to listOf(baumarkt),
+                JournalEntry(content = "Mittagspause mit zwei Dönern...", start_datetime = startDatetimeFromString("${yesterday}T12:30:00"), hasImage = true, zoneId = defaultZone.id) to listOf(journal),
+                JournalEntry(content = "Ein kleinerer Schurke wollte die U-Bahn sabotieren...", start_datetime = startDatetimeFromString("${yesterday}T10:00:00"), zoneId = defaultZone.id) to listOf(journal),
+                JournalEntry(content = "Todo item from yesterday.", start_datetime = startDatetimeFromString("${yesterday}T15:00:00"), zoneId = defaultZone.id) to listOf(todo),
+                JournalEntry(content = "Apples, bananas.", start_datetime = startDatetimeFromString("${yesterday}T17:00:00"), zoneId = defaultZone.id) to listOf(kaufen),
+                JournalEntry(content = "Journal entry from two days ago.", start_datetime = startDatetimeFromString("${twoDaysAgo}T18:00:00"), zoneId = defaultZone.id) to listOf(journal),
+                JournalEntry(content = "Another app idea from two days ago.", start_datetime = startDatetimeFromString("${twoDaysAgo}T20:00:00"), zoneId = defaultZone.id) to listOf(eloisa)
             )
             testEntries.forEach { (entry, categories) -> repository.insert(entry, categories) }
             _refreshTrigger.emit(Unit)
@@ -616,15 +644,17 @@ class MainViewModel(
 
                 val (targetCategory, contentToAdd) = parseRecognizedTextForCategory(recognizedText, categories, currentCategoryName)
 
-                val now = java.time.LocalDateTime.now()
-                val start_datetime = _selectedDate.value?.atTime(now.toLocalTime())?.atZone(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
+                val currentZone = ZoneId.systemDefault()
+                val now = java.time.LocalDateTime.now(currentZone)
+                val start_datetime = _selectedDate.value?.atTime(now.toLocalTime())?.atZone(currentZone)?.toInstant()?.toEpochMilli()
                     ?: System.currentTimeMillis()
                 _selectedDate.value = null
 
                 if (contentToAdd.isNotEmpty()) {
                     val entry = JournalEntry(
                         content = contentToAdd,
-                        start_datetime = start_datetime
+                        start_datetime = start_datetime,
+                        zoneId = currentZone.id
                     )
                     repository.insert(entry, listOf(targetCategory))
                     

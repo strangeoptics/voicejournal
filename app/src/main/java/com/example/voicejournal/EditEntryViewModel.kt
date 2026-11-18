@@ -13,6 +13,7 @@ import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
 import com.example.voicejournal.util.SecureApiKeyStore
+import com.example.voicejournal.util.TimeZoneUtils
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
+import java.time.ZoneId
 import java.util.UUID
 
 class EditEntryViewModel(
@@ -55,6 +57,11 @@ class EditEntryViewModel(
     private val _stopDateTime = MutableStateFlow<Long?>(null)
     val stopDateTime: StateFlow<Long?> = _stopDateTime.asStateFlow()
 
+    private val _zoneId = MutableStateFlow<String?>(
+        if (entryId == null) ZoneId.systemDefault().id else null
+    )
+    val zoneId: StateFlow<String?> = _zoneId.asStateFlow()
+
     private val _selectedCategories = MutableStateFlow<List<String>>(emptyList())
     val selectedCategories: StateFlow<List<String>> = _selectedCategories.asStateFlow()
 
@@ -79,6 +86,7 @@ class EditEntryViewModel(
                     _entryContent.value = TextFieldValue(it.entry.content, selection = TextRange(it.entry.content.length))
                     _startDateTime.value = it.entry.start_datetime
                     _stopDateTime.value = it.entry.stop_datetime
+                    _zoneId.value = it.entry.zoneId
                     _hasImage.value = it.entry.hasImage
                     _selectedCategories.value = it.categories
                         .filterNot { cat -> JournalConstants.isVirtualDeletedCategory(cat) }
@@ -95,13 +103,15 @@ class EditEntryViewModel(
                         listOfNotNull(realCategories.firstOrNull())
                     }
                 }
+                val currentZoneId = ZoneId.systemDefault().id
                 val newEntry = EntryWithCategories(
                     entry = JournalEntry(
                         id = UUID.randomUUID(),
                         content = "",
                         start_datetime = Instant.now().toEpochMilli(),
                         stop_datetime = null,
-                        hasImage = false
+                        hasImage = false,
+                        zoneId = currentZoneId
                     ),
                     categories = initialCategory
                 )
@@ -109,6 +119,7 @@ class EditEntryViewModel(
                 _entryContent.value = TextFieldValue(newEntry.entry.content)
                 _startDateTime.value = newEntry.entry.start_datetime
                 _stopDateTime.value = newEntry.entry.stop_datetime
+                _zoneId.value = newEntry.entry.zoneId
                 _hasImage.value = newEntry.entry.hasImage
                 _selectedCategories.value = newEntry.categories.map { cat -> cat.category }
             }
@@ -129,6 +140,10 @@ class EditEntryViewModel(
 
     fun updateStopDateTime(timeInMillis: Long?) {
         _stopDateTime.value = timeInMillis
+    }
+
+    fun updateZoneId(newZoneId: String?) {
+        _zoneId.value = TimeZoneUtils.sanitizeZoneId(newZoneId)
     }
 
     fun toggleCategory(category: String, isSelected: Boolean) {
@@ -157,6 +172,7 @@ class EditEntryViewModel(
         val updatedContent = _entryContent.value.text
         val updatedStartDatetime = _startDateTime.value
         val updatedStopDatetime = _stopDateTime.value
+        val updatedZoneId = TimeZoneUtils.sanitizeZoneId(_zoneId.value)
         val currentHasImage = _hasImage.value
 
         _isSaving.value = true
@@ -174,7 +190,8 @@ class EditEntryViewModel(
                         content = updatedContent,
                         start_datetime = updatedStartDatetime,
                         stop_datetime = updatedStopDatetime,
-                        hasImage = currentHasImage
+                        hasImage = currentHasImage,
+                        zoneId = updatedZoneId
                     )
                     if (entryId == null) {
                         repository.insert(entryToPersist, categories)

@@ -38,9 +38,10 @@ Optional periodic GPS track logging via `WorkManager` (`LocationWorker`, minimum
 - **UI Toolkit:** **Jetpack Compose** with **Material 3** (`1.4.0`), **Paging 3 Compose**, and **Compose Navigation**.
 
 ### Data Persistence & Security
-- **Local Database:** **Room** (`AppDatabase`, schema version `17`, schemas exported to `app/schemas/`).
-- **Zero Data Loss Policy:** Explicit `Migration` chain (`MIGRATION_1_2` through `MIGRATION_16_17`) — `fallbackToDestructiveMigration` is strictly forbidden.
+- **Local Database:** **Room** (`AppDatabase`, schema version `18`, schemas exported to `app/schemas/`).
+- **Zero Data Loss Policy:** Explicit `Migration` chain (`MIGRATION_1_2` through `MIGRATION_17_18`) — `fallbackToDestructiveMigration` is strictly forbidden.
   - Uses **Soft Delete** (`deletedAt: Long?`). Active views filter `deletedAt IS NULL`; the virtual read-only category `"Gelöscht"` (ID `-1`) serves as the recycle bin, where entries can be restored or permanently deleted after confirmation.
+  - Stores per-entry IANA timezone ID (`zoneId: String?` on `JournalEntry`, falling back to `ZoneId.systemDefault()` when `null`) so entries retain their authentic creation local date/time across travel timezones while keeping chronological UTC ordering (`start_datetime`).
 - **Credential Storage:** `SecureApiKeyStore` encrypts the Google Cloud Speech API key using Android Keystore `AES/GCM/NoPadding` (256-bit) inside excluded `SharedPreferences` (`voice_journal_secure_prefs`), excluded from cloud backup and device transfer in `backup_rules.xml` and `data_extraction_rules.xml`.
 
 ### Networking & Local Web Server

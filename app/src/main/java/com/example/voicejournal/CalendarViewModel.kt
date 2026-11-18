@@ -6,53 +6,55 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.voicejournal.data.JournalRepository
+import com.example.voicejournal.data.resolvedZoneId
+import com.example.voicejournal.data.startLocalDateTime
+import com.example.voicejournal.data.stopLocalDateTime
 import com.example.voicejournal.di.Injector
 import com.example.voicejournal.ui.components.Appointment
+import com.example.voicejournal.util.TimeZoneUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.ZoneId
 
 class CalendarViewModel(private val repository: JournalRepository) : ViewModel() {
 
     private val _dateRange = MutableStateFlow<Pair<LocalDate, LocalDate>>(
-        LocalDate.now() to LocalDate.now().plusDays(6))
+        LocalDate.now() to LocalDate.now().plusDays(6)
+    )
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val appointments: StateFlow<List<Appointment>> = _dateRange.flatMapLatest { (startDate, endDate) ->
-        val startMillis = startDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val endMillis = endDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        repository.getEntriesForCalendar(startMillis, endMillis)
-    }.map { entriesWithCategories ->
-        entriesWithCategories.map { entryWithCategories ->
-            val entry = entryWithCategories.entry
-            val startDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(entry.start_datetime), ZoneId.systemDefault())
-            val endDateTime = entry.stop_datetime?.let {
-                LocalDateTime.ofInstant(Instant.ofEpochMilli(it), ZoneId.systemDefault())
-            }
-            val appointmentColor = entryWithCategories.categories
-                .filter { it.color.isNotBlank() }
-                .minByOrNull { it.orderIndex }
-                ?.let {
-                    try {
-                        Color(android.graphics.Color.parseColor(it.color))
-                    } catch (e: IllegalArgumentException) {
-                        Color.Gray // Fallback for invalid color string
-                    }
-                } ?: Color.Blue // Default color if no categories or no valid color
+        val (queryStartMillis, queryEndMillis) = TimeZoneUtils.utcQueryBoundsForLocalDates(startDate, endDate)
+        repository.getEntriesForCalendar(queryStartMillis, queryEndMillis).map { entriesWithCategories ->
+            entriesWithCategories.mapNotNull { entryWithCategories ->
+                val entry = entryWithCategories.entry
+                val startDateTime = entry.startLocalDateTime()
+                val endDateTime = entry.stopLocalDateTime() ?: startDateTime.plusHours(1)
+                if (endDateTime.toLocalDate().isBefore(startDate) || startDateTime.toLocalDate().isAfter(endDate)) {
+                    return@mapNotNull null
+                }
+                val appointmentColor = entryWithCategories.categories
+                    .filter { it.color.isNotBlank() }
+                    .minByOrNull { it.orderIndex }
+                    ?.let {
+                        try {
+                            Color(android.graphics.Color.parseColor(it.color))
+                        } catch (e: IllegalArgumentException) {
+                            Color.Gray // Fallback for invalid color string
+                        }
+                    } ?: Color.Blue // Default color if no categories or no valid color
 
-            Appointment(
-                id = entry.id.toString(),
-                startDateTime = startDateTime,
-                endDateTime = endDateTime ?: startDateTime.plusHours(1),
-                title = entry.content.take(12),
-                description = entry.content,
-                entry = entry,
-                color = appointmentColor
-            )
+                Appointment(
+                    id = entry.id.toString(),
+                    startDateTime = startDateTime,
+                    endDateTime = endDateTime,
+                    title = entry.content.take(12),
+                    description = entry.content,
+                    entry = entry,
+                    color = appointmentColor
+                )
+            }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -65,11 +67,12 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
         viewModelScope.launch {
             val entry = appointment.entry
             if (entry != null) {
+                val entryZone = entry.resolvedZoneId()
                 val newStartMillis = appointment.startDateTime
-                    .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    .atZone(entryZone).toInstant().toEpochMilli()
 
                 val newEndMillis = appointment.endDateTime
-                    .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    .atZone(entryZone).toInstant().toEpochMilli()
 
                 val updatedEntry = entry.copy(
                     start_datetime = newStartMillis,

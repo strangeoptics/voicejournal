@@ -32,11 +32,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
 import com.example.voicejournal.data.EntryWithCategories
+import com.example.voicejournal.data.localDate
 import com.example.voicejournal.ui.components.FastScroller
 import com.example.voicejournal.ui.components.JournalEntryItem
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
@@ -133,12 +132,9 @@ fun HomeScreen(
                     val entryWithCategories = pagedEntries[index]
                     if (entryWithCategories != null) {
 
-                        val currentDate = Instant.ofEpochMilli(entryWithCategories.entry.start_datetime).atZone(
-                            ZoneId.systemDefault()).toLocalDate()
+                        val currentDate = entryWithCategories.entry.localDate()
                         val prevDate = if (index > 0) {
-                            pagedEntries.peek(index - 1)?.let {
-                                Instant.ofEpochMilli(it.entry.start_datetime).atZone(ZoneId.systemDefault()).toLocalDate()
-                            }
+                            pagedEntries.peek(index - 1)?.entry?.localDate()
                         } else {
                             null
                         }

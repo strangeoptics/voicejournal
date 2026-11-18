@@ -13,7 +13,8 @@ data class JournalEntryDto(
     var stop_datetime: Long? = null,
     val hasImage: Boolean,
     val checked: Boolean = false,
-    val categoryIds: List<Int> // Hier verwenden wir eine Liste von IDs (Integer)
+    val categoryIds: List<Int>,
+    val zoneId: String? = null
 )
 
 @Serializable
@@ -23,5 +24,6 @@ data class CreateJournalEntryDto(
     var stop_datetime: Long? = null,
     val hasImage: Boolean,
     val checked: Boolean = false,
-    val categoryIds: List<Int>
+    val categoryIds: List<Int>,
+    val zoneId: String? = null
 )

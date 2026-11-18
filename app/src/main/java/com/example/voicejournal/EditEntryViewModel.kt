@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.EntryWithCategories
+import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
 import com.example.voicejournal.util.SecureApiKeyStore
@@ -33,7 +34,7 @@ class EditEntryViewModel(
     private val _entry = MutableStateFlow<EntryWithCategories?>(null)
     val entry: StateFlow<EntryWithCategories?> = _entry.asStateFlow()
 
-    val allCategories: StateFlow<List<Category>> = repository.allCategories
+    val allCategories: StateFlow<List<Category>> = repository.realCategories
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _speechService = MutableStateFlow("ANDROID")
@@ -79,13 +80,20 @@ class EditEntryViewModel(
                     _startDateTime.value = it.entry.start_datetime
                     _stopDateTime.value = it.entry.stop_datetime
                     _hasImage.value = it.entry.hasImage
-                    _selectedCategories.value = it.categories.map { cat -> cat.category }
+                    _selectedCategories.value = it.categories
+                        .filterNot { cat -> JournalConstants.isVirtualDeletedCategory(cat) }
+                        .map { cat -> cat.category }
                 }
             } else {
-                val initialCategory = if (categoryId != null) {
-                    listOf(Category(category = categoryId, aliases = ""))
-                } else {
-                    emptyList()
+                val realCategories = repository.getRealCategoriesList()
+                val initialCategory = when {
+                    !categoryId.isNullOrBlank() && !JournalConstants.isVirtualDeletedName(categoryId) -> {
+                        val matched = realCategories.find { it.category == categoryId }
+                        listOf(matched ?: Category(category = categoryId, aliases = ""))
+                    }
+                    else -> {
+                        listOfNotNull(realCategories.firstOrNull())
+                    }
                 }
                 val newEntry = EntryWithCategories(
                     entry = JournalEntry(
@@ -124,9 +132,12 @@ class EditEntryViewModel(
     }
 
     fun toggleCategory(category: String, isSelected: Boolean) {
+        if (JournalConstants.isVirtualDeletedName(category)) return
         val currentSelection = _selectedCategories.value.toMutableList()
         if (isSelected) {
-            currentSelection.add(category)
+            if (!currentSelection.contains(category)) {
+                currentSelection.add(category)
+            }
         } else {
             currentSelection.remove(category)
         }
@@ -142,6 +153,7 @@ class EditEntryViewModel(
         val currentEntrySnapshot = _entry.value ?: return
 
         val updatedCategories = _selectedCategories.value
+            .filterNot { JournalConstants.isVirtualDeletedName(it) }
         val updatedContent = _entryContent.value.text
         val updatedStartDatetime = _startDateTime.value
         val updatedStopDatetime = _stopDateTime.value
@@ -153,8 +165,9 @@ class EditEntryViewModel(
         viewModelScope.launch {
             try {
                 withContext(NonCancellable) {
+                    val realCategories = repository.getRealCategoriesList()
                     val categories = updatedCategories.map { categoryName ->
-                        allCategories.value.find { c -> c.category == categoryName }
+                        realCategories.find { c -> c.category == categoryName }
                             ?: Category(category = categoryName, aliases = "")
                     }
                     val entryToPersist = currentEntrySnapshot.entry.copy(

@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -45,8 +44,7 @@ class ImportViewModel(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    val categories: StateFlow<List<Category>> = repository.allCategories
-        .map { list -> list.filter { it.id != JournalConstants.CATEGORY_DELETED_ID } }
+    val categories: StateFlow<List<Category>> = repository.realCategories
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _selectedCategory = MutableStateFlow<Category?>(null)
@@ -56,7 +54,7 @@ class ImportViewModel(
     private var loadedUri: Uri? = null
 
     fun selectCategory(category: Category) {
-        if (category.id != JournalConstants.CATEGORY_DELETED_ID) {
+        if (!JournalConstants.isVirtualDeletedCategory(category)) {
             _selectedCategory.value = category
         }
     }

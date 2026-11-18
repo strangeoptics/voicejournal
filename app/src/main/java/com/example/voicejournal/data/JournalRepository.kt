@@ -26,6 +26,23 @@ import java.util.regex.Pattern
 
 object JournalConstants {
     const val CATEGORY_DELETED_ID = -1
+    const val CATEGORY_DELETED_NAME = "Gelöscht"
+
+    fun isVirtualDeletedCategory(category: Category): Boolean {
+        return category.id == CATEGORY_DELETED_ID ||
+            category.category.trim().equals(CATEGORY_DELETED_NAME, ignoreCase = true)
+    }
+
+    fun isVirtualDeletedName(name: String?): Boolean {
+        return name != null && name.trim().equals(CATEGORY_DELETED_NAME, ignoreCase = true)
+    }
+
+    fun nextSafeOrderIndex(categories: Collection<Category>): Int {
+        val realCategories = categories.filterNot { isVirtualDeletedCategory(it) }
+        if (realCategories.isEmpty()) return 0
+        val maxExisting = realCategories.maxOf { it.orderIndex }.coerceAtMost(Int.MAX_VALUE - 2)
+        return maxOf(maxExisting + 1, realCategories.size)
+    }
 }
 
 class JournalRepository(
@@ -44,7 +61,7 @@ class JournalRepository(
 
     private val virtualDeletedCategory = Category(
         id = JournalConstants.CATEGORY_DELETED_ID,
-        category = "Gelöscht",
+        category = JournalConstants.CATEGORY_DELETED_NAME,
         aliases = "",
         showAll = true,
         orderIndex = Int.MAX_VALUE, // Put it at the end
@@ -54,7 +71,11 @@ class JournalRepository(
     )
 
     val allCategories: Flow<List<Category>> = categoryDao.getAllCategories().map { categories ->
-        categories + virtualDeletedCategory
+        categories.filterNot { JournalConstants.isVirtualDeletedCategory(it) } + virtualDeletedCategory
+    }
+
+    val realCategories: Flow<List<Category>> = categoryDao.getAllCategories().map { categories ->
+        categories.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
     }
 
     suspend fun getEntriesPager(
@@ -100,16 +121,16 @@ class JournalRepository(
     suspend fun getEntriesByIds(ids: Set<UUID>): List<EntryWithCategories> = entryDao.getEntriesByIds(ids)
 
     private suspend fun ensureCategoryExists(exportedCategory: Category) {
-        if (exportedCategory.id == JournalConstants.CATEGORY_DELETED_ID ||
-            exportedCategory.category.equals("Gelöscht", ignoreCase = true) ||
+        if (JournalConstants.isVirtualDeletedCategory(exportedCategory) ||
             exportedCategory.category.isBlank()
         ) {
             return
         }
         val existing = categoryDao.getCategoryByName(exportedCategory.category)
         if (existing == null) {
+            val safeOrderIndex = exportedCategory.orderIndex.coerceIn(0, Int.MAX_VALUE - 2)
             // Reset auto-generated ID to 0 to avoid primary key collisions across devices while preserving metadata
-            categoryDao.insertCategory(exportedCategory.copy(id = 0))
+            categoryDao.insertCategory(exportedCategory.copy(id = 0, orderIndex = safeOrderIndex))
         }
     }
 
@@ -295,25 +316,33 @@ class JournalRepository(
     fun getEntriesWithCategoriesSince(since: Long) = entryDao.getEntriesWithCategoriesSince(since)
 
     suspend fun insertCategory(category: Category) {
-        if (category.id != JournalConstants.CATEGORY_DELETED_ID) categoryDao.insertCategory(category)
+        if (!JournalConstants.isVirtualDeletedCategory(category)) {
+            val safeOrderIndex = category.orderIndex.coerceIn(0, Int.MAX_VALUE - 2)
+            categoryDao.insertCategory(category.copy(orderIndex = safeOrderIndex))
+        }
     }
 
     suspend fun updateCategory(category: Category) {
-        if (category.id != JournalConstants.CATEGORY_DELETED_ID) categoryDao.updateCategory(category)
+        if (!JournalConstants.isVirtualDeletedCategory(category)) {
+            val safeOrderIndex = category.orderIndex.coerceIn(0, Int.MAX_VALUE - 2)
+            categoryDao.updateCategory(category.copy(orderIndex = safeOrderIndex))
+        }
     }
 
     suspend fun updateCategories(categories: List<Category>) {
-        val filtered = categories.filter { it.id != JournalConstants.CATEGORY_DELETED_ID }
+        val filtered = categories
+            .filterNot { JournalConstants.isVirtualDeletedCategory(it) }
+            .map { it.copy(orderIndex = it.orderIndex.coerceIn(0, Int.MAX_VALUE - 2)) }
         categoryDao.updateCategories(filtered)
     }
 
     suspend fun insert(entry: JournalEntry, categories: List<Category>) {
-        val filtered = categories.filter { it.id != JournalConstants.CATEGORY_DELETED_ID }
+        val filtered = categories.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
         entryDao.insertWithCategories(entry, filtered, categoryDao)
     }
 
     suspend fun update(entry: JournalEntry, categories: List<Category>) {
-        val filtered = categories.filter { it.id != JournalConstants.CATEGORY_DELETED_ID }
+        val filtered = categories.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
         entryDao.updateWithCategories(entry, filtered, categoryDao)
     }
     
@@ -379,7 +408,23 @@ class JournalRepository(
 
     suspend fun getAllCategoriesList(): List<Category> {
         val dbList = categoryDao.getAllCategoriesList()
+            .filterNot { JournalConstants.isVirtualDeletedCategory(it) }
         return dbList + virtualDeletedCategory
+    }
+
+    suspend fun getRealCategoriesList(): List<Category> {
+        return categoryDao.getAllCategoriesList()
+            .filterNot { JournalConstants.isVirtualDeletedCategory(it) }
+    }
+
+    suspend fun normalizeCategoryOrderIndicesIfNeeded() {
+        val dbCategories = getRealCategoriesList()
+        if (dbCategories.any { it.orderIndex < 0 || it.orderIndex >= Int.MAX_VALUE - 1 }) {
+            val normalized = dbCategories.mapIndexed { index, cat ->
+                cat.copy(orderIndex = index)
+            }
+            categoryDao.updateCategories(normalized)
+        }
     }
 }
 

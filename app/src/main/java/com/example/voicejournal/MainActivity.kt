@@ -76,6 +76,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.voicejournal.data.GpsTrackPoint
+import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.ui.components.AppDrawer
 import com.example.voicejournal.ui.screens.HomeScreen
 import com.example.voicejournal.ui.screens.search.SearchActivity
@@ -458,7 +459,7 @@ class MainActivity : ComponentActivity() {
                                             }
                                             
                                             // Delete / Restore buttons based on category
-                                            if (category == "Gelöscht") {
+                                            if (JournalConstants.isVirtualDeletedName(category)) {
                                                 // Hard delete and Restore are possible
                                                 IconButton(onClick = { viewModel.restoreEntries(selectedEntryIds) }) {
                                                     Icon(Icons.Filled.Restore, contentDescription = "Einträge wiederherstellen")
@@ -525,9 +526,11 @@ class MainActivity : ComponentActivity() {
                                         ) {
                                             FloatingActionButton(
                                                 onClick = {
+                                                    val initialCat = viewModel.selectedCategory.value
+                                                        .takeUnless { JournalConstants.isVirtualDeletedName(it) }
                                                     val intent = EditEntryActivity.newIntentForNewEntry(
                                                         context,
-                                                        viewModel.selectedCategory.value
+                                                        initialCat
                                                     )
                                                     context.startActivity(intent)
                                                     isFabMenuExpanded = false

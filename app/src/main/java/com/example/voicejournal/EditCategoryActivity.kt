@@ -80,7 +80,12 @@ class EditCategoryActivity : ComponentActivity() {
                         initialCategory = category,
                         isSaving = isSaving,
                         onSave = { name, aliases, showAll, color, checkable, showDate ->
-                            val orderIndex = category?.orderIndex ?: (highestOrderIndex + 1)
+                            val fallbackNextIndex = if (highestOrderIndex >= Int.MAX_VALUE - 1) {
+                                0
+                            } else {
+                                (highestOrderIndex + 1).coerceAtLeast(0)
+                            }
+                            val orderIndex = category?.orderIndex ?: fallbackNextIndex
                             viewModel.saveCategory(name, aliases, showAll, orderIndex, color, checkable, showDate)
                         },
                         onNavigateUp = { finish() }

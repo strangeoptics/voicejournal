@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.IntentCompat
 import com.example.voicejournal.data.Category
+import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import java.time.Instant
@@ -224,8 +225,8 @@ fun CategorySelectionDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    // Filter out the 'Gelöscht' (-1) category which we shouldn't map imports to
-    val selectableCategories = categories.filter { it.id != -1 }
+    // Filter out the 'Gelöscht' category which we shouldn't map imports to
+    val selectableCategories = categories.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
 
     Box(modifier = Modifier.padding(16.dp)) {
         ExposedDropdownMenuBox(

@@ -78,7 +78,10 @@ class CategoryManagerActivity : ComponentActivity() {
                     },
                     floatingActionButton = {
                         FloatingActionButton(onClick = {
-                            val highestIndex = categories.maxOfOrNull { it.orderIndex } ?: 0
+                            val highestIndex = categories
+                                .filterNot { JournalConstants.isVirtualDeletedCategory(it) }
+                                .maxOfOrNull { it.orderIndex }
+                                ?.coerceIn(-1, Int.MAX_VALUE - 2) ?: -1
                             val intent = EditCategoryActivity.newIntent(context, null, highestIndex)
                             context.startActivity(intent)
                         }) {
@@ -90,18 +93,18 @@ class CategoryManagerActivity : ComponentActivity() {
                         modifier = Modifier.padding(padding),
                         categories = categories,
                         onCategoryLongClick = { category ->
-                            if (category.id != JournalConstants.CATEGORY_DELETED_ID) {
+                            if (!JournalConstants.isVirtualDeletedCategory(category)) {
                                 val intent = EditCategoryActivity.newIntent(context, category.id)
                                 context.startActivity(intent)
                             }
                         },
                         onDeleteCategory = { category ->
-                            if (category.id != JournalConstants.CATEGORY_DELETED_ID) {
+                            if (!JournalConstants.isVirtualDeletedCategory(category)) {
                                 viewModel.deleteCategory(category)
                             }
                         },
                         onMoveCategory = { category, moveUp ->
-                            if (category.id != JournalConstants.CATEGORY_DELETED_ID) {
+                            if (!JournalConstants.isVirtualDeletedCategory(category)) {
                                 viewModel.moveCategory(category, moveUp)
                             }
                         }
@@ -121,6 +124,10 @@ fun CategoryManagerScreen(
     onDeleteCategory: (Category) -> Unit,
     onMoveCategory: (Category, Boolean) -> Unit
 ) {
+    val movableCategories = remember(categories) {
+        categories.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -128,7 +135,7 @@ fun CategoryManagerScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(categories, key = { it.id }) { category ->
-            val isVirtualDeleted = category.id == JournalConstants.CATEGORY_DELETED_ID
+            val isVirtualDeleted = JournalConstants.isVirtualDeletedCategory(category)
             val dismissState = rememberSwipeToDismissBoxState(
                 confirmValueChange = {
                     if (it == SwipeToDismissBoxValue.StartToEnd && !isVirtualDeleted) {
@@ -211,10 +218,12 @@ fun CategoryManagerScreen(
                                 Text("All", modifier = Modifier.padding(start = 8.dp))
                             }
                             Column {
-                                IconButton(onClick = { onMoveCategory(category, true) }, enabled = !isVirtualDeleted && categories.first() != category) {
+                                val canMoveUp = !isVirtualDeleted && movableCategories.firstOrNull()?.id != category.id
+                                val canMoveDown = !isVirtualDeleted && movableCategories.lastOrNull()?.id != category.id
+                                IconButton(onClick = { onMoveCategory(category, true) }, enabled = canMoveUp) {
                                     Icon(Icons.Default.ArrowUpward, contentDescription = "Move Up")
                                 }
-                                IconButton(onClick = { onMoveCategory(category, false) }, enabled = !isVirtualDeleted && categories.last() != category) {
+                                IconButton(onClick = { onMoveCategory(category, false) }, enabled = canMoveDown) {
                                     Icon(Icons.Default.ArrowDownward, contentDescription = "Move Down")
                                 }
                             }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.voicejournal.data.Category
+import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.JournalRepository
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +34,7 @@ class EditCategoryViewModel(
     init {
         if (categoryId != -1) {
             viewModelScope.launch {
-                _category.value = repository.allCategories.first().find { it.id == categoryId }
+                _category.value = repository.realCategories.first().find { it.id == categoryId }
             }
         }
     }
@@ -52,18 +53,35 @@ class EditCategoryViewModel(
         showDate: Boolean
     ) {
         if (_isSaving.value || _saveCompleted.value) return
+
+        val trimmedName = name.trim()
+        if (trimmedName.isEmpty()) {
+            _saveError.value = "Bitte einen gültigen Kategorienamen eingeben."
+            return
+        }
+        if (JournalConstants.isVirtualDeletedName(trimmedName)) {
+            _saveError.value = "Der Name '${JournalConstants.CATEGORY_DELETED_NAME}' ist für den Papierkorb reserviert."
+            return
+        }
+
         _isSaving.value = true
         _saveError.value = null
 
         viewModelScope.launch {
             try {
                 withContext(NonCancellable) {
+                    val resolvedOrderIndex = if (categoryId != -1) {
+                        orderIndex.coerceIn(0, Int.MAX_VALUE - 2)
+                    } else {
+                        JournalConstants.nextSafeOrderIndex(repository.getRealCategoriesList())
+                    }
+
                     val categoryToSave = Category(
                         id = categoryId.takeIf { it != -1 } ?: 0,
-                        category = name,
+                        category = trimmedName,
                         aliases = aliases,
                         showAll = showAll,
-                        orderIndex = orderIndex,
+                        orderIndex = resolvedOrderIndex,
                         color = color,
                         checkable = checkable,
                         showDate = showDate
@@ -71,6 +89,12 @@ class EditCategoryViewModel(
                     if (categoryId != -1) {
                         repository.updateCategory(categoryToSave)
                     } else {
+                        val existing = repository.getRealCategoriesList().find {
+                            it.category.equals(trimmedName, ignoreCase = true)
+                        }
+                        if (existing != null) {
+                            throw IllegalArgumentException("Eine Kategorie mit dem Namen '${existing.category}' existiert bereits.")
+                        }
                         repository.insertCategory(categoryToSave)
                     }
                 }

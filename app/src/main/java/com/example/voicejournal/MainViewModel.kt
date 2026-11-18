@@ -13,6 +13,7 @@ import com.example.voicejournal.data.AppDatabase
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.data.GpsTrackPoint
+import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
 import com.example.voicejournal.di.Injector
@@ -165,9 +166,12 @@ class MainViewModel(
                 addDefaultCategories()
                 sharedPreferences.edit { putBoolean(KEY_DEFAULT_CATEGORIES_ADDED, true) }
             }
+            repository.normalizeCategoryOrderIndicesIfNeeded()
             categories.collect {
                 if (it.isNotEmpty() && _selectedCategory.value.isEmpty()) {
-                    _selectedCategory.value = it.first()
+                    _selectedCategory.value = it.firstOrNull { name ->
+                        !JournalConstants.isVirtualDeletedName(name)
+                    } ?: it.first()
                 }
             }
         }
@@ -290,9 +294,13 @@ class MainViewModel(
                     stop_datetime = updatedStopDatetime,
                     hasImage = hasImage
                 )
-                val categories = updatedCategories.map { categoryName ->
-                    categoriesFlow.value.find { c -> c.category == categoryName } ?: Category(category = categoryName, aliases = "")
-                }
+                val categories = updatedCategories
+                    .filterNot { JournalConstants.isVirtualDeletedName(it) }
+                    .map { categoryName ->
+                        categoriesFlow.value.find { c ->
+                            !JournalConstants.isVirtualDeletedCategory(c) && c.category == categoryName
+                        } ?: Category(category = categoryName, aliases = "")
+                    }
                 repository.update(updatedEntry, categories)
                 _editingEntry.value = null
                 _refreshTrigger.emit(Unit)
@@ -318,7 +326,7 @@ class MainViewModel(
 
     fun hardDeleteEntries(ids: Set<UUID>) {
         viewModelScope.launch {
-            if (_selectedCategory.value == "Gelöscht") {
+            if (JournalConstants.isVirtualDeletedName(_selectedCategory.value)) {
                 val entries = repository.getEntriesByIds(ids)
                 entries.forEach { repository.hardDelete(it.entry) }
                 _selectedEntryIds.value = emptySet()
@@ -329,7 +337,7 @@ class MainViewModel(
 
     fun restoreEntries(ids: Set<UUID>) {
         viewModelScope.launch {
-            if (_selectedCategory.value == "Gelöscht") {
+            if (JournalConstants.isVirtualDeletedName(_selectedCategory.value)) {
                 ids.forEach { repository.restoreEntry(it) }
                 _selectedEntryIds.value = emptySet()
                 _refreshTrigger.emit(Unit)
@@ -409,42 +417,50 @@ class MainViewModel(
 
 
     fun addOrUpdateCategory(categoryName: String, aliasesString: String, showAll: Boolean) {
+        val trimmedName = categoryName.trim()
+        if (trimmedName.isEmpty() || JournalConstants.isVirtualDeletedName(trimmedName)) return
         viewModelScope.launch {
-            val existingCategory = categoriesFlow.value.find { it.category == categoryName }
+            val realCategories = categoriesFlow.value.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
+            val existingCategory = realCategories.find { it.category.equals(trimmedName, ignoreCase = true) }
             val category = Category(
                 id = existingCategory?.id ?: 0,
-                category = categoryName,
+                category = existingCategory?.category ?: trimmedName,
                 aliases = aliasesString,
                 showAll = showAll,
-                orderIndex = existingCategory?.orderIndex ?: categoriesFlow.value.size
+                orderIndex = existingCategory?.orderIndex ?: JournalConstants.nextSafeOrderIndex(realCategories)
             )
             repository.insertCategory(category)
         }
     }
 
     fun updateCategory(category: Category) {
+        if (JournalConstants.isVirtualDeletedCategory(category)) return
         viewModelScope.launch {
             repository.updateCategory(category)
         }
     }
 
     fun deleteCategory(category: Category) {
+        if (JournalConstants.isVirtualDeletedCategory(category)) return
         viewModelScope.launch {
             repository.deleteCategory(category.id)
         }
     }
 
     fun moveCategory(category: Category, moveUp: Boolean) {
+        if (JournalConstants.isVirtualDeletedCategory(category)) return
         viewModelScope.launch {
-            val currentList = categoriesFlow.value.toMutableList()
-            val fromIndex = currentList.indexOf(category)
+            val realList = categoriesFlow.value
+                .filterNot { JournalConstants.isVirtualDeletedCategory(it) }
+                .toMutableList()
+            val fromIndex = realList.indexOfFirst { it.id == category.id }
             if (fromIndex == -1) return@launch
 
             val toIndex = if (moveUp) fromIndex - 1 else fromIndex + 1
 
-            if (toIndex >= 0 && toIndex < currentList.size) {
-                Collections.swap(currentList, fromIndex, toIndex)
-                val updatedCategories = currentList.mapIndexed { index, cat ->
+            if (toIndex in 0 until realList.size) {
+                Collections.swap(realList, fromIndex, toIndex)
+                val updatedCategories = realList.mapIndexed { index, cat ->
                     cat.copy(orderIndex = index)
                 }
                 repository.updateCategories(updatedCategories)
@@ -551,9 +567,14 @@ class MainViewModel(
         currentCategoryName: String
     ): Pair<Category, String> {
         val trimmedText = text.trim()
-        val defaultCat = categories.find { it.category == currentCategoryName }
-            ?: Category(category = currentCategoryName, aliases = "")
-            
+        val realCategories = categories.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
+        val defaultCat = if (currentCategoryName.isNotBlank() && !JournalConstants.isVirtualDeletedName(currentCategoryName)) {
+            realCategories.find { it.category == currentCategoryName }
+                ?: Category(category = currentCategoryName, aliases = "")
+        } else {
+            realCategories.firstOrNull() ?: Category(category = "journal", aliases = "")
+        }
+
         if (trimmedText.isEmpty()) {
             return Pair(defaultCat, "")
         }
@@ -565,13 +586,13 @@ class MainViewModel(
         if (matchResult != null) {
             val firstWord = matchResult.groupValues[1].lowercase(Locale.ROOT)
 
-            // b) Prüfe ob dieses Wort category oder aliases entspricht
-            val matchedCategory = categories.find { category ->
+            // b) Prüfe ob dieses Wort einer echten Kategorie oder deren Aliases entspricht (niemals 'Gelöscht')
+            val matchedCategory = realCategories.find { category ->
                 val catName = category.category.lowercase(Locale.ROOT)
                 val aliases = category.aliases.split(',')
                     .map { it.trim().lowercase(Locale.ROOT) }
                     .filter { it.isNotEmpty() }
-                
+
                 firstWord == catName || aliases.contains(firstWord)
             }
 
@@ -579,11 +600,11 @@ class MainViewModel(
                 // c) Entferne das Trigger-Wort aus dem Text
                 val removePrefixRegex = Regex("^[^\\s\\p{Punct}]+[\\s\\p{Punct}]*")
                 var remainingText = trimmedText.replaceFirst(removePrefixRegex, "").trim()
-                
+
                 // Capitalize the first letter of the remaining text
                 if (remainingText.isNotEmpty()) {
-                    remainingText = remainingText.replaceFirstChar { 
-                        if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() 
+                    remainingText = remainingText.replaceFirstChar {
+                        if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
                     }
                 }
 

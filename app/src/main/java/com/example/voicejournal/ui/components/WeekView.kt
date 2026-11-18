@@ -1,6 +1,5 @@
 package com.example.voicejournal.ui.components
 
-import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -9,21 +8,13 @@ import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TimePickerDialog
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -36,12 +27,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.voicejournal.EditEntryActivity
 import com.example.voicejournal.data.JournalEntry
-import java.time.LocalDate // New import
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
-import java.time.temporal.WeekFields // New import
+import java.time.temporal.WeekFields
 import java.util.*
 import kotlin.math.abs
 
@@ -335,14 +325,6 @@ fun WeekView(
                                         fontSize = 12.sp,
                                         color = Color.White
                                     )
-                                    //appointment.description?.let {
-                                    //    Text(
-                                    //        text = it,
-                                    //        fontSize = 10.sp,
-                                    //        color = Color.White,
-                                    //        modifier = Modifier.align(androidx.compose.ui.Alignment.BottomStart)
-                                    //    )
-                                    //}
                                 }
                             }
                         }

@@ -649,10 +649,6 @@ class MainActivity : ComponentActivity() {
                                         selectedDate = selectedDate,
                                         onDateSelected = viewModel::onDateSelected,
                                         onEntrySelected = viewModel::onEntrySelected,
-                                        onEditEntry = { entryToEdit ->
-                                            val intent = EditEntryActivity.newIntent(context, entryToEdit.entry.id)
-                                            context.startActivity(intent)
-                                        },
                                         onDateLongClicked = { date ->
                                             openGooglePhotos(date)
                                         },

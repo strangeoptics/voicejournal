@@ -10,7 +10,6 @@ import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import java.util.Locale
 import java.util.UUID
 
 @Dao
@@ -38,10 +37,6 @@ interface JournalEntryDao {
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL ORDER BY start_datetime DESC LIMIT :limit OFFSET :offset")
     suspend fun getPaginatedEntriesWithCategories(limit: Int, offset: Int): List<EntryWithCategories>
-
-    @Transaction
-    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL AND start_datetime >= :since ORDER BY start_datetime DESC")
-    fun getEntriesWithCategoriesSince(since: Long): Flow<List<EntryWithCategories>>
 
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL AND id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC")
@@ -110,9 +105,6 @@ interface JournalEntryDao {
     @Query("UPDATE journal_entries SET deletedAt = :timestamp WHERE id IN (:ids)")
     suspend fun softDeleteByIds(ids: Collection<UUID>, timestamp: Long)
 
-    @Query("DELETE FROM journal_entries WHERE id = :id")
-    suspend fun hardDeleteById(id: UUID)
-
     @Query("DELETE FROM journal_entries WHERE id IN (:ids)")
     suspend fun hardDeleteByIds(ids: Collection<UUID>)
 
@@ -176,9 +168,6 @@ interface JournalEntryDao {
             )
         }
     }
-
-    @Query("SELECT MAX(je.start_datetime) FROM journal_entries AS je INNER JOIN journal_entry_category_cross_ref AS jecr ON je.id = jecr.entryId WHERE jecr.categoryId = :categoryId AND je.deletedAt IS NULL")
-    suspend fun getLatestEntryDatetimeForCategory(categoryId: Int): Long?
 
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL AND start_datetime >= :startDateMillis AND start_datetime < :endDateMillis AND id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC")

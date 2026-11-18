@@ -165,7 +165,6 @@ class JournalRepository(
         id = JournalConstants.CATEGORY_DELETED_ID,
         category = JournalConstants.CATEGORY_DELETED_NAME,
         aliases = "",
-        showAll = true,
         orderIndex = Int.MAX_VALUE, // Put it at the end
         color = "#FFCDD2", // Light red
         checkable = false,
@@ -213,8 +212,6 @@ class JournalRepository(
         ).flow
     }
 
-    fun getAllEntriesWithCategories(): Flow<List<EntryWithCategories>> = entryDao.getEntriesWithCategories()
-    
     fun getEntriesForCalendar(startTime: Long, endTime: Long): Flow<List<EntryWithCategories>> =
         entryDao.getEntriesForCalendar(startTime, endTime)
 
@@ -474,8 +471,6 @@ class JournalRepository(
         }
     }
 
-    fun getEntriesWithCategoriesSince(since: Long) = entryDao.getEntriesWithCategoriesSince(since)
-
     suspend fun insertCategory(category: Category) {
         if (!JournalConstants.isVirtualDeletedCategory(category)) {
             val safeOrderIndex = category.orderIndex.coerceIn(0, Int.MAX_VALUE - 2)
@@ -506,9 +501,7 @@ class JournalRepository(
         val filtered = categories.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
         entryDao.updateWithCategories(entry, filtered, categoryDao)
     }
-    
-    suspend fun updateJournalEntry(entry: JournalEntry) = entryDao.update(entry)
-    
+
     suspend fun updateEntryChecked(entryId: UUID, checked: Boolean) = entryDao.updateChecked(entryId, checked)
 
     suspend fun updateEntriesZoneId(ids: Set<UUID>, zoneId: String?) {
@@ -521,10 +514,6 @@ class JournalRepository(
         }
     }
 
-    suspend fun delete(entry: JournalEntry) {
-        entryDao.softDelete(entry.id, System.currentTimeMillis())
-    }
-
     suspend fun deleteEntries(ids: Set<UUID>) {
         if (ids.isEmpty()) return
         val timestamp = System.currentTimeMillis()
@@ -533,10 +522,6 @@ class JournalRepository(
                 entryDao.softDeleteByIds(chunk, timestamp)
             }
         }
-    }
-
-    suspend fun hardDelete(entry: JournalEntry) {
-        entryDao.hardDeleteById(entry.id)
     }
 
     suspend fun hardDeleteEntries(ids: Set<UUID>) {
@@ -555,10 +540,6 @@ class JournalRepository(
         }
     }
 
-    suspend fun restoreEntry(id: UUID) {
-        entryDao.restoreEntry(id)
-    }
-
     suspend fun restoreEntries(ids: Set<UUID>) {
         if (ids.isEmpty()) return
         database.withTransaction {
@@ -569,11 +550,6 @@ class JournalRepository(
     }
 
     fun getDeletedEntriesCount(): Flow<Int> = entryDao.getDeletedEntriesCount()
-
-    suspend fun updateAliasesForCategory(categoryId: Int, aliases: List<String>) {
-        val aliasesString = aliases.joinToString(",")
-        if (categoryId != JournalConstants.CATEGORY_DELETED_ID) categoryDao.updateAliasesForCategory(categoryId, aliasesString)
-    }
 
     suspend fun deleteCategory(categoryId: Int) {
         if (categoryId != JournalConstants.CATEGORY_DELETED_ID) categoryDao.deleteCategory(categoryId)
@@ -590,19 +566,6 @@ class JournalRepository(
 
     fun getTrackPointsForDay(dayStartMillis: Long, dayEndMillis: Long): Flow<List<GpsTrackPoint>> {
         return gpsTrackPointDao.getTrackPointsForDay(dayStartMillis, dayEndMillis)
-    }
-
-    suspend fun getLatestEntryDatetimeForCategory(categoryId: Int): Long? {
-        if (categoryId == JournalConstants.CATEGORY_DELETED_ID) return null
-        return entryDao.getLatestEntryDatetimeForCategory(categoryId)
-    }
-
-    fun getEntriesWithCategoriesInDateRangeForCategory(categoryId: Int, startDateMillis: Long, endDateMillis: Long): Flow<List<EntryWithCategories>> {
-        return entryDao.getEntriesWithCategoriesInDateRangeForCategory(categoryId, startDateMillis, endDateMillis)
-    }
-
-    fun getEntriesWithCategoriesInDateRange(startDateMillis: Long, endDateMillis: Long): Flow<List<EntryWithCategories>> {
-        return entryDao.getEntriesWithCategoriesInDateRange(startDateMillis, endDateMillis)
     }
 
     suspend fun getAllCategoriesList(): List<Category> {

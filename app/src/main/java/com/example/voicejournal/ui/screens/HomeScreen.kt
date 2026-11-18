@@ -1,6 +1,5 @@
 package com.example.voicejournal.ui.screens
 
-import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -56,7 +55,6 @@ fun HomeScreen(
     selectedDate: LocalDate? = null,
     onDateSelected: (LocalDate) -> Unit = {},
     onEntrySelected: (EntryWithCategories) -> Unit = {},
-    onEditEntry: (EntryWithCategories) -> Unit = {},
     onDateLongClicked: (LocalDate) -> Unit = {},
     onPhotoIconClicked: (EntryWithCategories) -> Unit = {},
     scrollToEntryId: UUID?,
@@ -69,10 +67,6 @@ fun HomeScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         var expanded by remember { mutableStateOf(false) }
-
-        LaunchedEffect(pagedEntries.itemCount) {
-            Log.d("Paging", "List updated. New total item count: ${pagedEntries.itemCount}")
-        }
 
         ExposedDropdownMenuBox(
             expanded = expanded,
@@ -170,7 +164,6 @@ fun HomeScreen(
                             showCategoryTags = showCategoryTags,
                             truncationLength = truncationLength,
                             onEntrySelected = onEntrySelected,
-                            onEditEntry = onEditEntry,
                             onToggleSelection = onToggleEntrySelection,
                             onPhotoIconClicked = onPhotoIconClicked,
                             onCheckedChange = { onCheckedChange(entryWithCategories) }

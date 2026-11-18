@@ -12,10 +12,6 @@ import java.util.concurrent.TimeUnit
 
 class VoiceJournalApplication : Application() {
 
-    override fun onCreate() {
-        super.onCreate()
-    }
-
     companion object {
         fun setupLocationWorker(context: Context) {
             val sharedPreferences = context.getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE)

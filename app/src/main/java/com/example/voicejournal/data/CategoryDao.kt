@@ -40,9 +40,6 @@ interface CategoryDao {
             .distinctBy { it.id }
     }
 
-    @Query("UPDATE categories SET aliases = :aliases WHERE id = :categoryId")
-    suspend fun updateAliasesForCategory(categoryId: Int, aliases: String)
-
     @Query("DELETE FROM categories WHERE id = :categoryId")
     suspend fun deleteCategory(categoryId: Int)
 }

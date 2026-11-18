@@ -23,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.data.resolvedZoneId
@@ -40,7 +39,6 @@ fun JournalEntryItem(
     showCategoryTags: Boolean,
     truncationLength: Int,
     onEntrySelected: (EntryWithCategories) -> Unit,
-    onEditEntry: (EntryWithCategories) -> Unit,
     onToggleSelection: (UUID) -> Unit = {},
     onPhotoIconClicked: (EntryWithCategories) -> Unit,
     onCheckedChange: (Boolean) -> Unit

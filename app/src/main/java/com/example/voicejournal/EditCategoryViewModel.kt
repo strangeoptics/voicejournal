@@ -36,9 +36,6 @@ class EditCategoryViewModel(
     private val _color = MutableStateFlow(TextFieldValue("#FFFFFF"))
     val color: StateFlow<TextFieldValue> = _color.asStateFlow()
 
-    private val _showAll = MutableStateFlow(false)
-    val showAll: StateFlow<Boolean> = _showAll.asStateFlow()
-
     private val _checkable = MutableStateFlow(false)
     val checkable: StateFlow<Boolean> = _checkable.asStateFlow()
 
@@ -63,7 +60,6 @@ class EditCategoryViewModel(
                     _name.value = TextFieldValue(loaded.category, selection = TextRange(loaded.category.length))
                     _aliases.value = TextFieldValue(loaded.aliases, selection = TextRange(loaded.aliases.length))
                     _color.value = TextFieldValue(loaded.color, selection = TextRange(loaded.color.length))
-                    _showAll.value = loaded.showAll
                     _checkable.value = loaded.checkable
                     _showDate.value = loaded.showDate
                 }
@@ -90,10 +86,6 @@ class EditCategoryViewModel(
         _color.value = TextFieldValue(hexColor, selection = TextRange(hexColor.length))
     }
 
-    fun updateShowAll(value: Boolean) {
-        _showAll.value = value
-    }
-
     fun updateCheckable(value: Boolean) {
         _checkable.value = value
     }
@@ -106,31 +98,10 @@ class EditCategoryViewModel(
         _saveError.value = null
     }
 
-    fun saveCategory(fallbackOrderIndex: Int = 0) {
-        val currentOrderIndex = _category.value?.orderIndex ?: fallbackOrderIndex
-        saveCategory(
-            name = _name.value.text,
-            aliases = _aliases.value.text,
-            showAll = _showAll.value,
-            orderIndex = currentOrderIndex,
-            color = _color.value.text,
-            checkable = _checkable.value,
-            showDate = _showDate.value
-        )
-    }
-
-    fun saveCategory(
-        name: String,
-        aliases: String,
-        showAll: Boolean,
-        orderIndex: Int,
-        color: String,
-        checkable: Boolean,
-        showDate: Boolean
-    ) {
+    fun saveCategory() {
         if (_isSaving.value || _saveCompleted.value) return
 
-        val trimmedName = name.trim()
+        val trimmedName = _name.value.text.trim()
         if (trimmedName.isEmpty()) {
             _saveError.value = "Bitte einen gültigen Kategorienamen eingeben."
             return
@@ -140,6 +111,12 @@ class EditCategoryViewModel(
             return
         }
 
+        val currentAliases = _aliases.value.text
+        val currentColor = _color.value.text
+        val currentCheckable = _checkable.value
+        val currentShowDate = _showDate.value
+        val existingOrderIndex = _category.value?.orderIndex ?: 0
+
         _isSaving.value = true
         _saveError.value = null
 
@@ -147,7 +124,7 @@ class EditCategoryViewModel(
             try {
                 withContext(NonCancellable) {
                     val resolvedOrderIndex = if (categoryId != -1) {
-                        orderIndex.coerceIn(0, Int.MAX_VALUE - 2)
+                        existingOrderIndex.coerceIn(0, Int.MAX_VALUE - 2)
                     } else {
                         JournalConstants.nextSafeOrderIndex(repository.getRealCategoriesList())
                     }
@@ -155,12 +132,11 @@ class EditCategoryViewModel(
                     val categoryToSave = Category(
                         id = categoryId.takeIf { it != -1 } ?: 0,
                         category = trimmedName,
-                        aliases = aliases,
-                        showAll = showAll,
+                        aliases = currentAliases,
                         orderIndex = resolvedOrderIndex,
-                        color = color,
-                        checkable = checkable,
-                        showDate = showDate
+                        color = currentColor,
+                        checkable = currentCheckable,
+                        showDate = currentShowDate
                     )
                     if (categoryId != -1) {
                         repository.updateCategory(categoryToSave)

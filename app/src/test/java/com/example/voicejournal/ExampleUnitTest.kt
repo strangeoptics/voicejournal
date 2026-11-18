@@ -18,7 +18,7 @@ class ExampleUnitTest {
         Category(id = 1, category = "journal", aliases = "journal,tagebuch", orderIndex = 0),
         Category(id = 2, category = "todo", aliases = "todo,to-do,todoo", orderIndex = 1),
         Category(id = 3, category = "kaufen", aliases = "kaufen,einkaufen", orderIndex = 2),
-        Category(id = 4, category = "eloisa", aliases = "eloisa,luisa", showAll = true, orderIndex = 3),
+        Category(id = 4, category = "eloisa", aliases = "eloisa,luisa", orderIndex = 3),
         Category(id = -1, category = "Gelöscht", aliases = "", orderIndex = Int.MAX_VALUE)
     )
 

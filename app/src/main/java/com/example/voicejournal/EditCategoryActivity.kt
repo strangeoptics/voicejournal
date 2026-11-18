@@ -45,7 +45,6 @@ import com.example.voicejournal.ui.theme.VoicejournalTheme
 class EditCategoryActivity : ComponentActivity() {
 
     private val categoryId by lazy { intent.getIntExtra(EXTRA_CATEGORY_ID, -1) }
-    private val highestOrderIndex by lazy { intent.getIntExtra(EXTRA_HIGHEST_ORDER_INDEX, 100) }
 
     private val viewModel: EditCategoryViewModel by viewModels {
         EditCategoryViewModelFactory(Injector.provideJournalRepository(this), categoryId)
@@ -90,16 +89,11 @@ class EditCategoryActivity : ComponentActivity() {
                         CircularProgressIndicator()
                     }
                 } else if (categoryId == -1 || category != null) {
-                    val fallbackNextIndex = if (highestOrderIndex >= Int.MAX_VALUE - 1) {
-                        0
-                    } else {
-                        (highestOrderIndex + 1).coerceAtLeast(0)
-                    }
                     EditCategoryScreen(
                         isNewCategory = categoryId == -1,
                         isSaving = isSaving,
                         viewModel = viewModel,
-                        onSave = { viewModel.saveCategory(fallbackNextIndex) },
+                        onSave = { viewModel.saveCategory() },
                         onNavigateUp = { finish() }
                     )
                 }
@@ -109,12 +103,10 @@ class EditCategoryActivity : ComponentActivity() {
 
     companion object {
         private const val EXTRA_CATEGORY_ID = "extra_category_id"
-        private const val EXTRA_HIGHEST_ORDER_INDEX = "extra_highest_order_index"
 
-        fun newIntent(context: Context, categoryId: Int? = null, highestOrderIndex: Int = 0): Intent {
+        fun newIntent(context: Context, categoryId: Int? = null): Intent {
             return Intent(context, EditCategoryActivity::class.java).apply {
                 putExtra(EXTRA_CATEGORY_ID, categoryId ?: -1)
-                putExtra(EXTRA_HIGHEST_ORDER_INDEX, highestOrderIndex)
             }
         }
     }
@@ -131,7 +123,6 @@ fun EditCategoryScreen(
 ) {
     val name by viewModel.name.collectAsState()
     val aliases by viewModel.aliases.collectAsState()
-    val showAll by viewModel.showAll.collectAsState()
     val color by viewModel.color.collectAsState()
     val checkable by viewModel.checkable.collectAsState()
     val showDate by viewModel.showDate.collectAsState()
@@ -202,7 +193,7 @@ fun EditCategoryScreen(
                         .background(
                             try {
                                 Color(android.graphics.Color.parseColor(color.text))
-                            } catch (e: IllegalArgumentException) {
+                            } catch (_: IllegalArgumentException) {
                                 Color.Gray // Fallback color for invalid hex
                             }
                         )
@@ -213,14 +204,6 @@ fun EditCategoryScreen(
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Checkbox(checked = showAll, onCheckedChange = { viewModel.updateShowAll(it) })
-                Text("Show all entries in this category")
-            }
-            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()

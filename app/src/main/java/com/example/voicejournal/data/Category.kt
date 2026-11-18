@@ -17,6 +17,7 @@ data class Category(
     val id: Int = 0,
     val category: String, // The canonical category name
     val aliases: String,     // A comma-separated list of aliases
+    // Retained as default column for Room schema v18 stability and legacy JSON backup compatibility
     val showAll: Boolean = false,
     val orderIndex: Int = 0,
     val color: String = "#FFFFFF", // Default color white

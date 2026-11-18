@@ -9,7 +9,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import com.example.voicejournal.data.AppDatabase
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.data.GpsTrackPoint
@@ -47,8 +46,7 @@ import java.util.UUID
 class MainViewModel(
     private val repository: JournalRepository,
     private val sharedPreferences: SharedPreferences,
-    private val applicationContext: Context,
-    val db: AppDatabase
+    private val applicationContext: Context
 ) : ViewModel() {
 
     companion object {
@@ -57,7 +55,6 @@ class MainViewModel(
         const val KEY_GPS_TRACKING_ENABLED = "gps_tracking_enabled"
         const val KEY_GPS_INTERVAL_MINUTES = "gps_interval_minutes"
         const val KEY_SPEECH_SERVICE = "speech_service"
-        const val KEY_GOOGLE_CLOUD_API_KEY = "google_cloud_api_key"
         const val KEY_MAX_RECORDING_TIME = "max_recording_time"
         const val KEY_SILENCE_THRESHOLD = "silence_threshold"
         const val KEY_SILENCE_TIME_REQUIRED = "silence_time_required"
@@ -134,9 +131,6 @@ class MainViewModel(
 
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
     val selectedDate: StateFlow<LocalDate?> = _selectedDate.asStateFlow()
-
-    private val _editingEntry = MutableStateFlow<EntryWithCategories?>(null)
-    val editingEntry: StateFlow<EntryWithCategories?> = _editingEntry.asStateFlow()
 
     private val _selectedEntryIds = MutableStateFlow<Set<UUID>>(emptySet())
     val selectedEntryIds: StateFlow<Set<UUID>> = _selectedEntryIds.asStateFlow()
@@ -267,7 +261,7 @@ class MainViewModel(
             Category(category = "todo", aliases = "todo,to-do,todoo", orderIndex = 1),
             Category(category = "kaufen", aliases = "kaufen,einkaufen", orderIndex = 2),
             Category(category = "baumarkt", aliases = "baumarkt", orderIndex = 3),
-            Category(category = "eloisa", aliases = "eloisa,luisa", showAll = true, orderIndex = 4)
+            Category(category = "eloisa", aliases = "eloisa,luisa", orderIndex = 4)
         )
         defaultCategories.forEach { repository.insertCategory(it) }
     }
@@ -284,19 +278,6 @@ class MainViewModel(
         }.flatMapLatest { (category, anchorEntryId, _) ->
             repository.getEntriesPager(category?.id, anchorEntryId)
         }.cachedIn(viewModelScope)
-
-
-    // The groupedEntries, filteredEntries and entries are now replaced by pagedEntries.
-    // The UI will need to be updated to consume PagingData.
-    // For now, I will provide a placeholder for groupedEntries.
-    // The user's request is about loading, not grouping, so I can handle grouping later.
-    val groupedEntries: StateFlow<Map<LocalDate, List<EntryWithCategories>>> = 
-        MutableStateFlow(emptyMap<LocalDate, List<EntryWithCategories>>())
-            .asStateFlow()
-
-    val filteredEntries: StateFlow<List<EntryWithCategories>> =
-        MutableStateFlow(emptyList<EntryWithCategories>())
-            .asStateFlow()
 
     fun toggleEntrySelection(id: UUID) {
         _selectedEntryIds.value = _selectedEntryIds.value.toMutableSet().apply {
@@ -367,37 +348,6 @@ class MainViewModel(
         _selectedEntry.value = if (_selectedEntry.value == entry) null else entry
         if (_selectedEntry.value != null) {
             _selectedDate.value = null
-        }
-    }
-
-    fun onEditEntry(entry: EntryWithCategories) {
-        _editingEntry.value = entry
-    }
-
-    fun onDismissEditEntry() {
-        _editingEntry.value = null
-    }
-
-    fun onSaveEntry(updatedCategories: List<String>, updatedContent: String, updatedStartDatetime: Long, updatedStopDatetime: Long?, hasImage: Boolean) {
-        viewModelScope.launch {
-            _editingEntry.value?.let {
-                val updatedEntry = it.entry.copy(
-                    content = updatedContent,
-                    start_datetime = updatedStartDatetime,
-                    stop_datetime = updatedStopDatetime,
-                    hasImage = hasImage
-                )
-                val categories = updatedCategories
-                    .filterNot { JournalConstants.isVirtualDeletedName(it) }
-                    .map { categoryName ->
-                        categoriesFlow.value.find { c ->
-                            !JournalConstants.isVirtualDeletedCategory(c) && c.category == categoryName
-                        } ?: Category(category = categoryName, aliases = "")
-                    }
-                repository.update(updatedEntry, categories)
-                _editingEntry.value = null
-                _refreshTrigger.emit(Unit)
-            }
         }
     }
 
@@ -518,31 +468,6 @@ class MainViewModel(
     fun toggleShowCategoryTags() {
         val newValue = !showCategoryTags.value
         sharedPreferences.edit { putBoolean(KEY_SHOW_CATEGORY_TAGS, newValue) }
-    }
-
-
-    fun addOrUpdateCategory(categoryName: String, aliasesString: String, showAll: Boolean) {
-        val trimmedName = categoryName.trim()
-        if (trimmedName.isEmpty() || JournalConstants.isVirtualDeletedName(trimmedName)) return
-        viewModelScope.launch {
-            val realCategories = categoriesFlow.value.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
-            val existingCategory = realCategories.find { it.category.equals(trimmedName, ignoreCase = true) }
-            val category = Category(
-                id = existingCategory?.id ?: 0,
-                category = existingCategory?.category ?: trimmedName,
-                aliases = aliasesString,
-                showAll = showAll,
-                orderIndex = existingCategory?.orderIndex ?: JournalConstants.nextSafeOrderIndex(realCategories)
-            )
-            repository.insertCategory(category)
-        }
-    }
-
-    fun updateCategory(category: Category) {
-        if (JournalConstants.isVirtualDeletedCategory(category)) return
-        viewModelScope.launch {
-            repository.updateCategory(category)
-        }
     }
 
     fun deleteCategory(category: Category) {
@@ -685,8 +610,7 @@ class MainViewModelFactory(private val context: Context, private val sharedPrefe
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
             val repository = Injector.provideJournalRepository(context)
-            val db = Injector.getDatabase(context)
-            return MainViewModel(repository, sharedPreferences, context.applicationContext, db) as T
+            return MainViewModel(repository, sharedPreferences, context.applicationContext) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

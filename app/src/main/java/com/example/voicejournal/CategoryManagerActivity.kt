@@ -78,11 +78,7 @@ class CategoryManagerActivity : ComponentActivity() {
                     },
                     floatingActionButton = {
                         FloatingActionButton(onClick = {
-                            val highestIndex = categories
-                                .filterNot { JournalConstants.isVirtualDeletedCategory(it) }
-                                .maxOfOrNull { it.orderIndex }
-                                ?.coerceIn(-1, Int.MAX_VALUE - 2) ?: -1
-                            val intent = EditCategoryActivity.newIntent(context, null, highestIndex)
+                            val intent = EditCategoryActivity.newIntent(context)
                             context.startActivity(intent)
                         }) {
                             Icon(Icons.Default.Add, contentDescription = "Add Category")
@@ -213,9 +209,6 @@ fun CategoryManagerScreen(
                                     text = category.aliases,
                                     style = MaterialTheme.typography.bodyMedium
                                 )
-                            }
-                            if (category.showAll) {
-                                Text("All", modifier = Modifier.padding(start = 8.dp))
                             }
                             Column {
                                 val canMoveUp = !isVirtualDeleted && movableCategories.firstOrNull()?.id != category.id

@@ -38,9 +38,8 @@ class WebServer(private val db: AppDatabase) {
 
     private val virtualDeletedCategory = Category(
         id = JournalConstants.CATEGORY_DELETED_ID,
-        category = "Gelöscht",
+        category = JournalConstants.CATEGORY_DELETED_NAME,
         aliases = "",
-        showAll = true,
         orderIndex = Int.MAX_VALUE,
         color = "#FFCDD2",
         checkable = false,

@@ -234,8 +234,10 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 )
-                 LaunchedEffect(Unit) {
-                    if (isGpsTrackingEnabled && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                LaunchedEffect(isGpsTrackingEnabled) {
+                    val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    if (isGpsTrackingEnabled && !hasFine && !hasCoarse) {
                         locationPermissionLauncher.launch(
                             arrayOf(
                                 Manifest.permission.ACCESS_FINE_LOCATION,
@@ -278,7 +280,6 @@ class MainActivity : ComponentActivity() {
                     }
                 )
 
-                val textToShow = "" // TODO: Re-implement this with paged data if needed
                 val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission(),
                     onResult = { isGranted ->
@@ -503,12 +504,19 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
                                             IconButton(onClick = {
-                                                val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                                                val clip = ClipData.newPlainText("VoiceJournal", textToShow)
-                                                clipboardManager.setPrimaryClip(clip)
-                                                Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
+                                                scope.launch {
+                                                    val clipboardText = viewModel.getEntriesTextForClipboard()
+                                                    if (clipboardText.isBlank()) {
+                                                        Toast.makeText(context, "Keine Einträge zum Kopieren vorhanden", Toast.LENGTH_SHORT).show()
+                                                    } else {
+                                                        val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                                                        val clip = ClipData.newPlainText("VoiceJournal", clipboardText)
+                                                        clipboardManager.setPrimaryClip(clip)
+                                                        Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                }
                                             }) {
-                                                Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopiert")
+                                                Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopieren")
                                             }
                                         }
                                     },
@@ -715,15 +723,34 @@ class MainActivity : ComponentActivity() {
 
         val origin = "${points.first().latitude},${points.first().longitude}"
         val destination = "${points.last().latitude},${points.last().longitude}"
-        val waypoints = points.subList(1, points.size - 1).joinToString("|") { "${it.latitude},${it.longitude}" }
+        val sampledIntermediate = sampleWaypoints(points.subList(1, points.size - 1))
+        val waypointsParam = if (sampledIntermediate.isNotEmpty()) {
+            "&waypoints=" + sampledIntermediate.joinToString("|") { "${it.latitude},${it.longitude}" }
+        } else {
+            ""
+        }
 
-        val url = "https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination&waypoints=$waypoints&travelmode=driving"
+        val url = "https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination$waypointsParam&travelmode=driving"
 
         val intent = Intent(Intent.ACTION_VIEW, url.toUri())
         try {
             startActivity(intent)
         } catch (_: Exception) {
             Toast.makeText(this, "Could not open Google Maps.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    companion object {
+        internal const val MAX_MAPS_WAYPOINTS = 9
+
+        internal fun <T> sampleWaypoints(intermediate: List<T>, maxWaypoints: Int = MAX_MAPS_WAYPOINTS): List<T> {
+            if (maxWaypoints <= 0 || intermediate.isEmpty()) return emptyList()
+            if (intermediate.size <= maxWaypoints) return intermediate
+            if (maxWaypoints == 1) return listOf(intermediate[intermediate.size / 2])
+            return (0 until maxWaypoints).map { step ->
+                val index = ((step.toLong() * (intermediate.size - 1)) / (maxWaypoints - 1)).toInt()
+                intermediate[index]
+            }
         }
     }
 }

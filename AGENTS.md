@@ -1,59 +1,48 @@
 # voicejournal Project
-voicejournal is an Android app for writing your journal/diary.
-Each entry (app\src\main\java\com\example\voicejournal\data\JournalEntry) can be assigned to one or more
-categories (app\src\main\java\com\example\voicejournal\data\Category.kt).
-The main view is a large list of entries (app\src\main\java\com\example\voicejournal\ui\screens\HomeScreen.kt).
-It is managed by the \app\src\main\java\com\example\voicejournal\MainActivity.
-The list has infinite scrolling with bi-directional paging using the
-Paging3 library.
-There is also a FastScroller (app\src\main\java\com\example\voicejournal\ui\components\FastScroller.kt).
-The entries are grouped by day.
+
+voicejournal is an Android app for writing a personal voice-enabled journal/diary (`minSdk = 34`, `targetSdk = 36`).
+Each entry (`app/src/main/java/com/example/voicejournal/data/JournalEntry.kt`) can be assigned to one or more categories (`app/src/main/java/com/example/voicejournal/data/Category.kt`).
+The main view (`app/src/main/java/com/example/voicejournal/ui/screens/HomeScreen.kt`), hosted by `MainActivity`, displays entries grouped by day with Paging 3 (`androidx.paging`) and a custom `FastScroller` (`app/src/main/java/com/example/voicejournal/ui/components/FastScroller.kt`).
 
 ## Core Features
 
 ### Voice Dictation & Smart Categorization
-Texts dictated via the `SpeechRecognitionManager` are saved as new `JournalEntry` objects. The app uses the **first word** of the recognized text as a smart category trigger:
-- If this word matches a category name (`Category.category`) or one of its comma-separated aliases (`Category.aliases`, case-insensitive), the new entry is automatically assigned to that specific category instead of the active one.
-- The trigger word is automatically removed from the final entry content.
+Texts dictated via `SpeechRecognitionManager` (supporting Android `SpeechRecognizer` or Google Cloud Speech-to-Text REST API) are saved as `JournalEntry` objects or appended to the selected entry.
+When creating a new entry via voice, the **first word** acts as a smart category trigger:
+- If the first word matches a real category name (`Category.category`) or one of its comma-separated aliases (`Category.aliases`, case-insensitive), the entry is assigned to that category and the trigger word is stripped from the entry text.
+- Virtual recycle-bin categories (`"Gelöscht"`, ID `-1`) are excluded from category matching and assignment.
 - If no match is found, the entry is assigned to the currently selected category.
 
 ### Persistent Voice Recording Notification
-To allow quick access to voice dictation, the app provides a persistent notification acting as a shortcut to trigger speech recognition. 
-- The notification is marked as `ongoing` and `autoCancel(false)`, keeping it permanently in the notification drawer while the app is active, without being swipeable or dismissed upon click.
-- Clicking the notification uses `Intent.FLAG_ACTIVITY_SINGLE_TOP` to cleanly reuse the existing `MainActivity` via `onNewIntent`.
+A persistent notification (`NotificationHelper`) provides a quick shortcut to trigger speech recognition (`ongoing`, `autoCancel(false)`), reusing `MainActivity` via `Intent.FLAG_ACTIVITY_SINGLE_TOP` and `onNewIntent`.
 
-### Multi-Select & Sharing
-Journal entries can be selected simultaneously by long-pressing an entry and tapping others in the list. The top app bar transforms into a contextual action bar. Users can share the selected entries via standard Android sharing intents in two formats:
-- **Plain Text**: A clean, readable string where each entry is prefixed by its date and time.
-- **JSON**: The full `JournalEntry` objects (without their linked categories) serialized into a structured JSON array.
+### Multi-Select, Clipboard & Sharing / Import-Export
+- **Multi-Select & Sharing**: Long-pressing entries opens a contextual action bar supporting plain-text sharing and `.vj` export (via an isolated `FileProvider` cache subdirectory `cacheDir/shared_exports/`).
+- **Import (`ImportActivity`)**: Accepts `ACTION_VIEW`/`ACTION_SEND` `.vj`/JSON files, validates stream size (max 10 MB) and payload schema in `ImportViewModel`, and imports entries transactionally without overwriting existing category assignments.
+- **Full Backup**: Supports V3 JSON export (`"wt"` write+truncate) and transactional V1/V2/V3/legacy text import in `JournalRepository`.
 
-### Resilient Entry Editing (MVVM & State Management)
-The `EditEntryActivity` and its corresponding UI (`EditEntryScreen`) are designed to fully survive configuration changes (like screen rotations) without data loss. 
-- **ViewModel StateHolder**: All editable states (text content, timestamps, category selections, media attachments) are strictly managed within the `EditEntryViewModel` using `StateFlow`.
-- **Cursor Preservation**: The text input utilizes `TextFieldValue` to retain the exact cursor position and selection state during text entry and voice dictation insertions.
-- **UI State Recovery**: UI-only states, such as the visibility of date and time picker dialogs, are preserved across screen rotations using Compose's `rememberSaveable`.
+### Resilient Entry & Category Editing (MVVM & State Management)
+`EditEntryActivity` (`EditEntryViewModel`) and `EditCategoryActivity` (`EditCategoryViewModel`) manage all editable state in `StateFlow`, preserve cursor/selection state via `TextFieldValue`, survive configuration changes, and await `NonCancellable` database persistence before navigating back.
+
+### Background GPS Track Logging
+Optional periodic GPS track logging via `WorkManager` (`LocationWorker`, minimum 15-minute `PeriodicWorkRequest` interval) using `FusedLocationProviderClient` and Google Maps route preview (with automatic waypoint downsampling to respect Google Maps URL limits).
 
 ## Project Context: Frameworks and Libraries
 
-### Core Architecture
-- **Language:** **Kotlin** (idiomatic, null-safe, coroutine-based).
-- **Architecture Pattern:** **MVVM** (Model-View-ViewModel) in combination with the Android Jetpack components.
-- **Asynchronous Programming:** **Kotlin Coroutines** and **Flow** for managing background threads and reactive data streams.
+### Core Architecture & Dependency Injection
+- **Language:** **Kotlin** (`2.2.x`, Coroutines, `StateFlow`/`Flow`).
+- **Architecture Pattern:** **MVVM** with Android Jetpack ViewModels (`MainViewModel`, `EditEntryViewModel`, `EditCategoryViewModel`, `ImportViewModel`, `SearchViewModel`, `CalendarViewModel`).
+- **Dependency Injection:** **Manual DI** via the singleton service locator `Injector` (`app/src/main/java/com/example/voicejournal/di/Injector.kt`) and typed `ViewModelProvider.Factory` classes (Hilt is **not** used).
 
 ### User Interface (UI)
-- **UI Toolkit:** **Jetpack Compose** for building the entire user interface in a declarative way.
-- **Design System:** **Material 3** to use modern and consistent UI components.
-- **Navigation:** **Compose Navigation** for managing navigation between the different screens (composable functions).
+- **UI Toolkit:** **Jetpack Compose** with **Material 3** (`1.4.0`), **Paging 3 Compose**, and **Compose Navigation**.
 
-### Data Persistence
-- **Local Database:** **Room Persistence Library** for storing `JournalEntry` and `Category` objects in a local SQLite database.
-- **Zero Data Loss Policy:** Version Increment, Mandatory Migration Classes. 
-  - Uses **Soft Delete** for Journal Entries (`deletedAt: Long?`). Hard deletions are avoided.
-  - A virtual, hardcoded read-only category ("Gelöscht", ID `-1`) acts as a recycle bin showing all soft-deleted entries.
+### Data Persistence & Security
+- **Local Database:** **Room** (`AppDatabase`, schema version `17`, schemas exported to `app/schemas/`).
+- **Zero Data Loss Policy:** Explicit `Migration` chain (`MIGRATION_1_2` through `MIGRATION_16_17`) — `fallbackToDestructiveMigration` is strictly forbidden.
+  - Uses **Soft Delete** (`deletedAt: Long?`). Active views filter `deletedAt IS NULL`; the virtual read-only category `"Gelöscht"` (ID `-1`) serves as the recycle bin, where entries can be restored or permanently deleted after confirmation.
+- **Credential Storage:** `SecureApiKeyStore` encrypts the Google Cloud Speech API key using Android Keystore `AES/GCM/NoPadding` (256-bit) inside excluded `SharedPreferences` (`voice_journal_secure_prefs`), excluded from cloud backup and device transfer in `backup_rules.xml` and `data_extraction_rules.xml`.
 
-### Dependency Injection (DI)
-- **DI Framework:** **Hilt** to simplify dependency injection throughout the project.
-
-### Network & APIs
-- **HTTP Client:** **Retrofit** and **OkHttp** for communication with external APIs (e.g., for AI services).
-- **JSON Serialization:** **kotlinx.serialization** for converting JSON responses into Kotlin data classes.
+### Networking & Local Web Server
+- **Embedded Web Server:** **Ktor Server (`Netty`)** hosted in `WebServerService` (`specialUse` Foreground Service) serving a local web interface for browsing/editing journal entries on the local network.
+- **External Speech API:** Direct HTTPS requests via `HttpURLConnection` (with explicit connect/read timeouts) to `speech.googleapis.com` using **kotlinx.serialization** for JSON handling (Retrofit/OkHttp are **not** used).

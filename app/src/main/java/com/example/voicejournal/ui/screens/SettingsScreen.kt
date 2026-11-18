@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -29,6 +30,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -40,6 +42,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.voicejournal.worker.LocationWorker
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,7 +74,14 @@ fun SettingsScreen(
 ) {
     var apiKey by remember(currentApiKey) { mutableStateOf(currentApiKey) }
     var isApiKeyVisible by rememberSaveable { mutableStateOf(false) }
-    var truncationLengthState by remember { mutableStateOf(truncationLength.toString()) }
+    var truncationLengthState by rememberSaveable(truncationLength) { mutableStateOf(truncationLength.toString()) }
+
+    val minGpsMinutes = LocationWorker.MIN_INTERVAL_MINUTES
+    val clampedGpsInterval = gpsInterval.coerceIn(minGpsMinutes, 60)
+    var gpsSliderValue by remember(clampedGpsInterval) { mutableFloatStateOf(clampedGpsInterval.toFloat()) }
+    var maxRecordingSliderValue by remember(maxRecordingTime) { mutableFloatStateOf(maxRecordingTime.coerceIn(5, 60).toFloat()) }
+    var silenceThresholdSliderValue by remember(silenceThreshold) { mutableFloatStateOf(silenceThreshold.coerceIn(100, 2000).toFloat()) }
+    var silenceTimeSliderValue by remember(silenceTimeRequired) { mutableFloatStateOf(silenceTimeRequired.coerceIn(500, 5000).toFloat()) }
 
     Scaffold(
         topBar = {
@@ -88,6 +98,7 @@ fun SettingsScreen(
             Column(
                 modifier = Modifier
                     .padding(paddingValues)
+                    .imePadding()
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState())
             ) {
@@ -101,13 +112,12 @@ fun SettingsScreen(
                         value = truncationLengthState,
                         onValueChange = {
                             truncationLengthState = it
-                            it.toIntOrNull()?.let(onTruncationLengthChanged)
+                            it.toIntOrNull()?.takeIf { len -> len > 0 }?.let(onTruncationLengthChanged)
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.width(80.dp)
                     )
                 }
-
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -123,12 +133,15 @@ fun SettingsScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text("GPS Abrufintervall: ${gpsInterval} Minuten")
+                Text("GPS Abrufintervall: ${gpsSliderValue.roundToInt()} Minuten")
                 Slider(
-                    value = gpsInterval.toFloat(),
-                    onValueChange = { onGpsIntervalChanged(it.roundToInt()) },
-                    valueRange = 5f..60f,
-                    steps = 54, // (60-5) / 1
+                    value = gpsSliderValue,
+                    onValueChange = { gpsSliderValue = it },
+                    onValueChangeFinished = {
+                        onGpsIntervalChanged(gpsSliderValue.roundToInt().coerceAtLeast(minGpsMinutes))
+                    },
+                    valueRange = minGpsMinutes.toFloat()..60f,
+                    steps = 60 - minGpsMinutes - 1, // 1-Minuten-Schritte ab WorkManager-Minimum (15 Min.)
                     enabled = isGpsTrackingEnabled
                 )
 
@@ -189,7 +202,7 @@ fun SettingsScreen(
                         ) {
                             RadioButton(
                                 selected = (currentSpeechService == value),
-                                onClick = null // null recommended for accessibility with selectable
+                                onClick = null
                             )
                             Text(
                                 text = label,
@@ -227,26 +240,35 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Maximale Aufnahmedauer: $maxRecordingTime Sekunden")
+                    Text("Maximale Aufnahmedauer: ${maxRecordingSliderValue.roundToInt()} Sekunden")
                     Slider(
-                        value = maxRecordingTime.toFloat(),
-                        onValueChange = { onMaxRecordingTimeChanged(it.roundToInt()) },
+                        value = maxRecordingSliderValue,
+                        onValueChange = { maxRecordingSliderValue = it },
+                        onValueChangeFinished = {
+                            onMaxRecordingTimeChanged(maxRecordingSliderValue.roundToInt())
+                        },
                         valueRange = 5f..60f,
                         steps = 54
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Stille-Schwellenwert: $silenceThreshold")
+                    Text("Stille-Schwellenwert: ${silenceThresholdSliderValue.roundToInt()}")
                     Slider(
-                        value = silenceThreshold.toFloat(),
-                        onValueChange = { onSilenceThresholdChanged(it.roundToInt()) },
+                        value = silenceThresholdSliderValue,
+                        onValueChange = { silenceThresholdSliderValue = it },
+                        onValueChangeFinished = {
+                            onSilenceThresholdChanged(silenceThresholdSliderValue.roundToInt())
+                        },
                         valueRange = 100f..2000f,
                         steps = 189
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Benötigte Stille: $silenceTimeRequired ms")
+                    Text("Benötigte Stille: ${silenceTimeSliderValue.roundToInt()} ms")
                     Slider(
-                        value = silenceTimeRequired.toFloat(),
-                        onValueChange = { onSilenceTimeRequiredChanged(it.roundToInt()) },
+                        value = silenceTimeSliderValue,
+                        onValueChange = { silenceTimeSliderValue = it },
+                        onValueChangeFinished = {
+                            onSilenceTimeRequiredChanged(silenceTimeSliderValue.roundToInt())
+                        },
                         valueRange = 500f..5000f,
                         steps = 89
                     )

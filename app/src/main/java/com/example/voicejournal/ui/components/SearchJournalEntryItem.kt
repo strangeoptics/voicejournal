@@ -53,7 +53,7 @@ fun SearchJournalEntryItem(
             .combinedClickable(
                 onClick = {
                     onEntrySelected(entryWithCategories)
-                    if (entryWithCategories.entry.content.length > truncationLength) {
+                    if (truncationLength > 0 && entryWithCategories.entry.content.length > truncationLength) {
                         isExpanded = !isExpanded
                     }
                 },
@@ -85,7 +85,7 @@ fun SearchJournalEntryItem(
                 startDate.format(formatter)
             }
             val content = entryWithCategories.entry.content
-            val textToShow = if (!isExpanded && content.length > truncationLength) {
+            val textToShow = if (!isExpanded && truncationLength > 0 && content.length > truncationLength) {
                 "${content.take(truncationLength)}..."
             } else {
                 content

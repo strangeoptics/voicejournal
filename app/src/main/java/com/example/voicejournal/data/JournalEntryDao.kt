@@ -206,26 +206,13 @@ interface JournalEntryDao {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return flowOf(emptyList())
 
-        val lowered = trimmed.lowercase(Locale.GERMAN).replace("ẞ", "ß")
-        val hasUnsupportedNonAscii = lowered.any { ch -> ch.code > 127 && ch !in "äöüß" }
-        if (hasUnsupportedNonAscii) {
+        val escapedSqlQuery = JournalConstants.normalizeSearchQueryForSql(trimmed)
+        if (escapedSqlQuery == null) {
             return getEntriesWithCategories().map { entries ->
                 entries.filter { it.entry.content.contains(trimmed, ignoreCase = true) }
             }
         }
-
-        val escaped = buildString(lowered.length) {
-            for (ch in lowered) {
-                when (ch) {
-                    '\\', '%', '_' -> {
-                        append('\\')
-                        append(ch)
-                    }
-                    else -> append(ch)
-                }
-            }
-        }
-        return searchEntriesNormalized(escaped)
+        return searchEntriesNormalized(escapedSqlQuery)
     }
 
     @Query("""

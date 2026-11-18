@@ -2,7 +2,6 @@ package com.example.voicejournal.ui.screens
 
 import android.util.Log
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,23 +11,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,8 +34,6 @@ import androidx.paging.compose.LazyPagingItems
 import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.ui.components.FastScroller
 import com.example.voicejournal.ui.components.JournalEntryItem
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -92,7 +82,7 @@ fun HomeScreen(
         ) {
             TextField(
                 modifier = Modifier
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                     .fillMaxWidth(),
                 value = selectedCategory,
                 onValueChange = {},
@@ -124,7 +114,7 @@ fun HomeScreen(
                 }
                 if (targetIndex != null) {
                     lazyListState.scrollToItem(targetIndex)
-                    // onScrolledToEntry() // DO NOT CALL THIS HERE TO PREVENT JUMP-BACK
+                    onScrolledToEntry()
                 }
             }
         }
@@ -138,7 +128,7 @@ fun HomeScreen(
             ) {
                 items(
                     count = pagedEntries.itemCount,
-                    key = { index -> pagedEntries.peek(index)?.entry?.id ?: UUID.randomUUID() }
+                    key = { index -> pagedEntries.peek(index)?.entry?.id ?: "placeholder_$index" }
                 ) { index ->
                     val entryWithCategories = pagedEntries[index]
                     if (entryWithCategories != null) {

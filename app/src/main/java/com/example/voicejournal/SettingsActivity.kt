@@ -1,17 +1,26 @@
 package com.example.voicejournal
 
+import android.Manifest
 import android.content.Context
-import android.net.wifi.WifiManager
+import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.core.content.ContextCompat
 import com.example.voicejournal.ui.screens.SettingsScreen
 import com.example.voicejournal.ui.theme.VoicejournalTheme
-import java.util.Formatter
+import java.net.Inet4Address
+import java.net.NetworkInterface
 
 class SettingsActivity : ComponentActivity() {
 
@@ -34,8 +43,48 @@ class SettingsActivity : ComponentActivity() {
                 val truncationLength by viewModel.truncationLength.collectAsState()
                 val isDeveloperModeEnabled by viewModel.isDeveloperModeEnabled.collectAsState()
 
-                val ipAddress = getIpAddress(applicationContext) ?: "Unavailable"
-                val dnsName = getDnsName(applicationContext)
+                val ipAddress = remember(isWebServerEnabled) {
+                    getIpAddress(applicationContext) ?: "Unavailable"
+                }
+                val dnsName = remember { getDnsName(applicationContext) }
+
+                val backgroundLocationLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission(),
+                    onResult = { isGranted ->
+                        if (!isGranted) {
+                            Toast.makeText(
+                                this,
+                                "Hintergrund-Standort wird für GPS-Tracking bei geschlossener App empfohlen.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                )
+
+                val locationPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestMultiplePermissions(),
+                    onResult = { permissions ->
+                        val granted = (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true) ||
+                            (permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true)
+                        if (granted) {
+                            viewModel.saveGpsTrackingEnabled(true)
+                            if (ContextCompat.checkSelfPermission(
+                                    this,
+                                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                                ) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                            }
+                        } else {
+                            viewModel.saveGpsTrackingEnabled(false)
+                            Toast.makeText(
+                                this,
+                                "Standort-Berechtigung wird für GPS-Tracking benötigt.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                )
 
                 SettingsScreen(
                     isGpsTrackingEnabled = isGpsTrackingEnabled,
@@ -50,7 +99,37 @@ class SettingsActivity : ComponentActivity() {
                     silenceTimeRequired = silenceTimeRequired,
                     truncationLength = truncationLength,
                     isDeveloperModeEnabled = isDeveloperModeEnabled,
-                    onGpsEnableChanged = viewModel::saveGpsTrackingEnabled,
+                    onGpsEnableChanged = { enabled ->
+                        if (!enabled) {
+                            viewModel.saveGpsTrackingEnabled(false)
+                        } else {
+                            val hasForegroundLocation = ContextCompat.checkSelfPermission(
+                                this,
+                                Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+                                this,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+
+                            if (hasForegroundLocation) {
+                                viewModel.saveGpsTrackingEnabled(true)
+                                if (ContextCompat.checkSelfPermission(
+                                        this,
+                                        Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                                    ) != PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                                }
+                            } else {
+                                locationPermissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
+                            }
+                        }
+                    },
                     onWebServerEnableChanged = viewModel::saveWebServerEnabled,
                     onGpsIntervalChanged = viewModel::saveGpsInterval,
                     onSpeechServiceChanged = viewModel::saveSpeechService,
@@ -67,20 +146,30 @@ class SettingsActivity : ComponentActivity() {
     }
 
     private fun getIpAddress(context: Context): String? {
-        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-        val ipAddress = wifiManager.connectionInfo.ipAddress
-        if (ipAddress == 0) return null
-        return (ipAddress and 0xFF).toString() + "." +
-               (ipAddress shr 8 and 0xFF) + "." +
-               (ipAddress shr 16 and 0xFF) + "." +
-               (ipAddress shr 24 and 0xFF)
-    }
-    
-    private fun getDnsName(context: Context): String {
-        return try {
-            Settings.Secure.getString(context.contentResolver, "bluetooth_name") ?: android.os.Build.MODEL
-        } catch (e: SecurityException) {
-            android.os.Build.MODEL
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        val activeNetwork = connectivityManager?.activeNetwork
+        val linkProperties = activeNetwork?.let { connectivityManager.getLinkProperties(it) }
+        val activeIpv4 = linkProperties?.linkAddresses
+            ?.map { it.address }
+            ?.firstOrNull { it is Inet4Address && !it.isLoopbackAddress }
+            ?.hostAddress
+        if (!activeIpv4.isNullOrBlank()) {
+            return activeIpv4
         }
+
+        return runCatching {
+            NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
+                .asSequence()
+                .filter { it.isUp && !it.isLoopback }
+                .flatMap { it.inetAddresses.toList().asSequence() }
+                .firstOrNull { it is Inet4Address && !it.isLoopbackAddress }
+                ?.hostAddress
+        }.getOrNull()
+    }
+
+    private fun getDnsName(context: Context): String {
+        return runCatching {
+            Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: Build.MODEL
     }
 }

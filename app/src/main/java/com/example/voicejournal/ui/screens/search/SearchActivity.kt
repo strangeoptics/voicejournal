@@ -4,12 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import com.example.voicejournal.data.AppDatabase
+import com.example.voicejournal.di.Injector
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 
 class SearchActivity : ComponentActivity() {
     private val viewModel: SearchViewModel by viewModels {
-        val journalEntryDao = AppDatabase.getDatabase(applicationContext).journalEntryDao()
+        val journalEntryDao = Injector.getDatabase(applicationContext).journalEntryDao()
         SearchViewModelFactory(this, journalEntryDao)
     }
 
@@ -17,7 +17,10 @@ class SearchActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             VoicejournalTheme {
-                SearchScreen(viewModel = viewModel)
+                SearchScreen(
+                    viewModel = viewModel,
+                    onNavigateUp = { finish() }
+                )
             }
         }
     }

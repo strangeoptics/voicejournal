@@ -8,6 +8,7 @@ import androidx.paging.PagingData
 import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
@@ -18,9 +19,12 @@ import java.io.BufferedReader
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStreamReader
+import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.UUID
 import java.util.regex.Pattern
 
@@ -43,6 +47,30 @@ object JournalConstants {
         if (realCategories.isEmpty()) return 0
         val maxExisting = realCategories.maxOf { it.orderIndex }.coerceAtMost(Int.MAX_VALUE - 2)
         return maxOf(maxExisting + 1, realCategories.size)
+    }
+
+    /**
+     * Normalisiert und escaped eine Suchanfrage für SQLite `LIKE ... ESCAPE '\'`
+     * (inkl. deutscher Umlaute und `ẞ` -> `ß`). Gibt `null` zurück, wenn die Anfrage
+     * nicht-unterstützte Unicode-Zeichen enthält, sodass auf In-Memory-Filterung ausgewichen wird.
+     */
+    fun normalizeSearchQueryForSql(trimmedQuery: String): String? {
+        if (trimmedQuery.isEmpty()) return ""
+        val lowered = trimmedQuery.lowercase(Locale.GERMAN).replace("ẞ", "ß")
+        val hasUnsupportedNonAscii = lowered.any { ch -> ch.code > 127 && ch !in "äöüß" }
+        if (hasUnsupportedNonAscii) return null
+
+        return buildString(lowered.length) {
+            for (ch in lowered) {
+                when (ch) {
+                    '\\', '%', '_' -> {
+                        append('\\')
+                        append(ch)
+                    }
+                    else -> append(ch)
+                }
+            }
+        }
     }
 }
 
@@ -127,6 +155,46 @@ class JournalRepository(
         return ids.chunked(JournalConstants.SQLITE_MAX_BIND_PARAMS)
             .flatMap { chunk -> entryDao.getEntriesByIds(chunk) }
             .sortedBy { it.entry.start_datetime }
+    }
+
+    suspend fun getEntriesForClipboard(
+        categoryName: String,
+        selectedDate: LocalDate?
+    ): List<EntryWithCategories> {
+        if (JournalConstants.isVirtualDeletedName(categoryName)) {
+            val deleted = entryDao.getPaginatedDeletedEntries(500, 0)
+            return if (selectedDate != null) {
+                deleted.filter {
+                    Instant.ofEpochMilli(it.entry.start_datetime)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate() == selectedDate
+                }
+            } else {
+                deleted
+            }
+        }
+
+        val category = if (categoryName.isNotBlank()) {
+            categoryDao.getCategoryByName(categoryName)
+        } else {
+            null
+        }
+
+        if (selectedDate != null) {
+            val startMillis = selectedDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            val endMillis = selectedDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            return if (category != null) {
+                entryDao.getEntriesWithCategoriesInDateRangeForCategory(category.id, startMillis, endMillis).first()
+            } else {
+                entryDao.getEntriesWithCategoriesInDateRange(startMillis, endMillis).first()
+            }
+        }
+
+        return if (category != null) {
+            entryDao.getEntriesForCategory(category.id)
+        } else {
+            entryDao.getPaginatedEntriesWithCategories(500, 0)
+        }
     }
 
     private suspend fun ensureCategoryExists(exportedCategory: Category) {

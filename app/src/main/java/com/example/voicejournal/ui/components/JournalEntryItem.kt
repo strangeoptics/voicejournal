@@ -62,7 +62,7 @@ fun JournalEntryItem(
                         onToggleSelection(entryWithCategories.entry.id)
                     } else {
                         onEntrySelected(entryWithCategories)
-                        if (entryWithCategories.entry.content.length > truncationLength) {
+                        if (truncationLength > 0 && entryWithCategories.entry.content.length > truncationLength) {
                             isExpanded = !isExpanded
                         }
                     }
@@ -101,7 +101,7 @@ fun JournalEntryItem(
                 startDate.format(formatter)
             }
             val content = entryWithCategories.entry.content
-            val textToShow = if (!isExpanded && content.length > truncationLength) {
+            val textToShow = if (!isExpanded && truncationLength > 0 && content.length > truncationLength) {
                 "${content.take(truncationLength)}..."
             } else {
                 content

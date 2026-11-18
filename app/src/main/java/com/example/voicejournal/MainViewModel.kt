@@ -18,6 +18,7 @@ import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
 import com.example.voicejournal.di.Injector
 import com.example.voicejournal.util.SecureApiKeyStore
+import com.example.voicejournal.worker.LocationWorker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,6 +66,60 @@ class MainViewModel(
             prettyPrint = true
             encodeDefaults = true
         }
+
+        internal fun parseRecognizedTextForCategory(
+            text: String,
+            categories: List<Category>,
+            currentCategoryName: String
+        ): Pair<Category, String> {
+            val trimmedText = text.trim()
+            val realCategories = categories.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
+            val defaultCat = if (currentCategoryName.isNotBlank() && !JournalConstants.isVirtualDeletedName(currentCategoryName)) {
+                realCategories.find { it.category == currentCategoryName }
+                    ?: Category(category = currentCategoryName, aliases = "")
+            } else {
+                realCategories.firstOrNull() ?: Category(category = "journal", aliases = "")
+            }
+
+            if (trimmedText.isEmpty()) {
+                return Pair(defaultCat, "")
+            }
+
+            // a) Extrahiere das erste Wort (ignoriere Satzzeichen und beachte Case-Insensitivity)
+            val wordRegex = Regex("^([^\\s\\p{Punct}]+)")
+            val matchResult = wordRegex.find(trimmedText)
+
+            if (matchResult != null) {
+                val firstWord = matchResult.groupValues[1].lowercase(Locale.ROOT)
+
+                // b) Prüfe ob dieses Wort einer echten Kategorie oder deren Aliases entspricht (niemals 'Gelöscht')
+                val matchedCategory = realCategories.find { category ->
+                    val catName = category.category.lowercase(Locale.ROOT)
+                    val aliases = category.aliases.split(',')
+                        .map { it.trim().lowercase(Locale.ROOT) }
+                        .filter { it.isNotEmpty() }
+
+                    firstWord == catName || aliases.contains(firstWord)
+                }
+
+                if (matchedCategory != null) {
+                    // c) Entferne das Trigger-Wort aus dem Text
+                    val removePrefixRegex = Regex("^[^\\s\\p{Punct}]+[\\s\\p{Punct}]*")
+                    var remainingText = trimmedText.replaceFirst(removePrefixRegex, "").trim()
+
+                    // Capitalize the first letter of the remaining text
+                    if (remainingText.isNotEmpty()) {
+                        remainingText = remainingText.replaceFirstChar {
+                            if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+                        }
+                    }
+
+                    return Pair(matchedCategory, remainingText)
+                }
+            }
+
+            return Pair(defaultCat, trimmedText)
+        }
     }
 
     private val _selectedCategory = MutableStateFlow("")
@@ -88,7 +143,10 @@ class MainViewModel(
     private val _isWebServerEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_WEBSERVER_ENABLED, false))
     val isWebServerEnabled: StateFlow<Boolean> = _isWebServerEnabled.asStateFlow()
 
-    private val _gpsInterval = MutableStateFlow(sharedPreferences.getInt(KEY_GPS_INTERVAL_MINUTES, 10))
+    private val _gpsInterval = MutableStateFlow(
+        sharedPreferences.getInt(KEY_GPS_INTERVAL_MINUTES, LocationWorker.MIN_INTERVAL_MINUTES)
+            .coerceAtLeast(LocationWorker.MIN_INTERVAL_MINUTES)
+    )
     val gpsInterval: StateFlow<Int> = _gpsInterval.asStateFlow()
 
     private val _speechService = MutableStateFlow(sharedPreferences.getString(KEY_SPEECH_SERVICE, "ANDROID") ?: "ANDROID")
@@ -127,6 +185,7 @@ class MainViewModel(
         categories.map { it.category }.distinct()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val gpsTrackPoints: StateFlow<List<GpsTrackPoint>> = selectedDate
         .flatMapLatest { date ->
             val startOfDay = (date ?: LocalDate.now()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -143,7 +202,8 @@ class MainViewModel(
         when (key) {
             KEY_GPS_TRACKING_ENABLED -> _isGpsTrackingEnabled.value = prefs.getBoolean(key, false)
             KEY_WEBSERVER_ENABLED -> _isWebServerEnabled.value = prefs.getBoolean(key, false)
-            KEY_GPS_INTERVAL_MINUTES -> _gpsInterval.value = prefs.getInt(key, 10)
+            KEY_GPS_INTERVAL_MINUTES -> _gpsInterval.value = prefs.getInt(key, LocationWorker.MIN_INTERVAL_MINUTES)
+                .coerceAtLeast(LocationWorker.MIN_INTERVAL_MINUTES)
             KEY_SPEECH_SERVICE -> _speechService.value = prefs.getString(key, "ANDROID") ?: "ANDROID"
             KEY_MAX_RECORDING_TIME -> _maxRecordingTime.value = prefs.getInt(key, 15)
             KEY_SILENCE_THRESHOLD -> _silenceThreshold.value = prefs.getInt(key, 500)
@@ -154,6 +214,7 @@ class MainViewModel(
         }
     }
 
+    private val _pagerAnchorEntryId = MutableStateFlow<UUID?>(null)
     private val _scrollToEntryId = MutableStateFlow<UUID?>(null)
     val scrollToEntryId: StateFlow<UUID?> = _scrollToEntryId.asStateFlow()
 
@@ -201,12 +262,12 @@ class MainViewModel(
         combine(
             selectedCategory,
             categoriesFlow,
-            _scrollToEntryId,
+            _pagerAnchorEntryId,
             _refreshTrigger // Just to trigger
-        ) { selectedCat, categories, entryId, _ ->
-            Triple(categories.find { it.category == selectedCat }, entryId, selectedCat)
-        }.flatMapLatest { (category, entryId, selectedCat) ->
-            repository.getEntriesPager(category?.id, entryId)
+        ) { selectedCat, categories, anchorEntryId, _ ->
+            Triple(categories.find { it.category == selectedCat }, anchorEntryId, selectedCat)
+        }.flatMapLatest { (category, anchorEntryId, _) ->
+            repository.getEntriesPager(category?.id, anchorEntryId)
         }.cachedIn(viewModelScope)
 
 
@@ -232,8 +293,7 @@ class MainViewModel(
         _selectedEntryIds.value = emptySet()
     }
 
-    suspend fun getEntriesForSharing(ids: Set<UUID>): String {
-        val entries = repository.getEntriesByIds(ids)
+    private fun formatEntriesAsText(entries: List<EntryWithCategories>): String {
         val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm", Locale.getDefault())
         return entries.joinToString(separator = "\n\n") { entryWithCats ->
             val start = java.time.LocalDateTime.ofInstant(
@@ -255,12 +315,28 @@ class MainViewModel(
         }
     }
 
+    suspend fun getEntriesForSharing(ids: Set<UUID>): String {
+        val entries = repository.getEntriesByIds(ids)
+        return formatEntriesAsText(entries)
+    }
+
+    suspend fun getEntriesTextForClipboard(): String {
+        val singleSelected = _selectedEntry.value
+        val entries = when {
+            singleSelected != null -> listOf(singleSelected)
+            _selectedEntryIds.value.isNotEmpty() -> repository.getEntriesByIds(_selectedEntryIds.value)
+            else -> repository.getEntriesForClipboard(_selectedCategory.value, _selectedDate.value)
+        }
+        return formatEntriesAsText(entries)
+    }
+
     suspend fun getEntriesForSharingAsJson(ids: Set<UUID>): String {
         val entries = repository.getEntriesByIds(ids).map { it.entry }
         return jsonFormat.encodeToString(entries)
     }
 
     fun onCategoryChange(category: String) {
+        _pagerAnchorEntryId.value = null
         _scrollToEntryId.value = null
         _selectedCategory.value = category
         _selectedEntry.value = null
@@ -285,11 +361,10 @@ class MainViewModel(
     }
 
     fun onSaveEntry(updatedCategories: List<String>, updatedContent: String, updatedStartDatetime: Long, updatedStopDatetime: Long?, hasImage: Boolean) {
-        val sanitizedContent = updatedContent.replace("luisa", "Eloisa", ignoreCase = true)
         viewModelScope.launch {
             _editingEntry.value?.let {
                 val updatedEntry = it.entry.copy(
-                    content = sanitizedContent,
+                    content = updatedContent,
                     start_datetime = updatedStartDatetime,
                     stop_datetime = updatedStopDatetime,
                     hasImage = hasImage
@@ -354,6 +429,7 @@ class MainViewModel(
                 if (entryCategory != null && entryCategory != _selectedCategory.value) {
                     _selectedCategory.value = entryCategory
                 }
+                _pagerAnchorEntryId.value = entryId
                 _scrollToEntryId.value = entryId
             }
         }
@@ -379,7 +455,8 @@ class MainViewModel(
     }
 
     fun saveGpsInterval(interval: Int) {
-        sharedPreferences.edit { putInt(KEY_GPS_INTERVAL_MINUTES, interval) }
+        val clamped = interval.coerceAtLeast(LocationWorker.MIN_INTERVAL_MINUTES)
+        sharedPreferences.edit { putInt(KEY_GPS_INTERVAL_MINUTES, clamped) }
         VoiceJournalApplication.setupLocationWorker(applicationContext)
     }
 
@@ -527,9 +604,8 @@ class MainViewModel(
         viewModelScope.launch {
             val entryToUpdate = _selectedEntry.value
             if (entryToUpdate != null) {
-                val sanitizedText = recognizedText.replace("luisa", "Eloisa", ignoreCase = true)
                 val updatedEntry = entryToUpdate.entry.copy(
-                    content = entryToUpdate.entry.content + "\n" + sanitizedText
+                    content = entryToUpdate.entry.content + "\n" + recognizedText
                 )
                 repository.update(updatedEntry, entryToUpdate.categories)
                 _selectedEntry.value = null // Deselect after update
@@ -546,9 +622,8 @@ class MainViewModel(
                 _selectedDate.value = null
 
                 if (contentToAdd.isNotEmpty()) {
-                    val sanitizedContent = contentToAdd.replace("luisa", "Eloisa", ignoreCase = true)
                     val entry = JournalEntry(
-                        content = sanitizedContent,
+                        content = contentToAdd,
                         start_datetime = start_datetime
                     )
                     repository.insert(entry, listOf(targetCategory))
@@ -560,60 +635,6 @@ class MainViewModel(
                 }
             }
         }
-    }
-
-    private fun parseRecognizedTextForCategory(
-        text: String,
-        categories: List<Category>,
-        currentCategoryName: String
-    ): Pair<Category, String> {
-        val trimmedText = text.trim()
-        val realCategories = categories.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
-        val defaultCat = if (currentCategoryName.isNotBlank() && !JournalConstants.isVirtualDeletedName(currentCategoryName)) {
-            realCategories.find { it.category == currentCategoryName }
-                ?: Category(category = currentCategoryName, aliases = "")
-        } else {
-            realCategories.firstOrNull() ?: Category(category = "journal", aliases = "")
-        }
-
-        if (trimmedText.isEmpty()) {
-            return Pair(defaultCat, "")
-        }
-
-        // a) Extrahiere das erste Wort (ignoriere Satzzeichen und beachte Case-Insensitivity)
-        val wordRegex = Regex("^([^\\s\\p{Punct}]+)")
-        val matchResult = wordRegex.find(trimmedText)
-
-        if (matchResult != null) {
-            val firstWord = matchResult.groupValues[1].lowercase(Locale.ROOT)
-
-            // b) Prüfe ob dieses Wort einer echten Kategorie oder deren Aliases entspricht (niemals 'Gelöscht')
-            val matchedCategory = realCategories.find { category ->
-                val catName = category.category.lowercase(Locale.ROOT)
-                val aliases = category.aliases.split(',')
-                    .map { it.trim().lowercase(Locale.ROOT) }
-                    .filter { it.isNotEmpty() }
-
-                firstWord == catName || aliases.contains(firstWord)
-            }
-
-            if (matchedCategory != null) {
-                // c) Entferne das Trigger-Wort aus dem Text
-                val removePrefixRegex = Regex("^[^\\s\\p{Punct}]+[\\s\\p{Punct}]*")
-                var remainingText = trimmedText.replaceFirst(removePrefixRegex, "").trim()
-
-                // Capitalize the first letter of the remaining text
-                if (remainingText.isNotEmpty()) {
-                    remainingText = remainingText.replaceFirstChar {
-                        if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
-                    }
-                }
-
-                return Pair(matchedCategory, remainingText)
-            }
-        }
-
-        return Pair(defaultCat, trimmedText)
     }
 
     fun toggleEntryChecked(entry: JournalEntry) {

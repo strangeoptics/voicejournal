@@ -1,0 +1,47 @@
+<resources>
+    <string name="app_name">Voice Journal</string>
+    <string name="title_activity_settings">Einstellungen</string>
+    <string name="title_activity_category_manager">Kategorien verwalten</string>
+    <string name="title_activity_edit_entry">Eintrag bearbeiten</string>
+    <string name="title_activity_edit_category">Kategorie bearbeiten</string>
+    <string name="title_activity_calendar">Kalender</string>
+    <string name="title_activity_search">Suche</string>
+    <string name="title_activity_import">Einträge importieren</string>
+
+    <!-- Navigation & Drawer -->
+    <string name="nav_back">Zurück</string>
+    <string name="nav_open_menu">Navigationsmenü</string>
+    <string name="drawer_search">Suche</string>
+    <string name="drawer_settings">Einstellungen</string>
+    <string name="drawer_manage_categories">Kategorien verwalten</string>
+    <string name="drawer_calendar">Kalender</string>
+    <string name="drawer_import_journal">Tagebuch importieren</string>
+    <string name="drawer_export_journal">Tagebuch exportieren</string>
+    <string name="drawer_show_notification">Benachrichtigung anzeigen</string>
+    <string name="drawer_show_gps_track">GPS-Route anzeigen</string>
+    <string name="drawer_add_test_data">Testdaten einfügen</string>
+    <string name="drawer_delete_all_data">Alle Einträge löschen</string>
+
+    <!-- Main Top Bar & Multi-Select -->
+    <string name="selection_count">%1$d ausgewählt</string>
+    <string name="action_clear_selection">Auswahl aufheben</string>
+    <string name="action_edit_entry">Eintrag bearbeiten</string>
+    <string name="action_change_timezone">Zeitzone ändern</string>
+    <string name="action_share">Teilen</string>
+    <string name="action_share_as_text">Als Text teilen</string>
+    <string name="action_export_as_vj">Als .vj Datei exportieren</string>
+    <string name="action_restore_entries">Einträge wiederherstellen</string>
+    <string name="action_hard_delete">Endgültig löschen</string>
+    <string name="action_delete_entries">Einträge löschen</string>
+    <string name="action_toggle_category_tags">Kategorie-Tags umschalten</string>
+    <string name="action_show_gps_on_map">GPS-Route auf Karte anzeigen</string>
+    <string name="action_undo">Rückgängig</string>
+    <string name="action_copy_to_clipboard">In die Zwischenablage kopieren</string>
+
+    <!-- FAB Menu -->
+    <string name="fab_add_entry">Eintrag hinzufügen</string>
+    <string name="fab_close_menu">Menü schließen</string>
+    <string name="fab_create_manual">Eintrag manuell erstellen</string>
+    <string name="fab_speak">Sprechen</string>
+    <string name="fab_stop_recording">Aufnahme stoppen</string>
+</resources>

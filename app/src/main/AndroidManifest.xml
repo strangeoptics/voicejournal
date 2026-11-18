@@ -52,27 +52,31 @@
         <activity
             android:name=".ui.screens.importexport.ImportActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:label="Einträge importieren"
             android:theme="@style/Theme.Voicejournal">
 
-            <!-- Filter für Messenger/Mails, die eine spezifische VJ-MimeType beim Teilen oder Öffnen verwenden -->
+            <!-- Filter für Öffnen (ACTION_VIEW) von content://-URIs mit VJ-MimeType -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
-                <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="content" />
                 <data android:mimeType="application/vj" />
             </intent-filter>
 
-            <!-- Viel umfassenderer Filter für Dateisystem-Explorer -->
+            <!-- Filter für Teilen (ACTION_SEND via EXTRA_STREAM) mit VJ-MimeType -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/vj" />
+            </intent-filter>
+
+            <!-- Filter für Dateisystem-Explorer über sichere content://-URIs -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="content" />
-                <data android:scheme="file" />
                 <data android:host="*" />
 
                 <!-- Dateimanager setzen oft MimeTypes, wenn sie Dateiendungen nicht kennen.
@@ -86,7 +90,7 @@
                 <data android:pathSuffix=".vj" />
                 <data android:pathSuffix=".VJ" />
 
-                <!-- Reguläre Ausdrücke (pathPattern) als Fallback für ältere Android-Versionen -->
+                <!-- Reguläre Ausdrücke (pathPattern) als Fallback -->
                 <data android:pathPattern=".*\\.vj" />
                 <data android:pathPattern=".*\\..*\\.vj" />
                 <data android:pathPattern=".*\\..*\\..*\\.vj" />
@@ -94,14 +98,12 @@
                 <data android:pathPattern=".*\\..*\\..*\\..*\\..*\\.vj" />
             </intent-filter>
 
-            <!-- Fallback für Intents KOMPLETT ohne MimeType (sehr selten, aber vorkommend) -->
+            <!-- Fallback für content://-Intents ohne MimeType -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="content" />
-                <data android:scheme="file" />
                 <data android:host="*" />
                 <data android:pathSuffix=".vj" />
                 <data android:pathSuffix=".VJ" />

@@ -1,8 +1,11 @@
 package com.example.voicejournal.ui.screens.importexport
 
+import android.content.ContentResolver
 import android.content.Intent
 import android.net.Uri
+import android.os.BadParcelableException
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -22,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.IntentCompat
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.ui.theme.VoicejournalTheme
@@ -38,14 +42,16 @@ class ImportActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Hole die Daten je nachdem, ob es ein View- (Anklicken) oder Share- (Senden an) Intent ist.
-        val data: Uri? = intent?.data ?: intent?.getParcelableExtra(Intent.EXTRA_STREAM)
-        if (data != null) {
-            viewModel.loadFile(data)
-        } else {
-            Toast.makeText(this, "Keine Datei zum Importieren gefunden.", Toast.LENGTH_SHORT).show()
+        val data: Uri? = extractSafeImportUri(intent)
+        if (data == null) {
+            Toast.makeText(this, "Keine gültige Datei zum Importieren gefunden.", Toast.LENGTH_SHORT).show()
             finish()
             return
+        }
+
+        // Nur beim ersten Start laden, damit Rotationen verworfene Einträge nicht überschreiben
+        if (savedInstanceState == null) {
+            viewModel.loadFile(data)
         }
 
         setContent {
@@ -60,6 +66,54 @@ class ImportActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+
+        val data = extractSafeImportUri(intent)
+        if (data != null) {
+            viewModel.loadFile(data, forceReload = true)
+        } else {
+            Log.w("SECURITY_ALERT", "Blocked invalid or unsupported intent in ImportActivity.onNewIntent")
+            Toast.makeText(this, "Ungültige Import-Anfrage abgelehnt.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun extractSafeImportUri(incomingIntent: Intent?): Uri? {
+        if (incomingIntent == null) return null
+        val action = incomingIntent.action
+        if (action != Intent.ACTION_VIEW && action != Intent.ACTION_SEND) {
+            Log.w("SECURITY_ALERT", "Blocked unsupported action on ImportActivity: $action")
+            return null
+        }
+
+        val uri: Uri? = try {
+            when (action) {
+                Intent.ACTION_SEND -> {
+                    IntentCompat.getParcelableExtra(incomingIntent, Intent.EXTRA_STREAM, Uri::class.java)
+                        ?: incomingIntent.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
+                }
+                Intent.ACTION_VIEW -> incomingIntent.data
+                else -> null
+            }
+        } catch (e: BadParcelableException) {
+            Log.w("SECURITY_ALERT", "Malformed parcelable extra in ImportActivity intent", e)
+            null
+        } catch (e: RuntimeException) {
+            Log.w("SECURITY_ALERT", "Failed to read URI from ImportActivity intent", e)
+            null
+        }
+
+        if (uri == null) {
+            return null
+        }
+        if (uri.scheme != ContentResolver.SCHEME_CONTENT) {
+            Log.w("SECURITY_ALERT", "Blocked non-content URI scheme in ImportActivity: ${uri.scheme}")
+            return null
+        }
+        return uri
     }
 }
 

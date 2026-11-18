@@ -429,9 +429,9 @@ class MainActivity : ComponentActivity() {
                                                                 try {
                                                                     val json = viewModel.getEntriesForSharingAsJson(selectedEntryIds)
                                                                     
-                                                                    // Create temporary file with dynamic name to avoid caching issues in chat apps
-                                                                    val cacheDir = context.cacheDir
-                                                                    val file = java.io.File(cacheDir, "VoiceJournal_Export.vj")
+                                                                    // Create temporary file inside isolated FileProvider subdirectory
+                                                                    val exportDir = java.io.File(context.cacheDir, "shared_exports").apply { mkdirs() }
+                                                                    val file = java.io.File(exportDir, "VoiceJournal_Export.vj")
                                                                     file.writeText(json)
                                                                     
                                                                     val uri = androidx.core.content.FileProvider.getUriForFile(

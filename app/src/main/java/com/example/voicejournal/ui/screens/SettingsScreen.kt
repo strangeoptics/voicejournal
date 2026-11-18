@@ -24,17 +24,21 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
@@ -65,7 +69,8 @@ fun SettingsScreen(
     onDeveloperModeEnableChanged: (Boolean) -> Unit,
     onBackPressed: () -> Unit
 ) {
-    var apiKey by remember { mutableStateOf(currentApiKey) }
+    var apiKey by remember(currentApiKey) { mutableStateOf(currentApiKey) }
+    var isApiKeyVisible by rememberSaveable { mutableStateOf(false) }
     var truncationLengthState by remember { mutableStateOf(truncationLength.toString()) }
 
     Scaffold(
@@ -203,6 +208,21 @@ fun SettingsScreen(
                         onValueChange = {
                             apiKey = it
                             onApiKeyChanged(it)
+                        },
+                        singleLine = true,
+                        visualTransformation = if (isApiKeyVisible) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            autoCorrectEnabled = false
+                        ),
+                        trailingIcon = {
+                            TextButton(onClick = { isApiKeyVisible = !isApiKeyVisible }) {
+                                Text(if (isApiKeyVisible) "Verbergen" else "Anzeigen")
+                            }
                         },
                         modifier = Modifier.fillMaxWidth()
                     )

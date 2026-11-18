@@ -1,5 +1,6 @@
 package com.example.voicejournal
 
+import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -10,6 +11,7 @@ import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
+import com.example.voicejournal.util.SecureApiKeyStore
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +25,7 @@ import java.util.UUID
 class EditEntryViewModel(
     private val repository: JournalRepository,
     private val sharedPreferences: SharedPreferences,
+    private val applicationContext: Context,
     private val entryId: UUID?,
     private val categoryId: String?
 ) : ViewModel() {
@@ -33,11 +36,10 @@ class EditEntryViewModel(
     val allCategories: StateFlow<List<Category>> = repository.allCategories
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _speechService = MutableStateFlow("Android Speech Recognizer")
+    private val _speechService = MutableStateFlow("ANDROID")
     val speechService: StateFlow<String> = _speechService.asStateFlow()
 
-    private val _googleCloudApiKey = MutableStateFlow("")
-    val googleCloudApiKey: StateFlow<String> = _googleCloudApiKey.asStateFlow()
+    val googleCloudApiKey: StateFlow<String> = SecureApiKeyStore.apiKeyFlow
 
     // Form States
     private val _entryContent = MutableStateFlow(TextFieldValue(""))
@@ -65,8 +67,8 @@ class EditEntryViewModel(
     val saveError: StateFlow<String?> = _saveError.asStateFlow()
 
     init {
-        _speechService.value = sharedPreferences.getString("speech_service", "Android Speech Recognizer") ?: "Android Speech Recognizer"
-        _googleCloudApiKey.value = sharedPreferences.getString("google_cloud_api_key", "") ?: ""
+        _speechService.value = sharedPreferences.getString(MainViewModel.KEY_SPEECH_SERVICE, "ANDROID") ?: "ANDROID"
+        SecureApiKeyStore.getApiKey(applicationContext, sharedPreferences)
 
         viewModelScope.launch {
             if (entryId != null) {
@@ -179,13 +181,14 @@ class EditEntryViewModel(
 class EditEntryViewModelFactory(
     private val repository: JournalRepository,
     private val sharedPreferences: SharedPreferences,
+    private val applicationContext: Context,
     private val entryId: UUID?,
     private val categoryId: String?
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(EditEntryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return EditEntryViewModel(repository, sharedPreferences, entryId, categoryId) as T
+            return EditEntryViewModel(repository, sharedPreferences, applicationContext, entryId, categoryId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

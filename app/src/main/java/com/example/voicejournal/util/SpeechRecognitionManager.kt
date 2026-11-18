@@ -266,7 +266,7 @@ class SpeechRecognitionManager(
     }
 
     private suspend fun sendToGoogleCloud(base64Audio: String, apiKey: String) {
-        val url = URL("https://speech.googleapis.com/v1/speech:recognize?key=$apiKey")
+        val url = URL("https://speech.googleapis.com/v1/speech:recognize")
         val json = JSONObject().apply {
             put("config", JSONObject().apply {
                 put("encoding", "LINEAR16")
@@ -287,6 +287,7 @@ class SpeechRecognitionManager(
                     connection.readTimeout = READ_TIMEOUT_MS
                     connection.doOutput = true
                     connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                    connection.setRequestProperty("X-Goog-Api-Key", apiKey.trim())
 
                     connection.outputStream.use { os ->
                         OutputStreamWriter(os, Charsets.UTF_8).use { osw ->

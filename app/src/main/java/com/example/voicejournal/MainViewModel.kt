@@ -16,6 +16,7 @@ import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
 import com.example.voicejournal.di.Injector
+import com.example.voicejournal.util.SecureApiKeyStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -92,8 +93,7 @@ class MainViewModel(
     private val _speechService = MutableStateFlow(sharedPreferences.getString(KEY_SPEECH_SERVICE, "ANDROID") ?: "ANDROID")
     val speechService: StateFlow<String> = _speechService.asStateFlow()
 
-    private val _googleCloudApiKey = MutableStateFlow(sharedPreferences.getString(KEY_GOOGLE_CLOUD_API_KEY, "") ?: "")
-    val googleCloudApiKey: StateFlow<String> = _googleCloudApiKey.asStateFlow()
+    val googleCloudApiKey: StateFlow<String> = SecureApiKeyStore.apiKeyFlow
 
     private val _maxRecordingTime = MutableStateFlow(sharedPreferences.getInt(KEY_MAX_RECORDING_TIME, 15))
     val maxRecordingTime: StateFlow<Int> = _maxRecordingTime.asStateFlow()
@@ -144,7 +144,6 @@ class MainViewModel(
             KEY_WEBSERVER_ENABLED -> _isWebServerEnabled.value = prefs.getBoolean(key, false)
             KEY_GPS_INTERVAL_MINUTES -> _gpsInterval.value = prefs.getInt(key, 10)
             KEY_SPEECH_SERVICE -> _speechService.value = prefs.getString(key, "ANDROID") ?: "ANDROID"
-            KEY_GOOGLE_CLOUD_API_KEY -> _googleCloudApiKey.value = prefs.getString(key, "") ?: ""
             KEY_MAX_RECORDING_TIME -> _maxRecordingTime.value = prefs.getInt(key, 15)
             KEY_SILENCE_THRESHOLD -> _silenceThreshold.value = prefs.getInt(key, 500)
             KEY_SILENCE_TIME_REQUIRED -> _silenceTimeRequired.value = prefs.getInt(key, 2000)
@@ -158,6 +157,7 @@ class MainViewModel(
     val scrollToEntryId: StateFlow<UUID?> = _scrollToEntryId.asStateFlow()
 
     init {
+        SecureApiKeyStore.getApiKey(applicationContext, sharedPreferences)
         sharedPreferences.registerOnSharedPreferenceChangeListener(prefsListener)
         viewModelScope.launch {
             val areDefaultCategoriesAdded = sharedPreferences.getBoolean(KEY_DEFAULT_CATEGORIES_ADDED, false)
@@ -379,7 +379,7 @@ class MainViewModel(
     }
 
     fun saveApiKey(apiKey: String) {
-        sharedPreferences.edit { putString(KEY_GOOGLE_CLOUD_API_KEY, apiKey) }
+        SecureApiKeyStore.saveApiKey(applicationContext, apiKey, sharedPreferences)
     }
 
     fun saveMaxRecordingTime(time: Int) {

@@ -61,6 +61,7 @@ class EditEntryActivity : ComponentActivity() {
         EditEntryViewModelFactory(
             Injector.provideJournalRepository(this),
             getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE),
+            applicationContext,
             entryId,
             categoryId
         )

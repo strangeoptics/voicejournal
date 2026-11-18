@@ -1,9 +1,7 @@
 package com.example.voicejournal
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.net.Uri
-import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -15,13 +13,13 @@ import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
+import com.example.voicejournal.data.SettingsRepository
+import com.example.voicejournal.data.SpeechService
 import com.example.voicejournal.data.resolvedZoneId
 import com.example.voicejournal.data.startLocalDateTime
 import com.example.voicejournal.data.stopLocalDateTime
 import com.example.voicejournal.di.Injector
-import com.example.voicejournal.util.SecureApiKeyStore
 import com.example.voicejournal.util.TimeZoneUtils
-import com.example.voicejournal.worker.LocationWorker
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,30 +37,15 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Collections
 import java.util.Locale
 import java.util.UUID
 
 class MainViewModel(
     private val repository: JournalRepository,
-    private val sharedPreferences: SharedPreferences,
-    private val applicationContext: Context
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     companion object {
-        const val PREFS_NAME = "voice_journal_prefs"
-        const val KEY_DEFAULT_CATEGORIES_ADDED = "default_categories_added"
-        const val KEY_GPS_TRACKING_ENABLED = "gps_tracking_enabled"
-        const val KEY_GPS_INTERVAL_MINUTES = "gps_interval_minutes"
-        const val KEY_SPEECH_SERVICE = "speech_service"
-        const val KEY_MAX_RECORDING_TIME = "max_recording_time"
-        const val KEY_SILENCE_THRESHOLD = "silence_threshold"
-        const val KEY_SILENCE_TIME_REQUIRED = "silence_time_required"
-        const val KEY_TRUNCATION_LENGTH = "truncation_length"
-        const val KEY_WEBSERVER_ENABLED = "webserver_enabled"
-        const val KEY_DEVELOPER_MODE_ENABLED = "developer_mode_enabled"
-        const val KEY_SHOW_CATEGORY_TAGS = "show_category_tags"
-
         private val jsonFormat = Json {
             prettyPrint = true
             encodeDefaults = true
@@ -135,40 +118,16 @@ class MainViewModel(
     private val _selectedEntryIds = MutableStateFlow<Set<UUID>>(emptySet())
     val selectedEntryIds: StateFlow<Set<UUID>> = _selectedEntryIds.asStateFlow()
 
-    private val _isGpsTrackingEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_GPS_TRACKING_ENABLED, false))
-    val isGpsTrackingEnabled: StateFlow<Boolean> = _isGpsTrackingEnabled.asStateFlow()
-
-    private val _isWebServerEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_WEBSERVER_ENABLED, false))
-    val isWebServerEnabled: StateFlow<Boolean> = _isWebServerEnabled.asStateFlow()
-
-    private val _gpsInterval = MutableStateFlow(
-        sharedPreferences.getInt(KEY_GPS_INTERVAL_MINUTES, LocationWorker.MIN_INTERVAL_MINUTES)
-            .coerceAtLeast(LocationWorker.MIN_INTERVAL_MINUTES)
-    )
-    val gpsInterval: StateFlow<Int> = _gpsInterval.asStateFlow()
-
-    private val _speechService = MutableStateFlow(sharedPreferences.getString(KEY_SPEECH_SERVICE, "ANDROID") ?: "ANDROID")
-    val speechService: StateFlow<String> = _speechService.asStateFlow()
-
-    val googleCloudApiKey: StateFlow<String> = SecureApiKeyStore.apiKeyFlow
-
-    private val _maxRecordingTime = MutableStateFlow(sharedPreferences.getInt(KEY_MAX_RECORDING_TIME, 15))
-    val maxRecordingTime: StateFlow<Int> = _maxRecordingTime.asStateFlow()
-
-    private val _silenceThreshold = MutableStateFlow(sharedPreferences.getInt(KEY_SILENCE_THRESHOLD, 500))
-    val silenceThreshold: StateFlow<Int> = _silenceThreshold.asStateFlow()
-
-    private val _silenceTimeRequired = MutableStateFlow(sharedPreferences.getInt(KEY_SILENCE_TIME_REQUIRED, 2000))
-    val silenceTimeRequired: StateFlow<Int> = _silenceTimeRequired.asStateFlow()
-
-    private val _truncationLength = MutableStateFlow(sharedPreferences.getInt(KEY_TRUNCATION_LENGTH, 160))
-    val truncationLength: StateFlow<Int> = _truncationLength.asStateFlow()
-
-    private val _isDeveloperModeEnabled = MutableStateFlow(sharedPreferences.getBoolean(KEY_DEVELOPER_MODE_ENABLED, false))
-    val isDeveloperModeEnabled: StateFlow<Boolean> = _isDeveloperModeEnabled.asStateFlow()
-
-    private val _showCategoryTags = MutableStateFlow(sharedPreferences.getBoolean(KEY_SHOW_CATEGORY_TAGS, true))
-    val showCategoryTags: StateFlow<Boolean> = _showCategoryTags.asStateFlow()
+    val isGpsTrackingEnabled: StateFlow<Boolean> = settingsRepository.isGpsTrackingEnabled
+    val isWebServerEnabled: StateFlow<Boolean> = settingsRepository.isWebServerEnabled
+    val speechService: StateFlow<SpeechService> = settingsRepository.speechService
+    val googleCloudApiKey: StateFlow<String> = settingsRepository.googleCloudApiKey
+    val maxRecordingTime: StateFlow<Int> = settingsRepository.maxRecordingTime
+    val silenceThreshold: StateFlow<Int> = settingsRepository.silenceThreshold
+    val silenceTimeRequired: StateFlow<Int> = settingsRepository.silenceTimeRequired
+    val truncationLength: StateFlow<Int> = settingsRepository.truncationLength
+    val isDeveloperModeEnabled: StateFlow<Boolean> = settingsRepository.isDeveloperModeEnabled
+    val showCategoryTags: StateFlow<Boolean> = settingsRepository.showCategoryTags
 
     private val _refreshTrigger = MutableSharedFlow<Unit>(replay = 1)
 
@@ -207,34 +166,15 @@ class MainViewModel(
         date != null && points.size >= 2
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
-        when (key) {
-            KEY_GPS_TRACKING_ENABLED -> _isGpsTrackingEnabled.value = prefs.getBoolean(key, false)
-            KEY_WEBSERVER_ENABLED -> _isWebServerEnabled.value = prefs.getBoolean(key, false)
-            KEY_GPS_INTERVAL_MINUTES -> _gpsInterval.value = prefs.getInt(key, LocationWorker.MIN_INTERVAL_MINUTES)
-                .coerceAtLeast(LocationWorker.MIN_INTERVAL_MINUTES)
-            KEY_SPEECH_SERVICE -> _speechService.value = prefs.getString(key, "ANDROID") ?: "ANDROID"
-            KEY_MAX_RECORDING_TIME -> _maxRecordingTime.value = prefs.getInt(key, 15)
-            KEY_SILENCE_THRESHOLD -> _silenceThreshold.value = prefs.getInt(key, 500)
-            KEY_SILENCE_TIME_REQUIRED -> _silenceTimeRequired.value = prefs.getInt(key, 2000)
-            KEY_TRUNCATION_LENGTH -> _truncationLength.value = prefs.getInt(key, 160)
-            KEY_DEVELOPER_MODE_ENABLED -> _isDeveloperModeEnabled.value = prefs.getBoolean(key, false)
-            KEY_SHOW_CATEGORY_TAGS -> _showCategoryTags.value = prefs.getBoolean(key, true)
-        }
-    }
-
     private val _pagerAnchorEntryId = MutableStateFlow<UUID?>(null)
     private val _scrollToEntryId = MutableStateFlow<UUID?>(null)
     val scrollToEntryId: StateFlow<UUID?> = _scrollToEntryId.asStateFlow()
 
     init {
-        SecureApiKeyStore.getApiKey(applicationContext, sharedPreferences)
-        sharedPreferences.registerOnSharedPreferenceChangeListener(prefsListener)
         viewModelScope.launch {
-            val areDefaultCategoriesAdded = sharedPreferences.getBoolean(KEY_DEFAULT_CATEGORIES_ADDED, false)
-            if (!areDefaultCategoriesAdded) {
+            if (!settingsRepository.areDefaultCategoriesAdded()) {
                 addDefaultCategories()
-                sharedPreferences.edit { putBoolean(KEY_DEFAULT_CATEGORIES_ADDED, true) }
+                settingsRepository.markDefaultCategoriesAdded()
             }
             repository.normalizeCategoryOrderIndicesIfNeeded()
             categories.collect {
@@ -248,11 +188,6 @@ class MainViewModel(
         viewModelScope.launch {
             _refreshTrigger.emit(Unit) // Emit initial value to trigger loading
         }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        sharedPreferences.unregisterOnSharedPreferenceChangeListener(prefsListener)
     }
 
     private suspend fun addDefaultCategories() {
@@ -415,87 +350,9 @@ class MainViewModel(
     fun onScrolledToEntry() {
         _scrollToEntryId.value = null
     }
-    
-    fun saveGpsTrackingEnabled(isEnabled: Boolean) {
-        sharedPreferences.edit { putBoolean(KEY_GPS_TRACKING_ENABLED, isEnabled) }
-        VoiceJournalApplication.setupLocationWorker(applicationContext)
-    }
-
-    fun saveWebServerEnabled(isEnabled: Boolean) {
-        sharedPreferences.edit { putBoolean(KEY_WEBSERVER_ENABLED, isEnabled) }
-
-        if (isEnabled) {
-            WebServerService.start(applicationContext)
-        } else {
-            WebServerService.stop(applicationContext)
-        }
-    }
-
-    fun saveGpsInterval(interval: Int) {
-        val clamped = interval.coerceAtLeast(LocationWorker.MIN_INTERVAL_MINUTES)
-        sharedPreferences.edit { putInt(KEY_GPS_INTERVAL_MINUTES, clamped) }
-        VoiceJournalApplication.setupLocationWorker(applicationContext)
-    }
-
-    fun saveSpeechService(service: String) {
-        sharedPreferences.edit { putString(KEY_SPEECH_SERVICE, service) }
-    }
-
-    fun saveApiKey(apiKey: String) {
-        SecureApiKeyStore.saveApiKey(applicationContext, apiKey, sharedPreferences)
-    }
-
-    fun saveMaxRecordingTime(time: Int) {
-        sharedPreferences.edit { putInt(KEY_MAX_RECORDING_TIME, time) }
-    }
-
-    fun saveSilenceThreshold(threshold: Int) {
-        sharedPreferences.edit { putInt(KEY_SILENCE_THRESHOLD, threshold) }
-    }
-
-    fun saveSilenceTimeRequired(time: Int) {
-        sharedPreferences.edit { putInt(KEY_SILENCE_TIME_REQUIRED, time) }
-    }
-
-    fun saveTruncationLength(length: Int) {
-        sharedPreferences.edit { putInt(KEY_TRUNCATION_LENGTH, length) }
-    }
-
-    fun saveDeveloperModeEnabled(isEnabled: Boolean) {
-        sharedPreferences.edit { putBoolean(KEY_DEVELOPER_MODE_ENABLED, isEnabled) }
-    }
 
     fun toggleShowCategoryTags() {
-        val newValue = !showCategoryTags.value
-        sharedPreferences.edit { putBoolean(KEY_SHOW_CATEGORY_TAGS, newValue) }
-    }
-
-    fun deleteCategory(category: Category) {
-        if (JournalConstants.isVirtualDeletedCategory(category)) return
-        viewModelScope.launch {
-            repository.deleteCategory(category.id)
-        }
-    }
-
-    fun moveCategory(category: Category, moveUp: Boolean) {
-        if (JournalConstants.isVirtualDeletedCategory(category)) return
-        viewModelScope.launch {
-            val realList = categoriesFlow.value
-                .filterNot { JournalConstants.isVirtualDeletedCategory(it) }
-                .toMutableList()
-            val fromIndex = realList.indexOfFirst { it.id == category.id }
-            if (fromIndex == -1) return@launch
-
-            val toIndex = if (moveUp) fromIndex - 1 else fromIndex + 1
-
-            if (toIndex in 0 until realList.size) {
-                Collections.swap(realList, fromIndex, toIndex)
-                val updatedCategories = realList.mapIndexed { index, cat ->
-                    cat.copy(orderIndex = index)
-                }
-                repository.updateCategories(updatedCategories)
-            }
-        }
+        settingsRepository.toggleShowCategoryTags()
     }
 
     suspend fun exportJournal(uri: Uri) {
@@ -605,12 +462,15 @@ class MainViewModel(
     }
 }
 
-class MainViewModelFactory(private val context: Context, private val sharedPreferences: SharedPreferences) : ViewModelProvider.Factory {
+class MainViewModelFactory(private val context: Context) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
+            val appContext = context.applicationContext
             @Suppress("UNCHECKED_CAST")
-            val repository = Injector.provideJournalRepository(context)
-            return MainViewModel(repository, sharedPreferences, context.applicationContext) as T
+            return MainViewModel(
+                repository = Injector.provideJournalRepository(appContext),
+                settingsRepository = Injector.provideSettingsRepository(appContext)
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

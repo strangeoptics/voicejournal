@@ -24,8 +24,8 @@ import java.net.NetworkInterface
 
 class SettingsActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory(applicationContext, getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE))
+    private val viewModel: SettingsViewModel by viewModels {
+        SettingsViewModelFactory(applicationContext)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

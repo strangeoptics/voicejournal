@@ -3,6 +3,7 @@ package com.example.voicejournal
 import com.example.voicejournal.data.BackupJsonFormat
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.JournalConstants
+import com.example.voicejournal.data.SpeechService
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -153,5 +154,14 @@ class ExampleUnitTest {
         assertThrows(IllegalArgumentException::class.java) {
             JournalConstants.readBoundedUtf8(ByteArrayInputStream(bytes), maxBytes = (bytes.size - 1).toLong())
         }
+    }
+
+    @Test
+    fun speechService_fromPrefValue_parsesKnownValuesAndDefaultsSafelyToAndroid() {
+        assertEquals(SpeechService.ANDROID, SpeechService.fromPrefValue("ANDROID"))
+        assertEquals(SpeechService.GOOGLE_CLOUD, SpeechService.fromPrefValue("GOOGLE_CLOUD"))
+        assertEquals(SpeechService.GOOGLE_CLOUD, SpeechService.fromPrefValue(" google_cloud "))
+        assertEquals(SpeechService.ANDROID, SpeechService.fromPrefValue(null))
+        assertEquals(SpeechService.ANDROID, SpeechService.fromPrefValue("UNKNOWN_PROVIDER"))
     }
 }

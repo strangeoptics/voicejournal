@@ -42,6 +42,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.example.voicejournal.data.SpeechService
 import com.example.voicejournal.worker.LocationWorker
 import kotlin.math.roundToInt
 
@@ -53,7 +54,7 @@ fun SettingsScreen(
     ipAddress: String,
     dnsName: String,
     gpsInterval: Int,
-    currentSpeechService: String,
+    currentSpeechService: SpeechService,
     currentApiKey: String,
     maxRecordingTime: Int,
     silenceThreshold: Int,
@@ -63,7 +64,7 @@ fun SettingsScreen(
     onGpsEnableChanged: (Boolean) -> Unit,
     onWebServerEnableChanged: (Boolean) -> Unit,
     onGpsIntervalChanged: (Int) -> Unit,
-    onSpeechServiceChanged: (String) -> Unit,
+    onSpeechServiceChanged: (SpeechService) -> Unit,
     onApiKeyChanged: (String) -> Unit,
     onMaxRecordingTimeChanged: (Int) -> Unit,
     onSilenceThresholdChanged: (Int) -> Unit,
@@ -186,26 +187,25 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(24.dp))
                 Text("Spracherkennung Dienst", style = MaterialTheme.typography.titleMedium)
                 Column(Modifier.selectableGroup()) {
-                    val radioOptions = listOf("ANDROID" to "Android SpeechRecognizer", "GOOGLE_CLOUD" to "Google Cloud Speech API")
-                    radioOptions.forEach { (value, label) ->
+                    SpeechService.entries.forEach { service ->
                         Row(
                             Modifier
                                 .fillMaxWidth()
                                 .height(56.dp)
                                 .selectable(
-                                    selected = (currentSpeechService == value),
-                                    onClick = { onSpeechServiceChanged(value) },
+                                    selected = (currentSpeechService == service),
+                                    onClick = { onSpeechServiceChanged(service) },
                                     role = Role.RadioButton
                                 )
                                 .padding(horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
-                                selected = (currentSpeechService == value),
+                                selected = (currentSpeechService == service),
                                 onClick = null
                             )
                             Text(
-                                text = label,
+                                text = service.displayLabel,
                                 style = MaterialTheme.typography.bodyLarge,
                                 modifier = Modifier.padding(start = 16.dp)
                             )
@@ -213,7 +213,7 @@ fun SettingsScreen(
                     }
                 }
 
-                if (currentSpeechService == "GOOGLE_CLOUD") {
+                if (currentSpeechService == SpeechService.GOOGLE_CLOUD) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text("Google Cloud API Key")
                     TextField(

@@ -7,6 +7,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.example.voicejournal.di.Injector
 import com.example.voicejournal.worker.LocationWorker
 import java.util.concurrent.TimeUnit
 
@@ -14,10 +15,9 @@ class VoiceJournalApplication : Application() {
 
     companion object {
         fun setupLocationWorker(context: Context) {
-            val sharedPreferences = context.getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE)
-            val isGpsTrackingEnabled = sharedPreferences.getBoolean(MainViewModel.KEY_GPS_TRACKING_ENABLED, false)
-            val interval = sharedPreferences
-                .getInt(MainViewModel.KEY_GPS_INTERVAL_MINUTES, LocationWorker.MIN_INTERVAL_MINUTES)
+            val settingsRepository = Injector.provideSettingsRepository(context)
+            val isGpsTrackingEnabled = settingsRepository.isGpsTrackingEnabled.value
+            val interval = settingsRepository.gpsIntervalMinutes.value
                 .coerceAtLeast(LocationWorker.MIN_INTERVAL_MINUTES)
                 .toLong()
 

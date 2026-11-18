@@ -1,7 +1,5 @@
 package com.example.voicejournal
 
-import android.content.Context
-import android.content.SharedPreferences
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
@@ -12,7 +10,8 @@ import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
-import com.example.voicejournal.util.SecureApiKeyStore
+import com.example.voicejournal.data.SettingsRepository
+import com.example.voicejournal.data.SpeechService
 import com.example.voicejournal.util.TimeZoneUtils
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,8 +26,7 @@ import java.util.UUID
 
 class EditEntryViewModel(
     private val repository: JournalRepository,
-    private val sharedPreferences: SharedPreferences,
-    private val applicationContext: Context,
+    settingsRepository: SettingsRepository,
     private val entryId: UUID?,
     private val categoryId: String?
 ) : ViewModel() {
@@ -39,27 +37,11 @@ class EditEntryViewModel(
     val allCategories: StateFlow<List<Category>> = repository.realCategories
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _speechService = MutableStateFlow(
-        sharedPreferences.getString(MainViewModel.KEY_SPEECH_SERVICE, "ANDROID") ?: "ANDROID"
-    )
-    val speechService: StateFlow<String> = _speechService.asStateFlow()
-
-    val googleCloudApiKey: StateFlow<String> = SecureApiKeyStore.apiKeyFlow
-
-    private val _maxRecordingTime = MutableStateFlow(
-        sharedPreferences.getInt(MainViewModel.KEY_MAX_RECORDING_TIME, 15)
-    )
-    val maxRecordingTime: StateFlow<Int> = _maxRecordingTime.asStateFlow()
-
-    private val _silenceThreshold = MutableStateFlow(
-        sharedPreferences.getInt(MainViewModel.KEY_SILENCE_THRESHOLD, 500)
-    )
-    val silenceThreshold: StateFlow<Int> = _silenceThreshold.asStateFlow()
-
-    private val _silenceTimeRequired = MutableStateFlow(
-        sharedPreferences.getInt(MainViewModel.KEY_SILENCE_TIME_REQUIRED, 2000)
-    )
-    val silenceTimeRequired: StateFlow<Int> = _silenceTimeRequired.asStateFlow()
+    val speechService: StateFlow<SpeechService> = settingsRepository.speechService
+    val googleCloudApiKey: StateFlow<String> = settingsRepository.googleCloudApiKey
+    val maxRecordingTime: StateFlow<Int> = settingsRepository.maxRecordingTime
+    val silenceThreshold: StateFlow<Int> = settingsRepository.silenceThreshold
+    val silenceTimeRequired: StateFlow<Int> = settingsRepository.silenceTimeRequired
 
     // Form States
     private val _entryContent = MutableStateFlow(TextFieldValue(""))
@@ -92,8 +74,6 @@ class EditEntryViewModel(
     val saveError: StateFlow<String?> = _saveError.asStateFlow()
 
     init {
-        SecureApiKeyStore.getApiKey(applicationContext, sharedPreferences)
-
         viewModelScope.launch {
             if (entryId != null) {
                 val dbEntry = repository.getEntryById(entryId)
@@ -226,15 +206,14 @@ class EditEntryViewModel(
 
 class EditEntryViewModelFactory(
     private val repository: JournalRepository,
-    private val sharedPreferences: SharedPreferences,
-    private val applicationContext: Context,
+    private val settingsRepository: SettingsRepository,
     private val entryId: UUID?,
     private val categoryId: String?
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(EditEntryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return EditEntryViewModel(repository, sharedPreferences, applicationContext, entryId, categoryId) as T
+            return EditEntryViewModel(repository, settingsRepository, entryId, categoryId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

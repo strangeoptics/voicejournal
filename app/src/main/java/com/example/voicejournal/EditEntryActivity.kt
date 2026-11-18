@@ -62,8 +62,7 @@ class EditEntryActivity : ComponentActivity() {
     private val viewModel: EditEntryViewModel by viewModels {
         EditEntryViewModelFactory(
             Injector.provideJournalRepository(this),
-            getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE),
-            applicationContext,
+            Injector.provideSettingsRepository(this),
             entryId,
             categoryId
         )

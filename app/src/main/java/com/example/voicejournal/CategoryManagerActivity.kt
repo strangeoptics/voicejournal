@@ -53,8 +53,8 @@ import com.example.voicejournal.ui.theme.VoicejournalTheme
 
 class CategoryManagerActivity : ComponentActivity() {
 
-    private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory(applicationContext, getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE))
+    private val viewModel: CategoryManagerViewModel by viewModels {
+        CategoryManagerViewModelFactory(applicationContext)
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -62,7 +62,7 @@ class CategoryManagerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             VoicejournalTheme {
-                val categories by viewModel.categoriesFlow.collectAsState()
+                val categories by viewModel.categories.collectAsState()
                 val context = LocalContext.current
 
                 Scaffold(

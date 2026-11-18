@@ -7,7 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.savedstate.SavedStateRegistryOwner
 import com.example.voicejournal.data.EntryWithCategories
-import com.example.voicejournal.data.JournalEntryDao
+import com.example.voicejournal.data.JournalRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +17,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 
 class SearchViewModel(
-    private val journalEntryDao: JournalEntryDao,
+    private val repository: JournalRepository,
     private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -34,12 +35,13 @@ class SearchViewModel(
         }
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val searchResults: StateFlow<List<EntryWithCategories>> = _submittedQuery
         .flatMapLatest { query ->
             if (query.isBlank()) {
                 flowOf(emptyList())
             } else {
-                journalEntryDao.searchEntries(query)
+                repository.searchEntries(query)
             }
         }
         .stateIn(
@@ -68,7 +70,7 @@ class SearchViewModel(
 
 class SearchViewModelFactory(
     owner: SavedStateRegistryOwner,
-    private val journalEntryDao: JournalEntryDao,
+    private val repository: JournalRepository,
     defaultArgs: Bundle? = null
 ) : AbstractSavedStateViewModelFactory(owner, defaultArgs) {
     override fun <T : ViewModel> create(
@@ -78,7 +80,7 @@ class SearchViewModelFactory(
     ): T {
         if (modelClass.isAssignableFrom(SearchViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return SearchViewModel(journalEntryDao, handle) as T
+            return SearchViewModel(repository, handle) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

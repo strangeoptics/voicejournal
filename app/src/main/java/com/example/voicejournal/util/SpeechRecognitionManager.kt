@@ -15,6 +15,7 @@ import android.speech.SpeechRecognizer
 import android.util.Base64
 import android.util.Log
 import androidx.core.app.ActivityCompat
+import com.example.voicejournal.data.SpeechService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -90,7 +91,7 @@ class SpeechRecognitionManager(
     }
 
     fun startListening(
-        service: String = "ANDROID",
+        service: SpeechService = SpeechService.ANDROID,
         apiKey: String? = null,
         maxRecordingTimeSeconds: Int = 15,
         silenceThreshold: Int = 500,
@@ -99,7 +100,7 @@ class SpeechRecognitionManager(
         if (_isRecording.value) {
             return
         }
-        if (service == "GOOGLE_CLOUD" && !apiKey.isNullOrEmpty()) {
+        if (service == SpeechService.GOOGLE_CLOUD && !apiKey.isNullOrEmpty()) {
             startGoogleCloudListening(apiKey, maxRecordingTimeSeconds, silenceThreshold, silenceTimeRequired)
         } else {
             startAndroidListening()

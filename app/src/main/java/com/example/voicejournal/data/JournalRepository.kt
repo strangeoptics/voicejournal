@@ -568,6 +568,38 @@ class JournalRepository(
         return gpsTrackPointDao.getTrackPointsForDay(dayStartMillis, dayEndMillis)
     }
 
+    fun searchEntries(query: String): Flow<List<EntryWithCategories>> = entryDao.searchEntries(query)
+
+    suspend fun getPaginatedEntries(limit: Int, offset: Int): List<EntryWithCategories> {
+        return entryDao.getPaginatedEntriesWithCategories(
+            limit = limit.coerceAtLeast(1),
+            offset = offset.coerceAtLeast(0)
+        )
+    }
+
+    suspend fun getPaginatedEntriesForCategory(
+        categoryId: Int,
+        limit: Int,
+        offset: Int
+    ): List<EntryWithCategories> {
+        val safeLimit = limit.coerceAtLeast(1)
+        val safeOffset = offset.coerceAtLeast(0)
+        return if (categoryId == JournalConstants.CATEGORY_DELETED_ID) {
+            entryDao.getPaginatedDeletedEntries(safeLimit, safeOffset)
+        } else {
+            entryDao.getPaginatedEntriesForCategory(categoryId, safeLimit, safeOffset)
+        }
+    }
+
+    suspend fun getCategoriesByIds(categoryIds: Collection<Int>): List<Category> {
+        return categoryDao.getCategoriesByIds(categoryIds)
+            .filterNot { JournalConstants.isVirtualDeletedCategory(it) }
+    }
+
+    suspend fun softDeleteEntry(entryId: UUID) {
+        entryDao.softDelete(entryId, System.currentTimeMillis())
+    }
+
     suspend fun getAllCategoriesList(): List<Category> {
         val dbList = categoryDao.getAllCategoriesList()
             .filterNot { JournalConstants.isVirtualDeletedCategory(it) }

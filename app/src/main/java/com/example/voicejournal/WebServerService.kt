@@ -14,7 +14,6 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
-import androidx.core.content.edit
 import com.example.voicejournal.di.Injector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,16 +28,14 @@ class WebServerService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        val db = Injector.getDatabase(applicationContext)
-        webServer = WebServer(db)
+        val repository = Injector.provideJournalRepository(applicationContext)
+        webServer = WebServer(repository)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
-                getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE).edit {
-                    putBoolean(MainViewModel.KEY_WEBSERVER_ENABLED, false)
-                }
+                Injector.provideSettingsRepository(applicationContext).setWebServerEnabled(false)
                 stopServer()
             }
             ACTION_START, null -> startServer()

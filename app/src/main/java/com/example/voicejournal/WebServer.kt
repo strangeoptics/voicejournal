@@ -1,13 +1,11 @@
 package com.example.voicejournal
 
-import com.example.voicejournal.data.AppDatabase
-import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.CreateJournalEntryDto
-import com.example.voicejournal.data.JournalConstants
+import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalEntryDto
+import com.example.voicejournal.data.JournalRepository
 import com.example.voicejournal.util.TimeZoneUtils
-import java.time.ZoneId
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
@@ -26,25 +24,16 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.routing
+import java.time.ZoneId
 import java.util.UUID
 
-class WebServer(private val db: AppDatabase) {
+class WebServer(private val repository: JournalRepository) {
 
     @Volatile
     private var server: ApplicationEngine? = null
 
     val isRunning: Boolean
         get() = server != null
-
-    private val virtualDeletedCategory = Category(
-        id = JournalConstants.CATEGORY_DELETED_ID,
-        category = JournalConstants.CATEGORY_DELETED_NAME,
-        aliases = "",
-        orderIndex = Int.MAX_VALUE,
-        color = "#FFCDD2",
-        checkable = false,
-        showDate = true
-    )
 
     @Synchronized
     fun start() {
@@ -65,28 +54,16 @@ class WebServer(private val db: AppDatabase) {
             }
             routing {
                 get("/categories") {
-                    val categories = db.categoryDao().getAllCategoriesList() + virtualDeletedCategory
+                    val categories = repository.getAllCategoriesList()
                     call.respond(categories)
                 }
                 get("/journalentries") {
-                    val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
-                    val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 10
+                    val page = (call.request.queryParameters["page"]?.toIntOrNull() ?: 1).coerceAtLeast(1)
+                    val pageSize = (call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 10).coerceIn(1, 500)
                     val offset = (page - 1) * pageSize
 
-                    val entries = db.journalEntryDao().getPaginatedEntriesWithCategories(pageSize, offset)
-                    val dtos = entries.map { entryWithCategories ->
-                        JournalEntryDto(
-                            id = entryWithCategories.entry.id,
-                            content = entryWithCategories.entry.content,
-                            start_datetime = entryWithCategories.entry.start_datetime,
-                            stop_datetime = entryWithCategories.entry.stop_datetime,
-                            hasImage = entryWithCategories.entry.hasImage,
-                            checked = entryWithCategories.entry.checked,
-                            categoryIds = entryWithCategories.categories.map { it.id },
-                            zoneId = entryWithCategories.entry.zoneId
-                        )
-                    }
-                    call.respond(dtos)
+                    val entries = repository.getPaginatedEntries(pageSize, offset)
+                    call.respond(entries.map { it.toDto() })
                 }
                 get("/journalentries/category/{id}") {
                     val id = call.parameters["id"]?.toIntOrNull()
@@ -95,59 +72,27 @@ class WebServer(private val db: AppDatabase) {
                         return@get
                     }
 
-                    val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
-                    val pageSize = call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 10
+                    val page = (call.request.queryParameters["page"]?.toIntOrNull() ?: 1).coerceAtLeast(1)
+                    val pageSize = (call.request.queryParameters["pageSize"]?.toIntOrNull() ?: 10).coerceIn(1, 500)
                     val offset = (page - 1) * pageSize
 
-                    val entries = if (id == JournalConstants.CATEGORY_DELETED_ID) {
-                        db.journalEntryDao().getPaginatedDeletedEntries(pageSize, offset)
-                    } else {
-                        db.journalEntryDao().getPaginatedEntriesForCategory(id, pageSize, offset)
-                    }
-                    val dtos = entries.map { entryWithCategories ->
-                        JournalEntryDto(
-                            id = entryWithCategories.entry.id,
-                            content = entryWithCategories.entry.content,
-                            start_datetime = entryWithCategories.entry.start_datetime,
-                            stop_datetime = entryWithCategories.entry.stop_datetime,
-                            hasImage = entryWithCategories.entry.hasImage,
-                            checked = entryWithCategories.entry.checked,
-                            categoryIds = entryWithCategories.categories.map { it.id },
-                            zoneId = entryWithCategories.entry.zoneId
-                        )
-                    }
-                    call.respond(dtos)
+                    val entries = repository.getPaginatedEntriesForCategory(id, pageSize, offset)
+                    call.respond(entries.map { it.toDto() })
                 }
                 get("/journalentries/{id}") {
-                    val id = call.parameters["id"]?.let {
-                        try {
-                            UUID.fromString(it)
-                        } catch (e: IllegalArgumentException) {
-                            null
-                        }
-                    }
+                    val id = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                     if (id == null) {
                         call.respond(HttpStatusCode.BadRequest, "Invalid or missing entry ID")
                         return@get
                     }
 
-                    val entry = db.journalEntryDao().getEntryById(id)
+                    val entry = repository.getEntryById(id)
                     if (entry == null) {
                         call.respond(HttpStatusCode.NotFound, "Entry not found")
                         return@get
                     }
 
-                    val dto = JournalEntryDto(
-                        id = entry.entry.id,
-                        content = entry.entry.content,
-                        start_datetime = entry.entry.start_datetime,
-                        stop_datetime = entry.entry.stop_datetime,
-                        hasImage = entry.entry.hasImage,
-                        checked = entry.entry.checked,
-                        categoryIds = entry.categories.map { it.id },
-                        zoneId = entry.entry.zoneId
-                    )
-                    call.respond(dto)
+                    call.respond(entry.toDto())
                 }
                 post("/journalentries") {
                     val createDto = call.receive<CreateJournalEntryDto>()
@@ -161,35 +106,18 @@ class WebServer(private val db: AppDatabase) {
                         zoneId = TimeZoneUtils.sanitizeZoneId(createDto.zoneId) ?: ZoneId.systemDefault().id
                     )
 
-                    val categories = db.categoryDao().getCategoriesByIds(createDto.categoryIds)
-                    db.journalEntryDao().insertWithCategories(entry, categories, db.categoryDao())
+                    val categories = repository.getCategoriesByIds(createDto.categoryIds)
+                    repository.insert(entry, categories)
 
-                    val newEntry = db.journalEntryDao().getEntryById(entry.id)
-
+                    val newEntry = repository.getEntryById(entry.id)
                     if (newEntry != null) {
-                        val dto = JournalEntryDto(
-                            id = newEntry.entry.id,
-                            content = newEntry.entry.content,
-                            start_datetime = newEntry.entry.start_datetime,
-                            stop_datetime = newEntry.entry.stop_datetime,
-                            hasImage = newEntry.entry.hasImage,
-                            checked = newEntry.entry.checked,
-                            categoryIds = newEntry.categories.map { it.id },
-                            zoneId = newEntry.entry.zoneId
-                        )
-                        call.respond(HttpStatusCode.Created, dto)
+                        call.respond(HttpStatusCode.Created, newEntry.toDto())
                     } else {
                         call.respond(HttpStatusCode.InternalServerError, "Could not retrieve the newly created entry.")
                     }
                 }
                 put("/journalentries/{id}") {
-                    val id = call.parameters["id"]?.let {
-                        try {
-                            UUID.fromString(it)
-                        } catch (e: IllegalArgumentException) {
-                            null
-                        }
-                    }
+                    val id = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                     if (id == null) {
                         call.respond(HttpStatusCode.BadRequest, "Invalid or missing entry ID")
                         return@put
@@ -197,7 +125,7 @@ class WebServer(private val db: AppDatabase) {
 
                     val journalEntryDto = call.receive<JournalEntryDto>()
 
-                    val existingEntry = db.journalEntryDao().getEntryById(id)
+                    val existingEntry = repository.getEntryById(id)
                     if (existingEntry == null) {
                         call.respond(HttpStatusCode.NotFound, "Entry not found")
                         return@put
@@ -218,31 +146,24 @@ class WebServer(private val db: AppDatabase) {
                         checked = journalEntryDto.checked,
                         zoneId = resolvedZoneId
                     )
-                    val categories = db.categoryDao().getCategoriesByIds(journalEntryDto.categoryIds)
-
-                    db.journalEntryDao().updateWithCategories(entry, categories, db.categoryDao())
+                    val categories = repository.getCategoriesByIds(journalEntryDto.categoryIds)
+                    repository.update(entry, categories)
                     call.respond(HttpStatusCode.OK)
                 }
                 delete("/journalentries/{id}") {
-                    val id = call.parameters["id"]?.let {
-                        try {
-                            UUID.fromString(it)
-                        } catch (e: IllegalArgumentException) {
-                            null
-                        }
-                    }
+                    val id = call.parameters["id"]?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                     if (id == null) {
                         call.respond(HttpStatusCode.BadRequest, "Invalid or missing entry ID")
                         return@delete
                     }
 
-                    val entryWithCategories = db.journalEntryDao().getEntryById(id)
+                    val entryWithCategories = repository.getEntryById(id)
                     if (entryWithCategories == null) {
                         call.respond(HttpStatusCode.NotFound, "Entry not found")
                         return@delete
                     }
 
-                    db.journalEntryDao().softDelete(entryWithCategories.entry.id, System.currentTimeMillis())
+                    repository.softDeleteEntry(entryWithCategories.entry.id)
                     call.respond(HttpStatusCode.NoContent)
                 }
             }
@@ -253,5 +174,18 @@ class WebServer(private val db: AppDatabase) {
     fun stop() {
         server?.stop(1000, 2000)
         server = null
+    }
+
+    private fun EntryWithCategories.toDto(): JournalEntryDto {
+        return JournalEntryDto(
+            id = entry.id,
+            content = entry.content,
+            start_datetime = entry.start_datetime,
+            stop_datetime = entry.stop_datetime,
+            hasImage = entry.hasImage,
+            checked = entry.checked,
+            categoryIds = categories.map { it.id },
+            zoneId = entry.zoneId
+        )
     }
 }

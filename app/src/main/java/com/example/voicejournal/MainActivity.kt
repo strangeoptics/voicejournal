@@ -101,7 +101,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var speechRecognitionManager: SpeechRecognitionManager
 
     private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory(applicationContext, getSharedPreferences(MainViewModel.PREFS_NAME, MODE_PRIVATE))
+        MainViewModelFactory(applicationContext)
     }
 
 

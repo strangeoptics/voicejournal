@@ -9,8 +9,8 @@ import com.example.voicejournal.ui.theme.VoicejournalTheme
 
 class SearchActivity : ComponentActivity() {
     private val viewModel: SearchViewModel by viewModels {
-        val journalEntryDao = Injector.getDatabase(applicationContext).journalEntryDao()
-        SearchViewModelFactory(this, journalEntryDao)
+        val repository = Injector.provideJournalRepository(applicationContext)
+        SearchViewModelFactory(this, repository)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

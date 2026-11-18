@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.speech.SpeechRecognizer
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -108,18 +107,11 @@ class EditEntryActivity : ComponentActivity() {
             onError = { error ->
                 runOnUiThread {
                     if (!isFinishing && !isDestroyed) {
-                        val errorMessage = when (error) {
-                            SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
-                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions"
-                            SpeechRecognizer.ERROR_NETWORK -> "Network error or invalid API key"
-                            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
-                            SpeechRecognizer.ERROR_NO_MATCH -> "No speech was recognized"
-                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer is busy"
-                            SpeechRecognizer.ERROR_SERVER -> "Server error"
-                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input"
-                            else -> "An unknown error occurred ($error)"
-                        }
-                        Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
+                        Toast.makeText(
+                            this,
+                            SpeechRecognitionManager.errorMessageForCode(error),
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             }

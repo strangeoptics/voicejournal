@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -34,7 +33,7 @@ import com.example.voicejournal.EditEntryActivity
 import com.example.voicejournal.MainActivity
 import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.data.localDate
-import com.example.voicejournal.ui.components.SearchJournalEntryItem
+import com.example.voicejournal.ui.components.JournalEntryItem
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -111,25 +110,23 @@ fun SearchResultsList(entries: List<EntryWithCategories>) {
                 items = entriesOnDate,
                 key = { it.entry.id }
             ) { entry ->
-                SearchJournalEntryItem(
+                JournalEntryItem(
                     entryWithCategories = entry,
-                    isSelected = false, // No selection in search results
-                    showCategoryTags = true, // Always show tags in search
-                    truncationLength = 200, // A reasonable default
+                    showCheckbox = false,
+                    expandOnClick = false,
+                    truncationLength = 200,
                     onEntrySelected = {
-                        // Navigate to edit screen on click
                         val intent = EditEntryActivity.newIntent(context, it.entry.id)
                         context.startActivity(intent)
                     },
-                    onEditEntry = {
+                    onLongClickEntry = {
                         val intent = EditEntryActivity.newIntent(context, it.entry.id)
                         context.startActivity(intent)
                     },
-                    onPhotoIconClicked = {}, // No action for photo icon in search
                     onGoToEntryClicked = {
                         val intent = Intent(context, MainActivity::class.java).apply {
                             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                            putExtra("ENTRY_ID", it.entry.id.toString())
+                            putExtra(MainActivity.EXTRA_ENTRY_ID, it.entry.id.toString())
                         }
                         context.startActivity(intent)
                         (context as? Activity)?.finish()

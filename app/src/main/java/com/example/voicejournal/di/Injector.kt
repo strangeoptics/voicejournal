@@ -2,6 +2,7 @@ package com.example.voicejournal.di
 
 import android.content.Context
 import com.example.voicejournal.data.AppDatabase
+import com.example.voicejournal.data.JournalBackupManager
 import com.example.voicejournal.data.JournalRepository
 import com.example.voicejournal.data.SettingsRepository
 
@@ -22,12 +23,20 @@ object Injector {
             journalRepositoryInstance ?: run {
                 val appContext = context.applicationContext
                 val database = getDatabase(appContext)
+                val entryDao = database.journalEntryDao()
+                val categoryDao = database.categoryDao()
+                val backupManager = JournalBackupManager(
+                    database = database,
+                    entryDao = entryDao,
+                    categoryDao = categoryDao,
+                    context = appContext
+                )
                 JournalRepository(
                     database = database,
-                    entryDao = database.journalEntryDao(),
-                    categoryDao = database.categoryDao(),
+                    entryDao = entryDao,
+                    categoryDao = categoryDao,
                     gpsTrackPointDao = database.gpsTrackPointDao(),
-                    context = appContext
+                    backupManager = backupManager
                 ).also { journalRepositoryInstance = it }
             }
         }

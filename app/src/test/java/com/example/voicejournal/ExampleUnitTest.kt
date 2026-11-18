@@ -2,8 +2,10 @@ package com.example.voicejournal
 
 import com.example.voicejournal.data.BackupJsonFormat
 import com.example.voicejournal.data.Category
+import com.example.voicejournal.data.JournalBackupManager
 import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.SpeechService
+import com.example.voicejournal.util.SpeechRecognitionManager
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -118,30 +120,30 @@ class ExampleUnitTest {
         """.trimIndent()
         assertEquals(
             BackupJsonFormat.ARRAY_V2,
-            JournalConstants.detectBackupJsonFormat(Json.parseToJsonElement(v2ArrayWithKeywordInContent))
+            JournalBackupManager.detectBackupJsonFormat(Json.parseToJsonElement(v2ArrayWithKeywordInContent))
         )
 
         val v3Array = """[{"id":"123e4567-e89b-12d3-a456-426614174000","content":"Test","start_datetime":1700000000000}]"""
         assertEquals(
             BackupJsonFormat.ARRAY_V3,
-            JournalConstants.detectBackupJsonFormat(Json.parseToJsonElement(v3Array))
+            JournalBackupManager.detectBackupJsonFormat(Json.parseToJsonElement(v3Array))
         )
 
         val v2ObjectWithoutExplicitVersion = """{"entries":[{"id":1,"title":"journal","content":"Hi","timestamp":1700000000000}]}"""
         assertEquals(
             BackupJsonFormat.OBJECT_V2,
-            JournalConstants.detectBackupJsonFormat(Json.parseToJsonElement(v2ObjectWithoutExplicitVersion))
+            JournalBackupManager.detectBackupJsonFormat(Json.parseToJsonElement(v2ObjectWithoutExplicitVersion))
         )
 
         val v3Object = """{"version":3,"entries":[],"categories":[]}"""
         assertEquals(
             BackupJsonFormat.OBJECT_V3,
-            JournalConstants.detectBackupJsonFormat(Json.parseToJsonElement(v3Object))
+            JournalBackupManager.detectBackupJsonFormat(Json.parseToJsonElement(v3Object))
         )
 
         assertEquals(
             BackupJsonFormat.EMPTY_ARRAY,
-            JournalConstants.detectBackupJsonFormat(Json.parseToJsonElement("[]"))
+            JournalBackupManager.detectBackupJsonFormat(Json.parseToJsonElement("[]"))
         )
     }
 
@@ -149,10 +151,10 @@ class ExampleUnitTest {
     fun readBoundedUtf8_readsWithinLimitAndRejectsOversizedStreams() {
         val text = "Tagebucheintrag mit Umlauten: äöüß"
         val bytes = text.toByteArray(Charsets.UTF_8)
-        assertEquals(text, JournalConstants.readBoundedUtf8(ByteArrayInputStream(bytes), maxBytes = 1024L))
+        assertEquals(text, JournalBackupManager.readBoundedUtf8(ByteArrayInputStream(bytes), maxBytes = 1024L))
 
         assertThrows(IllegalArgumentException::class.java) {
-            JournalConstants.readBoundedUtf8(ByteArrayInputStream(bytes), maxBytes = (bytes.size - 1).toLong())
+            JournalBackupManager.readBoundedUtf8(ByteArrayInputStream(bytes), maxBytes = (bytes.size - 1).toLong())
         }
     }
 
@@ -163,5 +165,32 @@ class ExampleUnitTest {
         assertEquals(SpeechService.GOOGLE_CLOUD, SpeechService.fromPrefValue(" google_cloud "))
         assertEquals(SpeechService.ANDROID, SpeechService.fromPrefValue(null))
         assertEquals(SpeechService.ANDROID, SpeechService.fromPrefValue("UNKNOWN_PROVIDER"))
+    }
+
+    @Test
+    fun parseGoogleSpeechTranscript_extractsTrimmedTranscriptAndHandlesEmptyOrUnknownFields() {
+        val validResponse = """
+            {
+              "results": [
+                {
+                  "alternatives": [
+                    {
+                      "transcript": "  einkaufen Brot und Käse  ",
+                      "confidence": 0.96
+                    }
+                  ],
+                  "resultEndTime": "2.100s"
+                }
+              ],
+              "totalBilledTime": "3s"
+            }
+        """.trimIndent()
+        assertEquals(
+            "einkaufen Brot und Käse",
+            SpeechRecognitionManager.parseGoogleSpeechTranscript(validResponse)
+        )
+
+        assertEquals("", SpeechRecognitionManager.parseGoogleSpeechTranscript("""{}"""))
+        assertEquals("", SpeechRecognitionManager.parseGoogleSpeechTranscript("""{"results":[]}"""))
     }
 }

@@ -6,96 +6,54 @@ import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.speech.SpeechRecognizer
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Label
-import androidx.compose.material.icons.automirrored.filled.LabelOff
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentPaste
-import androidx.compose.material.icons.filled.Create
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.localDate
 import com.example.voicejournal.ui.components.AppDrawer
+import com.example.voicejournal.ui.components.MainFabMenu
+import com.example.voicejournal.ui.components.MainTopAppBar
 import com.example.voicejournal.ui.components.TimeZonePickerDialog
-import com.example.voicejournal.ui.components.public
 import com.example.voicejournal.ui.screens.HomeScreen
 import com.example.voicejournal.ui.screens.search.SearchActivity
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.NotificationHelper
+import com.example.voicejournal.util.ShareExportHelper
 import com.example.voicejournal.util.SpeechRecognitionManager
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 class MainActivity : ComponentActivity() {
 
     private lateinit var speechRecognitionManager: SpeechRecognitionManager
@@ -103,7 +61,6 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels {
         MainViewModelFactory(applicationContext)
     }
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -119,17 +76,7 @@ class MainActivity : ComponentActivity() {
             onError = { error ->
                 runOnUiThread {
                     if (!isFinishing && !isDestroyed) {
-                        val errorMessage = when (error) {
-                            SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
-                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions"
-                            SpeechRecognizer.ERROR_NETWORK -> "Network error or invalid API key"
-                            SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
-                            SpeechRecognizer.ERROR_NO_MATCH -> "No speech was recognized"
-                            SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer is busy"
-                            SpeechRecognizer.ERROR_SERVER -> "Server error"
-                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input"
-                            else -> "An unknown error occurred ($error)"
-                        }
+                        val errorMessage = SpeechRecognitionManager.errorMessageForCode(error)
                         Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
                     }
                 }
@@ -140,7 +87,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             VoicejournalTheme {
                 val context = LocalContext.current
-                val navController = rememberNavController()
                 val category by viewModel.selectedCategory.collectAsState()
                 val selectedEntry by viewModel.selectedEntry.collectAsState()
                 val selectedEntryIds by viewModel.selectedEntryIds.collectAsState()
@@ -157,13 +103,12 @@ class MainActivity : ComponentActivity() {
                 val pagedEntries = viewModel.pagedEntries.collectAsLazyPagingItems()
                 val scrollToEntryId by viewModel.scrollToEntryId.collectAsState()
 
-
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
-                var showDeleteConfirmationDialog by remember { mutableStateOf(false) }
-                var showHardDeleteSelectionDialog by remember { mutableStateOf(false) }
-                var showBatchTimeZoneDialog by remember { mutableStateOf(false) }
-                var isFabMenuExpanded by remember { mutableStateOf(false) }
+                var showDeleteConfirmationDialog by rememberSaveable { mutableStateOf(false) }
+                var showHardDeleteSelectionDialog by rememberSaveable { mutableStateOf(false) }
+                var showBatchTimeZoneDialog by rememberSaveable { mutableStateOf(false) }
+                var isFabMenuExpanded by rememberSaveable { mutableStateOf(false) }
 
                 if (showBatchTimeZoneDialog) {
                     TimeZonePickerDialog(
@@ -223,8 +168,6 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-
-                // Permission launchers...
                 val backgroundLocationLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission(),
                     onResult = { isGranted ->
@@ -262,7 +205,6 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 }
-
 
                 val filePickerLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.OpenDocument(),
@@ -317,6 +259,18 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 )
+
+                val requestOrStartVoiceRecording = {
+                    if (ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        startListening()
+                    } else {
+                        recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                }
 
                 ModalNavigationDrawer(
                     drawerState = drawerState,
@@ -381,289 +335,104 @@ class MainActivity : ComponentActivity() {
                         Scaffold(
                             modifier = Modifier.fillMaxSize(),
                             topBar = {
-                                TopAppBar(
-                                    title = {
-                                        if (selectedEntryIds.isNotEmpty()) {
-                                            Text("${selectedEntryIds.size} ausgewählt")
-                                        } else {
-                                            Text("Voice Journal")
+                                MainTopAppBar(
+                                    selectedEntryIds = selectedEntryIds,
+                                    selectedEntry = selectedEntry,
+                                    isRecycleBinSelected = JournalConstants.isVirtualDeletedName(category),
+                                    showCategoryTags = showCategoryTags,
+                                    hasGpsTrackForSelectedDate = hasGpsTrackForSelectedDate,
+                                    canUndo = canUndo,
+                                    onClearSelection = viewModel::clearSelection,
+                                    onOpenDrawer = { scope.launch { drawerState.open() } },
+                                    onEditEntryById = { entryId ->
+                                        context.startActivity(EditEntryActivity.newIntent(context, entryId))
+                                        viewModel.clearSelection()
+                                    },
+                                    onEditSelectedSingleEntry = { entry ->
+                                        context.startActivity(EditEntryActivity.newIntent(context, entry.entry.id))
+                                        viewModel.onEntrySelected(entry)
+                                    },
+                                    onChangeTimeZoneClicked = { showBatchTimeZoneDialog = true },
+                                    onShareAsTextClicked = {
+                                        scope.launch {
+                                            val text = viewModel.getEntriesForSharing(selectedEntryIds)
+                                            startActivity(ShareExportHelper.createPlainTextShareIntent(text))
+                                            viewModel.clearSelection()
                                         }
                                     },
-                                    navigationIcon = {
-                                        if (selectedEntryIds.isNotEmpty()) {
-                                            IconButton(onClick = { viewModel.clearSelection() }) {
-                                                Icon(Icons.Filled.Close, contentDescription = "Auswahl aufheben")
-                                            }
-                                        } else {
-                                            IconButton(onClick = {
-                                                scope.launch { drawerState.open() }
-                                            }) {
-                                                Icon(Icons.Filled.MoreVert, contentDescription = "Navigation Menu")
+                                    onExportAsVjClicked = {
+                                        scope.launch {
+                                            try {
+                                                val json = viewModel.getEntriesForSharingAsJson(selectedEntryIds)
+                                                val uri = ShareExportHelper.writeSharedExportUri(context, json)
+                                                startActivity(ShareExportHelper.createVjFileShareIntent(uri))
+                                            } catch (_: Exception) {
+                                                Toast.makeText(context, "Export fehlgeschlagen", Toast.LENGTH_SHORT).show()
+                                            } finally {
+                                                viewModel.clearSelection()
                                             }
                                         }
                                     },
-                                    actions = {
-                                        if (selectedEntryIds.isNotEmpty()) {
-                                            if (selectedEntryIds.size == 1) {
-                                                IconButton(onClick = {
-                                                    val entryId = selectedEntryIds.first()
-                                                    val intent = EditEntryActivity.newIntent(context, entryId)
-                                                    context.startActivity(intent)
-                                                    viewModel.clearSelection()
-                                                }) {
-                                                    Icon(Icons.Filled.Edit, contentDescription = "Eintrag bearbeiten")
-                                                }
-                                            }
-
-                                            IconButton(onClick = { showBatchTimeZoneDialog = true }) {
-                                                Icon(public, contentDescription = "Zeitzone ändern")
-                                            }
-
-                                            var shareMenuExpanded by remember { mutableStateOf(false) }
-                                            Box {
-                                                IconButton(onClick = { shareMenuExpanded = true }) {
-                                                    Icon(Icons.Filled.Share, contentDescription = "Teilen")
-                                                }
-                                                DropdownMenu(
-                                                    expanded = shareMenuExpanded,
-                                                    onDismissRequest = { shareMenuExpanded = false }
-                                                ) {
-                                                    DropdownMenuItem(
-                                                        text = { Text("Als Text teilen") },
-                                                        onClick = {
-                                                            shareMenuExpanded = false
-                                                            scope.launch {
-                                                                val text = viewModel.getEntriesForSharing(selectedEntryIds)
-                                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                                    type = "text/plain"
-                                                                    putExtra(Intent.EXTRA_TEXT, text)
-                                                                }
-                                                                startActivity(Intent.createChooser(shareIntent, "Einträge teilen"))
-                                                                viewModel.clearSelection()
-                                                            }
-                                                        }
-                                                    )
-                                                    DropdownMenuItem(
-                                                        text = { Text("Als .vj Datei exportieren") },
-                                                        onClick = {
-                                                            shareMenuExpanded = false
-                                                            scope.launch {
-                                                                try {
-                                                                    val json = viewModel.getEntriesForSharingAsJson(selectedEntryIds)
-                                                                    
-                                                                    val uri = withContext(Dispatchers.IO) {
-                                                                        // Create temporary file inside isolated FileProvider subdirectory
-                                                                        val exportDir = java.io.File(context.cacheDir, "shared_exports").apply { mkdirs() }
-                                                                        val file = java.io.File(exportDir, "VoiceJournal_Export.vj")
-                                                                        file.writeText(json, Charsets.UTF_8)
-
-                                                                        androidx.core.content.FileProvider.getUriForFile(
-                                                                            context,
-                                                                            "${context.packageName}.fileprovider",
-                                                                            file
-                                                                        )
-                                                                    }
-                                                                    
-                                                                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                                        type = "application/vj"
-                                                                        putExtra(Intent.EXTRA_STREAM, uri)
-                                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                                    }
-                                                                    startActivity(Intent.createChooser(shareIntent, "Einträge exportieren"))
-                                                                } catch(e: Exception) {
-                                                                    Toast.makeText(context, "Export fehlgeschlagen", Toast.LENGTH_SHORT).show()
-                                                                } finally {
-                                                                    viewModel.clearSelection()
-                                                                }
-                                                            }
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                            
-                                            // Delete / Restore buttons based on category
-                                            if (JournalConstants.isVirtualDeletedName(category)) {
-                                                // Hard delete and Restore are possible
-                                                IconButton(onClick = { viewModel.restoreEntries(selectedEntryIds) }) {
-                                                    Icon(Icons.Filled.Restore, contentDescription = "Einträge wiederherstellen")
-                                                }
-                                                IconButton(onClick = { 
-                                                    showHardDeleteSelectionDialog = true
-                                                }) {
-                                                    Icon(Icons.Filled.DeleteForever, contentDescription = "Endgültig löschen")
-                                                }
+                                    onRestoreSelectedClicked = { viewModel.restoreEntries(selectedEntryIds) },
+                                    onRequestHardDeleteSelectedClicked = { showHardDeleteSelectionDialog = true },
+                                    onDeleteSelectedClicked = { viewModel.deleteEntries(selectedEntryIds) },
+                                    onToggleCategoryTagsClicked = viewModel::toggleShowCategoryTags,
+                                    onOpenGpsTrackClicked = { openGoogleMapsWithTrack(gpsTrackPoints) },
+                                    onUndoDeleteClicked = viewModel::onUndoDelete,
+                                    onCopyToClipboardClicked = {
+                                        scope.launch {
+                                            val clipboardText = viewModel.getEntriesTextForClipboard()
+                                            if (clipboardText.isBlank()) {
+                                                Toast.makeText(context, "Keine Einträge zum Kopieren vorhanden", Toast.LENGTH_SHORT).show()
                                             } else {
-                                                // Normal delete
-                                                IconButton(onClick = { viewModel.deleteEntries(selectedEntryIds) }) {
-                                                    Icon(Icons.Filled.Delete, contentDescription = "Einträge löschen")
-                                                }
-                                            }
-                                        } else {
-                                            if (selectedEntry != null) {
-                                                IconButton(onClick = {
-                                                    val entryId = selectedEntry!!.entry.id
-                                                    val intent = EditEntryActivity.newIntent(context, entryId)
-                                                    context.startActivity(intent)
-                                                    viewModel.onEntrySelected(selectedEntry!!) // Auswahl im Hintergrund wieder aufheben
-                                                }) {
-                                                    Icon(Icons.Filled.Edit, contentDescription = "Eintrag bearbeiten")
-                                                }
-                                            }
-                                            IconButton(onClick = { viewModel.toggleShowCategoryTags() }) {
-                                                Icon(
-                                                    imageVector = if (showCategoryTags) Icons.AutoMirrored.Filled.Label else Icons.AutoMirrored.Filled.LabelOff,
-                                                    contentDescription = "Toggle Category Tags"
-                                                )
-                                            }
-                                            if (hasGpsTrackForSelectedDate) {
-                                                IconButton(onClick = { openGoogleMapsWithTrack(gpsTrackPoints) }) {
-                                                    Icon(Icons.Filled.Map, contentDescription = "Show GPS Track on Map")
-                                                }
-                                            }
-                                            if (canUndo) {
-                                                IconButton(onClick = viewModel::onUndoDelete) {
-                                                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
-                                                }
-                                            }
-                                            IconButton(onClick = {
-                                                scope.launch {
-                                                    val clipboardText = viewModel.getEntriesTextForClipboard()
-                                                    if (clipboardText.isBlank()) {
-                                                        Toast.makeText(context, "Keine Einträge zum Kopieren vorhanden", Toast.LENGTH_SHORT).show()
-                                                    } else {
-                                                        val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                                                        val clip = ClipData.newPlainText("VoiceJournal", clipboardText)
-                                                        clipboardManager.setPrimaryClip(clip)
-                                                        Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
-                                                    }
-                                                }
-                                            }) {
-                                                Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopieren")
+                                                val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                                                val clip = ClipData.newPlainText("VoiceJournal", clipboardText)
+                                                clipboardManager.setPrimaryClip(clip)
+                                                Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
                                             }
                                         }
-                                    },
-                                    colors = TopAppBarDefaults.topAppBarColors(
-                                        containerColor = if (selectedEntryIds.isNotEmpty()) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-                                    )
-                                 )
+                                    }
+                                )
                             },
                             floatingActionButton = {
-                                Column(horizontalAlignment = Alignment.End) {
-                                    AnimatedVisibility(visible = isFabMenuExpanded) {
-                                        Column(
-                                            horizontalAlignment = Alignment.End,
-                                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                                        ) {
-                                            FloatingActionButton(
-                                                onClick = {
-                                                    val initialCat = viewModel.selectedCategory.value
-                                                        .takeUnless { JournalConstants.isVirtualDeletedName(it) }
-                                                    val intent = EditEntryActivity.newIntentForNewEntry(
-                                                        context,
-                                                        initialCat
-                                                    )
-                                                    context.startActivity(intent)
-                                                    isFabMenuExpanded = false
-                                                }
-                                            ) {
-                                                Icon(Icons.Filled.Create, contentDescription = "Create Entry Manually")
-                                            }
-                                            FloatingActionButton(
-                                                onClick = {
-                                                    when {
-                                                        ContextCompat.checkSelfPermission(
-                                                            context,
-                                                            Manifest.permission.RECORD_AUDIO
-                                                        ) == PackageManager.PERMISSION_GRANTED -> {
-                                                            startListening()
-                                                        }
-                                                        else -> {
-                                                            recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                                        }
-                                                    }
-                                                    isFabMenuExpanded = false
-                                                }
-                                            ) {
-                                                Icon(Icons.Filled.Mic, contentDescription = "Sprechen")
-                                            }
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    FloatingActionButton(
-                                        onClick = {}
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(56.dp)
-                                                .combinedClickable(
-                                                    onClick = {
-                                                        if (isRecording) {
-                                                            speechRecognitionManager.stopListening()
-                                                        } else {
-                                                            isFabMenuExpanded = !isFabMenuExpanded
-                                                        }
-                                                    },
-                                                    onLongClick = {
-                                                        when {
-                                                            ContextCompat.checkSelfPermission(
-                                                                context,
-                                                                Manifest.permission.RECORD_AUDIO
-                                                            ) == PackageManager.PERMISSION_GRANTED -> {
-                                                                startListening()
-                                                            }
-                                                            else -> {
-                                                                recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                                            }
-                                                        }
-                                                    }
-                                                ),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            if (isRecording) {
-                                                Icon(Icons.Filled.Stop, contentDescription = "Stop recording")
-                                            } else if (isFabMenuExpanded) {
-                                                Icon(Icons.Filled.Close, contentDescription = "Close Menu")
-                                            } else {
-                                                Icon(Icons.Filled.Add, contentDescription = "Add Entry")
-                                            }
-                                        }
-                                    }
-                                }
+                                MainFabMenu(
+                                    isRecording = isRecording,
+                                    isExpanded = isFabMenuExpanded,
+                                    onExpandedChange = { isFabMenuExpanded = it },
+                                    onCreateManualEntryClicked = {
+                                        val initialCat = viewModel.selectedCategory.value
+                                            .takeUnless { JournalConstants.isVirtualDeletedName(it) }
+                                        context.startActivity(
+                                            EditEntryActivity.newIntentForNewEntry(context, initialCat)
+                                        )
+                                    },
+                                    onStartVoiceEntryClicked = requestOrStartVoiceRecording,
+                                    onStopRecordingClicked = speechRecognitionManager::stopListening
+                                )
                             }
                         ) { innerPadding ->
-                            NavHost(
-                                navController = navController,
-                                startDestination = "home",
-                                modifier = Modifier.padding(innerPadding)
-                            ) {
-                                composable("home") {
-                                    HomeScreen(
-                                        modifier = Modifier,
-                                        pagedEntries = pagedEntries,
-                                        categories = categories,
-                                        selectedCategory = category,
-                                        onCategoryChange = viewModel::onCategoryChange,
-                                        selectedEntry = selectedEntry,
-                                        selectedEntryIds = selectedEntryIds,
-                                        onToggleEntrySelection = viewModel::toggleEntrySelection,
-                                        selectedDate = selectedDate,
-                                        onDateSelected = viewModel::onDateSelected,
-                                        onEntrySelected = viewModel::onEntrySelected,
-                                        onDateLongClicked = { date ->
-                                            openGooglePhotos(date)
-                                        },
-                                        onPhotoIconClicked = { entryWithCategories ->
-                                            val date = entryWithCategories.entry.localDate()
-                                            openGooglePhotos(date)
-                                        },
-                                        truncationLength = truncationLength,
-                                        showCategoryTags = showCategoryTags,
-                                        scrollToEntryId = scrollToEntryId,
-                                        onScrolledToEntry = viewModel::onScrolledToEntry,
-                                        onCheckedChange = { entry -> viewModel.toggleEntryChecked(entry.entry) }
-                                    )
-                                 }
-                            }
+                            HomeScreen(
+                                modifier = Modifier.padding(innerPadding),
+                                pagedEntries = pagedEntries,
+                                categories = categories,
+                                selectedCategory = category,
+                                onCategoryChange = viewModel::onCategoryChange,
+                                selectedEntry = selectedEntry,
+                                selectedEntryIds = selectedEntryIds,
+                                onToggleEntrySelection = viewModel::toggleEntrySelection,
+                                selectedDate = selectedDate,
+                                onDateSelected = viewModel::onDateSelected,
+                                onEntrySelected = viewModel::onEntrySelected,
+                                onDateLongClicked = ::openGooglePhotos,
+                                onPhotoIconClicked = { entryWithCategories ->
+                                    openGooglePhotos(entryWithCategories.entry.localDate())
+                                },
+                                truncationLength = truncationLength,
+                                showCategoryTags = showCategoryTags,
+                                scrollToEntryId = scrollToEntryId,
+                                onScrolledToEntry = viewModel::onScrolledToEntry,
+                                onCheckedChange = { entry -> viewModel.toggleEntryChecked(entry.entry) }
+                            )
                         }
                     }
                 )
@@ -698,17 +467,16 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
-
     private fun handleIntent(intent: Intent) {
         if (intent.action == NotificationHelper.NOTIFICATION_ACTION) {
             handleNotificationAction()
         }
-        if (intent.hasExtra("ENTRY_ID")) {
-            val entryId = intent.getStringExtra("ENTRY_ID")
+        if (intent.hasExtra(EXTRA_ENTRY_ID)) {
+            val entryId = intent.getStringExtra(EXTRA_ENTRY_ID)
             if (entryId != null) {
                 try {
                     viewModel.scrollToEntry(UUID.fromString(entryId))
-                } catch (e: IllegalArgumentException) {
+                } catch (_: IllegalArgumentException) {
                     // Ignore invalid UUID
                 }
             }
@@ -759,6 +527,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        const val EXTRA_ENTRY_ID = "ENTRY_ID"
         internal const val MAX_MAPS_WAYPOINTS = 9
 
         internal fun <T> sampleWaypoints(intermediate: List<T>, maxWaypoints: Int = MAX_MAPS_WAYPOINTS): List<T> {

@@ -1,5 +1,6 @@
 package com.example.voicejournal.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowCircleRight
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -29,23 +31,27 @@ import com.example.voicejournal.data.resolvedZoneId
 import com.example.voicejournal.util.TimeZoneUtils
 import java.util.UUID
 
-@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun JournalEntryItem(
     entryWithCategories: EntryWithCategories,
-    isSelected: Boolean,
+    isSelected: Boolean = false,
     isMultiSelected: Boolean = false,
     isSelectionMode: Boolean = false,
-    showCategoryTags: Boolean,
+    showCategoryTags: Boolean = true,
+    showCheckbox: Boolean = true,
+    expandOnClick: Boolean = true,
     truncationLength: Int,
     onEntrySelected: (EntryWithCategories) -> Unit,
+    onLongClickEntry: ((EntryWithCategories) -> Unit)? = null,
     onToggleSelection: (UUID) -> Unit = {},
-    onPhotoIconClicked: (EntryWithCategories) -> Unit,
-    onCheckedChange: (Boolean) -> Unit
+    onPhotoIconClicked: (EntryWithCategories) -> Unit = {},
+    onGoToEntryClicked: ((EntryWithCategories) -> Unit)? = null,
+    onCheckedChange: (Boolean) -> Unit = {}
 ) {
     var isExpanded by remember { mutableStateOf(false) }
 
-    val isCheckable = entryWithCategories.categories.any { it.checkable }
+    val isCheckable = showCheckbox && entryWithCategories.categories.any { it.checkable }
     val shouldShowDate = entryWithCategories.categories.isEmpty() || entryWithCategories.categories.any { it.showDate }
 
     Card(
@@ -58,13 +64,17 @@ fun JournalEntryItem(
                         onToggleSelection(entryWithCategories.entry.id)
                     } else {
                         onEntrySelected(entryWithCategories)
-                        if (truncationLength > 0 && entryWithCategories.entry.content.length > truncationLength) {
+                        if (expandOnClick && truncationLength > 0 && entryWithCategories.entry.content.length > truncationLength) {
                             isExpanded = !isExpanded
                         }
                     }
                 },
                 onLongClick = {
-                    onToggleSelection(entryWithCategories.entry.id)
+                    if (onLongClickEntry != null) {
+                        onLongClickEntry(entryWithCategories)
+                    } else {
+                        onToggleSelection(entryWithCategories.entry.id)
+                    }
                 }
             ),
         colors = CardDefaults.cardColors(
@@ -160,6 +170,15 @@ fun JournalEntryItem(
                             Icon(
                                 imageVector = Icons.Default.PhotoCamera,
                                 contentDescription = "Open Photo",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    if (onGoToEntryClicked != null) {
+                        IconButton(onClick = { onGoToEntryClicked(entryWithCategories) }) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowCircleRight,
+                                contentDescription = "Go to entry",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }

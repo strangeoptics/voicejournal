@@ -26,7 +26,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
@@ -34,6 +36,39 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import java.util.Locale
 import kotlin.math.abs
+
+@Serializable
+internal data class GoogleSpeechRequest(
+    val config: RecognitionConfig,
+    val audio: RecognitionAudio
+)
+
+@Serializable
+internal data class RecognitionConfig(
+    val encoding: String,
+    val sampleRateHertz: Int,
+    val languageCode: String
+)
+
+@Serializable
+internal data class RecognitionAudio(
+    val content: String
+)
+
+@Serializable
+internal data class GoogleSpeechResponse(
+    val results: List<SpeechRecognitionResult> = emptyList()
+)
+
+@Serializable
+internal data class SpeechRecognitionResult(
+    val alternatives: List<SpeechRecognitionAlternative> = emptyList()
+)
+
+@Serializable
+internal data class SpeechRecognitionAlternative(
+    val transcript: String = ""
+)
 
 class SpeechRecognitionManager(
     context: Context,
@@ -268,16 +303,16 @@ class SpeechRecognitionManager(
 
     private suspend fun sendToGoogleCloud(base64Audio: String, apiKey: String) {
         val url = URL("https://speech.googleapis.com/v1/speech:recognize")
-        val json = JSONObject().apply {
-            put("config", JSONObject().apply {
-                put("encoding", "LINEAR16")
-                put("sampleRateHertz", 16000)
-                put("languageCode", Locale.getDefault().toLanguageTag())
-            })
-            put("audio", JSONObject().apply {
-                put("content", base64Audio)
-            })
-        }
+        val requestPayload = speechJson.encodeToString(
+            GoogleSpeechRequest(
+                config = RecognitionConfig(
+                    encoding = "LINEAR16",
+                    sampleRateHertz = 16000,
+                    languageCode = Locale.getDefault().toLanguageTag()
+                ),
+                audio = RecognitionAudio(content = base64Audio)
+            )
+        )
 
         try {
             val result = withContext(Dispatchers.IO) {
@@ -292,7 +327,7 @@ class SpeechRecognitionManager(
 
                     connection.outputStream.use { os ->
                         OutputStreamWriter(os, Charsets.UTF_8).use { osw ->
-                            osw.write(json.toString())
+                            osw.write(requestPayload)
                         }
                     }
 
@@ -309,16 +344,7 @@ class SpeechRecognitionManager(
             }
 
             if (result != null) {
-                val jsonResponse = JSONObject(result)
-                val results = jsonResponse.optJSONArray("results")
-                val transcript = results
-                    ?.optJSONObject(0)
-                    ?.optJSONArray("alternatives")
-                    ?.optJSONObject(0)
-                    ?.optString("transcript", "")
-                    ?.trim()
-                    .orEmpty()
-
+                val transcript = parseGoogleSpeechTranscript(result)
                 if (transcript.isNotEmpty()) {
                     withContext(Dispatchers.Main) {
                         onTextRecognized(capitalizeFirstLetter(transcript))
@@ -373,5 +399,34 @@ class SpeechRecognitionManager(
     companion object {
         private const val CONNECT_TIMEOUT_MS = 15_000
         private const val READ_TIMEOUT_MS = 30_000
+
+        private val speechJson = Json {
+            ignoreUnknownKeys = true
+        }
+
+        internal fun parseGoogleSpeechTranscript(responseJson: String): String {
+            val response = speechJson.decodeFromString<GoogleSpeechResponse>(responseJson)
+            return response.results
+                .firstOrNull()
+                ?.alternatives
+                ?.firstOrNull()
+                ?.transcript
+                ?.trim()
+                .orEmpty()
+        }
+
+        fun errorMessageForCode(error: Int): String {
+            return when (error) {
+                SpeechRecognizer.ERROR_AUDIO -> "Audio recording error"
+                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Insufficient permissions"
+                SpeechRecognizer.ERROR_NETWORK -> "Network error or invalid API key"
+                SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
+                SpeechRecognizer.ERROR_NO_MATCH -> "No speech was recognized"
+                SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Recognizer is busy"
+                SpeechRecognizer.ERROR_SERVER -> "Server error"
+                SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech input"
+                else -> "An unknown error occurred ($error)"
+            }
+        }
     }
 }

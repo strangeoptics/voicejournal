@@ -10,6 +10,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.voicejournal.data.Category
+import com.example.voicejournal.data.JournalBackupManager
 import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.JournalRepository
@@ -27,7 +28,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 
@@ -79,7 +79,7 @@ class ImportViewModel(
                 Log.e("SECURITY_ERROR", "Blocked unauthorized URI access in ImportViewModel: $uri", e)
                 _entries.value = emptyList()
                 _error.value = "Zugriff verweigert: Die gewählte Dateiquelle ist nicht zulässig."
-            } catch (e: FileTooLargeException) {
+            } catch (e: JournalBackupManager.FileTooLargeException) {
                 Log.w("ImportViewModel", "Rejected oversized import file", e)
                 _entries.value = emptyList()
                 _error.value = "Die ausgewählte Datei ist zu groß (maximal 10 MB erlaubt)."
@@ -111,27 +111,19 @@ class ImportViewModel(
 
             val declaredLength = descriptor.declaredLength
             if (declaredLength != AssetFileDescriptor.UNKNOWN_LENGTH && declaredLength > MAX_IMPORT_BYTES) {
-                throw FileTooLargeException("Declared length $declaredLength exceeds limit $MAX_IMPORT_BYTES")
+                throw JournalBackupManager.FileTooLargeException(
+                    "Declared length $declaredLength exceeds limit $MAX_IMPORT_BYTES"
+                )
             }
             val statSize = descriptor.parcelFileDescriptor.statSize
             if (statSize > MAX_IMPORT_BYTES) {
-                throw FileTooLargeException("Stat size $statSize exceeds limit $MAX_IMPORT_BYTES")
+                throw JournalBackupManager.FileTooLargeException(
+                    "Stat size $statSize exceeds limit $MAX_IMPORT_BYTES"
+                )
             }
 
             descriptor.createInputStream().use { inputStream ->
-                val output = ByteArrayOutputStream()
-                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                var totalRead = 0L
-                while (true) {
-                    val bytesRead = inputStream.read(buffer)
-                    if (bytesRead == -1) break
-                    totalRead += bytesRead
-                    if (totalRead > MAX_IMPORT_BYTES) {
-                        throw FileTooLargeException("Stream exceeds maximum size of $MAX_IMPORT_BYTES bytes")
-                    }
-                    output.write(buffer, 0, bytesRead)
-                }
-                output.toString(Charsets.UTF_8.name())
+                JournalBackupManager.readBoundedUtf8(inputStream, maxBytes = MAX_IMPORT_BYTES)
             }
         }
     }
@@ -187,10 +179,8 @@ class ImportViewModel(
         }
     }
 
-    private class FileTooLargeException(message: String) : IOException(message)
-
     companion object {
-        private const val MAX_IMPORT_BYTES = 10L * 1024L * 1024L // 10 MB
+        private const val MAX_IMPORT_BYTES = JournalBackupManager.MAX_SHARED_IMPORT_BYTES
     }
 }
 

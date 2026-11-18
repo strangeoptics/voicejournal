@@ -1,12 +1,16 @@
 package com.example.voicejournal
 
+import com.example.voicejournal.data.BackupJsonFormat
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.JournalConstants
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayInputStream
 
 class ExampleUnitTest {
 
@@ -97,5 +101,57 @@ class ExampleUnitTest {
         assertEquals("100\\%\\_test\\\\ok", JournalConstants.normalizeSearchQueryForSql("100%_Test\\OK"))
         // Non-German Unicode characters return null to trigger exact Unicode in-memory filtering
         assertNull(JournalConstants.normalizeSearchQueryForSql("Café éclair"))
+    }
+
+    @Test
+    fun detectBackupJsonFormat_distinguishesV2AndV3EvenWithKeywordsInsideContent() {
+        val v2ArrayWithKeywordInContent = """
+            [
+              {
+                "id": 1,
+                "title": "dev",
+                "content": "Refactored \"start_datetime\" and \"version\": 3 in SQLite",
+                "timestamp": 1700000000000
+              }
+            ]
+        """.trimIndent()
+        assertEquals(
+            BackupJsonFormat.ARRAY_V2,
+            JournalConstants.detectBackupJsonFormat(Json.parseToJsonElement(v2ArrayWithKeywordInContent))
+        )
+
+        val v3Array = """[{"id":"123e4567-e89b-12d3-a456-426614174000","content":"Test","start_datetime":1700000000000}]"""
+        assertEquals(
+            BackupJsonFormat.ARRAY_V3,
+            JournalConstants.detectBackupJsonFormat(Json.parseToJsonElement(v3Array))
+        )
+
+        val v2ObjectWithoutExplicitVersion = """{"entries":[{"id":1,"title":"journal","content":"Hi","timestamp":1700000000000}]}"""
+        assertEquals(
+            BackupJsonFormat.OBJECT_V2,
+            JournalConstants.detectBackupJsonFormat(Json.parseToJsonElement(v2ObjectWithoutExplicitVersion))
+        )
+
+        val v3Object = """{"version":3,"entries":[],"categories":[]}"""
+        assertEquals(
+            BackupJsonFormat.OBJECT_V3,
+            JournalConstants.detectBackupJsonFormat(Json.parseToJsonElement(v3Object))
+        )
+
+        assertEquals(
+            BackupJsonFormat.EMPTY_ARRAY,
+            JournalConstants.detectBackupJsonFormat(Json.parseToJsonElement("[]"))
+        )
+    }
+
+    @Test
+    fun readBoundedUtf8_readsWithinLimitAndRejectsOversizedStreams() {
+        val text = "Tagebucheintrag mit Umlauten: äöüß"
+        val bytes = text.toByteArray(Charsets.UTF_8)
+        assertEquals(text, JournalConstants.readBoundedUtf8(ByteArrayInputStream(bytes), maxBytes = 1024L))
+
+        assertThrows(IllegalArgumentException::class.java) {
+            JournalConstants.readBoundedUtf8(ByteArrayInputStream(bytes), maxBytes = (bytes.size - 1).toLong())
+        }
     }
 }

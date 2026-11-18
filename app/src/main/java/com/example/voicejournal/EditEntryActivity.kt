@@ -354,15 +354,25 @@ fun EditEntryScreen(
 
     val speechService by viewModel.speechService.collectAsState()
     val googleCloudApiKey by viewModel.googleCloudApiKey.collectAsState()
+    val maxRecordingTime by viewModel.maxRecordingTime.collectAsState()
+    val silenceThreshold by viewModel.silenceThreshold.collectAsState()
+    val silenceTimeRequired by viewModel.silenceTimeRequired.collectAsState()
+
+    val startDictation = {
+        speechRecognitionManager.startListening(
+            service = speechService,
+            apiKey = googleCloudApiKey,
+            maxRecordingTimeSeconds = maxRecordingTime,
+            silenceThreshold = silenceThreshold,
+            silenceTimeRequired = silenceTimeRequired
+        )
+    }
 
     val recordAudioPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { isGranted ->
             if (isGranted) {
-                speechRecognitionManager.startListening(
-                    service = speechService,
-                    apiKey = googleCloudApiKey
-                )
+                startDictation()
             }
         }
     )
@@ -382,10 +392,7 @@ fun EditEntryScreen(
                             speechRecognitionManager.stopListening()
                         } else {
                             when (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)) {
-                                PackageManager.PERMISSION_GRANTED -> speechRecognitionManager.startListening(
-                                    service = speechService,
-                                    apiKey = googleCloudApiKey
-                                )
+                                PackageManager.PERMISSION_GRANTED -> startDictation()
                                 else -> recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                             }
                         }

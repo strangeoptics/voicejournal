@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.voicejournal.data.JournalRepository
-import com.example.voicejournal.data.resolvedZoneId
 import com.example.voicejournal.data.startLocalDateTime
 import com.example.voicejournal.data.stopLocalDateTime
 import com.example.voicejournal.di.Injector
@@ -14,17 +13,38 @@ import com.example.voicejournal.ui.components.Appointment
 import com.example.voicejournal.util.TimeZoneUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.temporal.WeekFields
+import java.util.Locale
 
 class CalendarViewModel(private val repository: JournalRepository) : ViewModel() {
 
-    private val _dateRange = MutableStateFlow<Pair<LocalDate, LocalDate>>(
-        LocalDate.now() to LocalDate.now().plusDays(6)
-    )
+    private val _numberOfDays = MutableStateFlow(7)
+    val numberOfDays: StateFlow<Int> = _numberOfDays.asStateFlow()
+
+    private val _currentDate = MutableStateFlow(LocalDate.now())
+    val currentDate: StateFlow<LocalDate> = _currentDate.asStateFlow()
+
+    private val _selectedDate = MutableStateFlow<LocalDate?>(null)
+    val selectedDate: StateFlow<LocalDate?> = _selectedDate.asStateFlow()
+
+    private val dateRange: Flow<Pair<LocalDate, LocalDate>> = combine(
+        _currentDate,
+        _numberOfDays,
+        _selectedDate
+    ) { date, days, selected ->
+        if (selected != null) {
+            selected to selected
+        } else {
+            val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
+            val startDate = if (days == 7) date.with(firstDayOfWeek) else date
+            val endDate = startDate.plusDays(days.toLong() - 1)
+            startDate to endDate
+        }
+    }.distinctUntilChanged()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val appointments: StateFlow<List<Appointment>> = _dateRange.flatMapLatest { (startDate, endDate) ->
+    val appointments: StateFlow<List<Appointment>> = dateRange.flatMapLatest { (startDate, endDate) ->
         val (queryStartMillis, queryEndMillis) = TimeZoneUtils.utcQueryBoundsForLocalDates(startDate, endDate)
         repository.getEntriesForCalendar(queryStartMillis, queryEndMillis).map { entriesWithCategories ->
             entriesWithCategories.mapNotNull { entryWithCategories ->
@@ -58,29 +78,27 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun setDateRange(startDate: LocalDate, numberOfDays: Int) {
-        val endDate = startDate.plusDays(numberOfDays.toLong() - 1)
-        _dateRange.value = startDate to endDate
+    fun setNumberOfDays(days: Int) {
+        _numberOfDays.value = days
+        _selectedDate.value = null
+        if (days == 7) {
+            val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
+            _currentDate.value = _currentDate.value.with(firstDayOfWeek)
+        }
     }
 
-    fun updateAppointment(appointment: Appointment) {
-        viewModelScope.launch {
-            val entry = appointment.entry
-            if (entry != null) {
-                val entryZone = entry.resolvedZoneId()
-                val newStartMillis = appointment.startDateTime
-                    .atZone(entryZone).toInstant().toEpochMilli()
+    fun selectDate(date: LocalDate?) {
+        _selectedDate.value = date
+    }
 
-                val newEndMillis = appointment.endDateTime
-                    .atZone(entryZone).toInstant().toEpochMilli()
+    fun navigateNext() {
+        _currentDate.value = _currentDate.value.plusDays(_numberOfDays.value.toLong())
+        _selectedDate.value = null
+    }
 
-                val updatedEntry = entry.copy(
-                    start_datetime = newStartMillis,
-                    stop_datetime = newEndMillis
-                )
-                repository.updateJournalEntry(updatedEntry)
-            }
-        }
+    fun navigatePrevious() {
+        _currentDate.value = _currentDate.value.minusDays(_numberOfDays.value.toLong())
+        _selectedDate.value = null
     }
 }
 

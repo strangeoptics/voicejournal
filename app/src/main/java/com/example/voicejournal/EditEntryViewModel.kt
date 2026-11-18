@@ -39,10 +39,27 @@ class EditEntryViewModel(
     val allCategories: StateFlow<List<Category>> = repository.realCategories
         .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _speechService = MutableStateFlow("ANDROID")
+    private val _speechService = MutableStateFlow(
+        sharedPreferences.getString(MainViewModel.KEY_SPEECH_SERVICE, "ANDROID") ?: "ANDROID"
+    )
     val speechService: StateFlow<String> = _speechService.asStateFlow()
 
     val googleCloudApiKey: StateFlow<String> = SecureApiKeyStore.apiKeyFlow
+
+    private val _maxRecordingTime = MutableStateFlow(
+        sharedPreferences.getInt(MainViewModel.KEY_MAX_RECORDING_TIME, 15)
+    )
+    val maxRecordingTime: StateFlow<Int> = _maxRecordingTime.asStateFlow()
+
+    private val _silenceThreshold = MutableStateFlow(
+        sharedPreferences.getInt(MainViewModel.KEY_SILENCE_THRESHOLD, 500)
+    )
+    val silenceThreshold: StateFlow<Int> = _silenceThreshold.asStateFlow()
+
+    private val _silenceTimeRequired = MutableStateFlow(
+        sharedPreferences.getInt(MainViewModel.KEY_SILENCE_TIME_REQUIRED, 2000)
+    )
+    val silenceTimeRequired: StateFlow<Int> = _silenceTimeRequired.asStateFlow()
 
     // Form States
     private val _entryContent = MutableStateFlow(TextFieldValue(""))
@@ -75,7 +92,6 @@ class EditEntryViewModel(
     val saveError: StateFlow<String?> = _saveError.asStateFlow()
 
     init {
-        _speechService.value = sharedPreferences.getString(MainViewModel.KEY_SPEECH_SERVICE, "ANDROID") ?: "ANDROID"
         SecureApiKeyStore.getApiKey(applicationContext, sharedPreferences)
 
         viewModelScope.launch {

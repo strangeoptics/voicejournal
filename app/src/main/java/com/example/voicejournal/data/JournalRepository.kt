@@ -12,14 +12,19 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.intOrNull
 import com.example.voicejournal.util.TimeZoneUtils
-import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.FileOutputStream
 import java.io.IOException
-import java.io.InputStreamReader
+import java.io.InputStream
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -28,10 +33,78 @@ import java.util.Locale
 import java.util.UUID
 import java.util.regex.Pattern
 
+internal enum class BackupJsonFormat {
+    OBJECT_V3,
+    OBJECT_V2,
+    ARRAY_V3,
+    ARRAY_V2,
+    EMPTY_ARRAY
+}
+
 object JournalConstants {
     const val CATEGORY_DELETED_ID = -1
     const val CATEGORY_DELETED_NAME = "Gelöscht"
     const val SQLITE_MAX_BIND_PARAMS = 900
+    const val MAX_BACKUP_IMPORT_BYTES = 50L * 1024L * 1024L // 50 MB
+
+    internal fun readBoundedUtf8(
+        inputStream: InputStream,
+        maxBytes: Long = MAX_BACKUP_IMPORT_BYTES
+    ): String {
+        val output = ByteArrayOutputStream()
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var totalRead = 0L
+        while (true) {
+            val bytesRead = inputStream.read(buffer)
+            if (bytesRead == -1) break
+            totalRead += bytesRead
+            if (totalRead > maxBytes) {
+                val mbLimit = (maxBytes / (1024L * 1024L)).coerceAtLeast(1L)
+                throw IllegalArgumentException(
+                    "Die ausgewählte Datei ist zu groß (maximal $mbLimit MB erlaubt)."
+                )
+            }
+            output.write(buffer, 0, bytesRead)
+        }
+        return output.toString(Charsets.UTF_8.name())
+    }
+
+    internal fun detectBackupJsonFormat(root: JsonElement): BackupJsonFormat {
+        return when (root) {
+            is JsonObject -> {
+                val version = (root["version"] as? JsonPrimitive)?.intOrNull
+                when {
+                    version != null && version >= 3 -> BackupJsonFormat.OBJECT_V3
+                    version != null -> BackupJsonFormat.OBJECT_V2
+                    "entries" in root -> {
+                        val entriesArray = root["entries"] as? JsonArray
+                            ?: throw IllegalArgumentException("Ungültiges 'entries'-Feld im JSON-Backup.")
+                        val firstEntry = entriesArray.firstOrNull() as? JsonObject
+                        if (firstEntry != null && "start_datetime" in firstEntry) {
+                            BackupJsonFormat.OBJECT_V3
+                        } else {
+                            BackupJsonFormat.OBJECT_V2
+                        }
+                    }
+                    else -> throw IllegalArgumentException("Unbekanntes JSON-Backup-Format.")
+                }
+            }
+            is JsonArray -> {
+                if (root.isEmpty()) {
+                    BackupJsonFormat.EMPTY_ARRAY
+                } else {
+                    val firstEntry = root.first() as? JsonObject
+                        ?: throw IllegalArgumentException("Ungültiges JSON-Array-Backup-Format.")
+                    when {
+                        "start_datetime" in firstEntry -> BackupJsonFormat.ARRAY_V3
+                        "timestamp" in firstEntry -> BackupJsonFormat.ARRAY_V2
+                        else -> throw IllegalArgumentException("Unbekanntes JSON-Eintragsformat.")
+                    }
+                }
+            }
+            else -> throw IllegalArgumentException("Unbekanntes JSON-Backup-Format.")
+        }
+    }
 
     fun isVirtualDeletedCategory(category: Category): Boolean {
         return category.id == CATEGORY_DELETED_ID ||
@@ -215,9 +288,7 @@ class JournalRepository(
 
     suspend fun importJournal(uri: Uri) = withContext(Dispatchers.IO) {
         val content = context.contentResolver.openInputStream(uri)?.use { inputStream ->
-            BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8)).use { reader ->
-                reader.readText()
-            }
+            JournalConstants.readBoundedUtf8(inputStream)
         } ?: throw IOException("Die ausgewählte Datei konnte nicht geöffnet werden.")
 
         val trimmed = content.trim().removePrefix("\uFEFF")
@@ -227,11 +298,12 @@ class JournalRepository(
 
         if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
             try {
+                val root = importJson.parseToJsonElement(trimmed)
+                val format = JournalConstants.detectBackupJsonFormat(root)
                 database.withTransaction {
-                    if (trimmed.startsWith("{") && trimmed.contains("\"version\"")) {
-                        val version = importJson.decodeFromString<VersionCheck>(trimmed).version
-                        if (version >= 3) {
-                            val journalExport = importJson.decodeFromString<JournalExportV3>(trimmed)
+                    when (format) {
+                        BackupJsonFormat.OBJECT_V3 -> {
+                            val journalExport = importJson.decodeFromJsonElement<JournalExportV3>(root)
                             journalExport.categories.forEach { ensureCategoryExists(it) }
                             journalExport.entries.forEach { entryExport ->
                                 val entry = JournalEntry(
@@ -245,14 +317,15 @@ class JournalRepository(
                                     zoneId = TimeZoneUtils.sanitizeZoneId(entryExport.zoneId)
                                 )
                                 val categories = entryExport.categories
-                                    .filter { it.isNotBlank() && !it.equals("Gelöscht", ignoreCase = true) }
+                                    .filter { it.isNotBlank() && !JournalConstants.isVirtualDeletedName(it) }
                                     .map { categoryName ->
                                         Category(category = categoryName, aliases = "")
                                     }
                                 entryDao.insertWithCategories(entry, categories, categoryDao)
                             }
-                        } else {
-                            val journalExport = importJson.decodeFromString<JournalExport>(trimmed)
+                        }
+                        BackupJsonFormat.OBJECT_V2 -> {
+                            val journalExport = importJson.decodeFromJsonElement<JournalExport>(root)
                             journalExport.categories.forEach { ensureCategoryExists(it) }
                             journalExport.entries.forEach { v2Entry ->
                                 val newEntry = JournalEntry(
@@ -268,9 +341,8 @@ class JournalRepository(
                                 )
                             }
                         }
-                    } else if (trimmed.startsWith("[")) {
-                        if (trimmed.contains("\"start_datetime\"")) {
-                            val entries = importJson.decodeFromString<List<JournalEntry>>(trimmed)
+                        BackupJsonFormat.ARRAY_V3 -> {
+                            val entries = importJson.decodeFromJsonElement<List<JournalEntry>>(root)
                             val fallbackCategory = Category(category = "journal", aliases = "")
                             entries.forEach { imported ->
                                 val cleanEntry = imported.copy(
@@ -284,8 +356,9 @@ class JournalRepository(
                                     entryDao.insertWithCategories(cleanEntry, listOf(fallbackCategory), categoryDao)
                                 }
                             }
-                        } else {
-                            val entries = importJson.decodeFromString<List<JournalEntryV2>>(trimmed)
+                        }
+                        BackupJsonFormat.ARRAY_V2 -> {
+                            val entries = importJson.decodeFromJsonElement<List<JournalEntryV2>>(root)
                             entries.forEach { v2Entry ->
                                 val newEntry = JournalEntry(
                                     content = v2Entry.content,
@@ -300,8 +373,7 @@ class JournalRepository(
                                 )
                             }
                         }
-                    } else {
-                        throw IllegalArgumentException("Unbekanntes JSON-Backup-Format.")
+                        BackupJsonFormat.EMPTY_ARRAY -> Unit
                     }
                 }
             } catch (e: SerializationException) {
@@ -554,6 +626,3 @@ class JournalRepository(
         }
     }
 }
-
-@kotlinx.serialization.Serializable
-private data class VersionCheck(val version: Int)

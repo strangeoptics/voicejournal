@@ -31,14 +31,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.*
-import androidx.compose.runtime.* 
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.example.voicejournal.data.Category
 import com.example.voicejournal.di.Injector
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 
@@ -56,12 +56,24 @@ class EditCategoryActivity : ComponentActivity() {
         setContent {
             VoicejournalTheme {
                 val category by viewModel.category.collectAsState()
+                val isLoaded by viewModel.isLoaded.collectAsState()
                 val isSaving by viewModel.isSaving.collectAsState()
                 val saveCompleted by viewModel.saveCompleted.collectAsState()
                 val saveError by viewModel.saveError.collectAsState()
 
                 LaunchedEffect(saveCompleted) {
                     if (saveCompleted) {
+                        finish()
+                    }
+                }
+
+                LaunchedEffect(isLoaded, category) {
+                    if (categoryId != -1 && isLoaded && category == null) {
+                        Toast.makeText(
+                            this@EditCategoryActivity,
+                            "Kategorie nicht gefunden.",
+                            Toast.LENGTH_SHORT
+                        ).show()
                         finish()
                     }
                 }
@@ -73,24 +85,21 @@ class EditCategoryActivity : ComponentActivity() {
                     }
                 }
 
-                // Handle the case where a category is being edited but not yet loaded
-                if (categoryId != -1 && category == null) {
+                if (!isLoaded) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
-                } else {
+                } else if (categoryId == -1 || category != null) {
+                    val fallbackNextIndex = if (highestOrderIndex >= Int.MAX_VALUE - 1) {
+                        0
+                    } else {
+                        (highestOrderIndex + 1).coerceAtLeast(0)
+                    }
                     EditCategoryScreen(
-                        initialCategory = category,
+                        isNewCategory = categoryId == -1,
                         isSaving = isSaving,
-                        onSave = { name, aliases, showAll, color, checkable, showDate ->
-                            val fallbackNextIndex = if (highestOrderIndex >= Int.MAX_VALUE - 1) {
-                                0
-                            } else {
-                                (highestOrderIndex + 1).coerceAtLeast(0)
-                            }
-                            val orderIndex = category?.orderIndex ?: fallbackNextIndex
-                            viewModel.saveCategory(name, aliases, showAll, orderIndex, color, checkable, showDate)
-                        },
+                        viewModel = viewModel,
+                        onSave = { viewModel.saveCategory(fallbackNextIndex) },
                         onNavigateUp = { finish() }
                     )
                 }
@@ -114,23 +123,24 @@ class EditCategoryActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditCategoryScreen(
-    initialCategory: Category?,
+    isNewCategory: Boolean,
     isSaving: Boolean = false,
-    onSave: (String, String, Boolean, String, Boolean, Boolean) -> Unit,
+    viewModel: EditCategoryViewModel,
+    onSave: () -> Unit,
     onNavigateUp: () -> Unit
 ) {
-    var name by remember { mutableStateOf(initialCategory?.category ?: "") }
-    var aliases by remember { mutableStateOf(initialCategory?.aliases ?: "") }
-    var showAll by remember { mutableStateOf(initialCategory?.showAll ?: false) }
-    var color by remember { mutableStateOf(initialCategory?.color ?: "#FFFFFF") }
-    var checkable by remember { mutableStateOf(initialCategory?.checkable ?: false) }
-    var showDate by remember { mutableStateOf(initialCategory?.showDate ?: true) }
-    var showColorPickerDialog by remember { mutableStateOf(false) }
+    val name by viewModel.name.collectAsState()
+    val aliases by viewModel.aliases.collectAsState()
+    val showAll by viewModel.showAll.collectAsState()
+    val color by viewModel.color.collectAsState()
+    val checkable by viewModel.checkable.collectAsState()
+    val showDate by viewModel.showDate.collectAsState()
+    var showColorPickerDialog by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (initialCategory == null) "Add Category" else "Edit Category") },
+                title = { Text(if (isNewCategory) "Add Category" else "Edit Category") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateUp, enabled = !isSaving) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -140,8 +150,8 @@ fun EditCategoryScreen(
         },
         floatingActionButton = {
             FloatingActionButton(onClick = {
-                if (!isSaving && name.isNotBlank()) {
-                    onSave(name, aliases, showAll, color, checkable, showDate)
+                if (!isSaving && name.text.isNotBlank()) {
+                    onSave()
                 }
             }) {
                 Icon(Icons.Default.Done, contentDescription = "Save Category")
@@ -159,17 +169,17 @@ fun EditCategoryScreen(
         ) {
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it },
+                onValueChange = { viewModel.updateName(it) },
                 label = { Text("Category Name") },
                 modifier = Modifier.fillMaxWidth(),
                 // A category name should not be changed, as it could orphan relations
                 // However, for a new category it must be enabled.
-                enabled = initialCategory == null
+                enabled = isNewCategory
             )
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = aliases,
-                onValueChange = { aliases = it },
+                onValueChange = { viewModel.updateAliases(it) },
                 label = { Text("Aliases (comma-separated)") },
                 modifier = Modifier.fillMaxWidth()
             )
@@ -180,7 +190,7 @@ fun EditCategoryScreen(
             ) {
                 OutlinedTextField(
                     value = color,
-                    onValueChange = { color = it },
+                    onValueChange = { viewModel.updateColor(it) },
                     label = { Text("Color (Hex)") },
                     modifier = Modifier.weight(1f)
                 )
@@ -191,7 +201,7 @@ fun EditCategoryScreen(
                         .size(56.dp)
                         .background(
                             try {
-                                Color(android.graphics.Color.parseColor(color))
+                                Color(android.graphics.Color.parseColor(color.text))
                             } catch (e: IllegalArgumentException) {
                                 Color.Gray // Fallback color for invalid hex
                             }
@@ -207,7 +217,7 @@ fun EditCategoryScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Checkbox(checked = showAll, onCheckedChange = { showAll = it })
+                Checkbox(checked = showAll, onCheckedChange = { viewModel.updateShowAll(it) })
                 Text("Show all entries in this category")
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -215,7 +225,7 @@ fun EditCategoryScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Checkbox(checked = checkable, onCheckedChange = { checkable = it })
+                Checkbox(checked = checkable, onCheckedChange = { viewModel.updateCheckable(it) })
                 Text("Checkable (Checklist mode)")
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -223,7 +233,7 @@ fun EditCategoryScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Checkbox(checked = showDate, onCheckedChange = { showDate = it })
+                Checkbox(checked = showDate, onCheckedChange = { viewModel.updateShowDate(it) })
                 Text("Show Date")
             }
         }
@@ -232,7 +242,7 @@ fun EditCategoryScreen(
     if (showColorPickerDialog) {
         ColorPickerDialog(
             onColorSelected = { selectedColor ->
-                color = "#%06X".format(0xFFFFFF and selectedColor.toArgb())
+                viewModel.selectColorHex("#%06X".format(0xFFFFFF and selectedColor.toArgb()))
                 showColorPickerDialog = false
             },
             onDismiss = { showColorPickerDialog = false }

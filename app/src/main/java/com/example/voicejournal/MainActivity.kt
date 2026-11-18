@@ -86,7 +86,9 @@ import com.example.voicejournal.ui.screens.search.SearchActivity
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.NotificationHelper
 import com.example.voicejournal.util.SpeechRecognitionManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -449,16 +451,18 @@ class MainActivity : ComponentActivity() {
                                                                 try {
                                                                     val json = viewModel.getEntriesForSharingAsJson(selectedEntryIds)
                                                                     
-                                                                    // Create temporary file inside isolated FileProvider subdirectory
-                                                                    val exportDir = java.io.File(context.cacheDir, "shared_exports").apply { mkdirs() }
-                                                                    val file = java.io.File(exportDir, "VoiceJournal_Export.vj")
-                                                                    file.writeText(json)
-                                                                    
-                                                                    val uri = androidx.core.content.FileProvider.getUriForFile(
-                                                                        context,
-                                                                        "${context.packageName}.fileprovider",
-                                                                        file
-                                                                    )
+                                                                    val uri = withContext(Dispatchers.IO) {
+                                                                        // Create temporary file inside isolated FileProvider subdirectory
+                                                                        val exportDir = java.io.File(context.cacheDir, "shared_exports").apply { mkdirs() }
+                                                                        val file = java.io.File(exportDir, "VoiceJournal_Export.vj")
+                                                                        file.writeText(json, Charsets.UTF_8)
+
+                                                                        androidx.core.content.FileProvider.getUriForFile(
+                                                                            context,
+                                                                            "${context.packageName}.fileprovider",
+                                                                            file
+                                                                        )
+                                                                    }
                                                                     
                                                                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                                                         type = "application/vj"

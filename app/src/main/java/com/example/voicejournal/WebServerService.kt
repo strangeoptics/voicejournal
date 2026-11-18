@@ -90,9 +90,9 @@ class WebServerService : Service() {
         serviceScope.cancel()
         if (::webServer.isInitialized && webServer.isRunning) {
             val serverInstance = webServer
-            Thread {
+            CoroutineScope(Dispatchers.IO).launch {
                 serverInstance.stop()
-            }.start()
+            }
         }
         super.onDestroy()
     }

@@ -2,6 +2,7 @@ package com.example.voicejournal
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
@@ -18,12 +19,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import com.example.voicejournal.ui.components.WeekView
 import com.example.voicejournal.ui.theme.VoicejournalTheme
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.time.temporal.WeekFields
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,7 +36,7 @@ class CalendarActivity : ComponentActivity() {
             VoicejournalTheme {
                 CalendarScreen(
                     viewModel = viewModel,
-                    onFinish = { finish() } // Provide the finish callback
+                    onFinish = { finish() }
                 )
             }
         }
@@ -47,17 +47,13 @@ class CalendarActivity : ComponentActivity() {
 @Composable
 fun CalendarScreen(viewModel: CalendarViewModel, onFinish: () -> Unit) {
     val appointments by viewModel.appointments.collectAsState()
+    val numberOfDays by viewModel.numberOfDays.collectAsState()
+    val currentDate by viewModel.currentDate.collectAsState()
+    val selectedDate by viewModel.selectedDate.collectAsState()
+    var showMenu by rememberSaveable { mutableStateOf(false) }
 
-    var numberOfDays by remember { mutableStateOf(7) }
-    var currentDate by remember { mutableStateOf(LocalDate.now()) }
-    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
-    var showMenu by remember { mutableStateOf(false) }
-
-    // Update the ViewModel when the date range changes
-    LaunchedEffect(currentDate, numberOfDays) {
-        val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
-        val startDate = if (numberOfDays == 7) currentDate.with(firstDayOfWeek) else currentDate
-        viewModel.setDateRange(startDate, numberOfDays)
+    BackHandler(enabled = selectedDate != null) {
+        viewModel.selectDate(null)
     }
 
     Scaffold(
@@ -78,7 +74,7 @@ fun CalendarScreen(viewModel: CalendarViewModel, onFinish: () -> Unit) {
                 navigationIcon = {
                     IconButton(onClick = {
                         if (selectedDate != null) {
-                            selectedDate = null
+                            viewModel.selectDate(null)
                         } else {
                             onFinish()
                         }
@@ -101,27 +97,21 @@ fun CalendarScreen(viewModel: CalendarViewModel, onFinish: () -> Unit) {
                             DropdownMenuItem(
                                 text = { Text("Tagesansicht") },
                                 onClick = {
-                                    numberOfDays = 1
-                                    selectedDate = null
+                                    viewModel.setNumberOfDays(1)
                                     showMenu = false
                                 }
                             )
                             DropdownMenuItem(
                                 text = { Text("3-Tages-Ansicht") },
                                 onClick = {
-                                    numberOfDays = 3
-                                    selectedDate = null
+                                    viewModel.setNumberOfDays(3)
                                     showMenu = false
                                 }
                             )
                             DropdownMenuItem(
                                 text = { Text("Wochenansicht") },
                                 onClick = {
-                                    numberOfDays = 7
-                                    selectedDate = null
-                                    // Adjust date to the start of the week when switching to week view
-                                    val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
-                                    currentDate = currentDate.with(firstDayOfWeek)
+                                    viewModel.setNumberOfDays(7)
                                     showMenu = false
                                 }
                             )
@@ -138,17 +128,10 @@ fun CalendarScreen(viewModel: CalendarViewModel, onFinish: () -> Unit) {
             currentDate = currentDate,
             selectedDate = selectedDate,
             onDayClick = { date ->
-                // If a day is clicked, switch to single-day view
-                selectedDate = date
+                viewModel.selectDate(date)
             },
-            onNextWeek = {
-                currentDate = currentDate.plusDays(numberOfDays.toLong())
-                 selectedDate = null
-            },
-            onPreviousWeek = {
-                currentDate = currentDate.minusDays(numberOfDays.toLong())
-                 selectedDate = null
-            }
+            onNextWeek = viewModel::navigateNext,
+            onPreviousWeek = viewModel::navigatePrevious
         )
     }
 }

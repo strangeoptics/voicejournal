@@ -11,7 +11,7 @@ import java.util.UUID
 
 @Database(
     entities = [JournalEntry::class, Category::class, GpsTrackPoint::class, JournalEntryCategoryCrossRef::class],
-    version = 16,
+    version = 17,
     exportSchema = true
 )
 @TypeConverters(UuidConverter::class)
@@ -246,6 +246,23 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_journal_entries_deletedAt_start_datetime` ON `journal_entries` (`deletedAt`, `start_datetime`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_journal_entries_start_datetime` ON `journal_entries` (`start_datetime`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_journal_entries_stop_datetime` ON `journal_entries` (`stop_datetime`)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_gps_track_points_timestamp` ON `gps_track_points` (`timestamp`)"
+                )
+            }
+        }
+
         val ALL_MIGRATIONS = arrayOf(
             MIGRATION_1_2,
             MIGRATION_2_3,
@@ -261,7 +278,8 @@ abstract class AppDatabase : RoomDatabase() {
             MIGRATION_12_13,
             MIGRATION_13_14,
             MIGRATION_14_15,
-            MIGRATION_15_16
+            MIGRATION_15_16,
+            MIGRATION_16_17
         )
 
         fun getDatabase(context: Context): AppDatabase {

@@ -27,6 +27,7 @@ import java.util.regex.Pattern
 object JournalConstants {
     const val CATEGORY_DELETED_ID = -1
     const val CATEGORY_DELETED_NAME = "Gelöscht"
+    const val SQLITE_MAX_BIND_PARAMS = 900
 
     fun isVirtualDeletedCategory(category: Category): Boolean {
         return category.id == CATEGORY_DELETED_ID ||
@@ -118,7 +119,15 @@ class JournalRepository(
 
     suspend fun getEntryById(entryId: UUID): EntryWithCategories? = entryDao.getEntryById(entryId)
 
-    suspend fun getEntriesByIds(ids: Set<UUID>): List<EntryWithCategories> = entryDao.getEntriesByIds(ids)
+    suspend fun getEntriesByIds(ids: Set<UUID>): List<EntryWithCategories> {
+        if (ids.isEmpty()) return emptyList()
+        if (ids.size <= JournalConstants.SQLITE_MAX_BIND_PARAMS) {
+            return entryDao.getEntriesByIds(ids)
+        }
+        return ids.chunked(JournalConstants.SQLITE_MAX_BIND_PARAMS)
+            .flatMap { chunk -> entryDao.getEntriesByIds(chunk) }
+            .sortedBy { it.entry.start_datetime }
+    }
 
     private suspend fun ensureCategoryExists(exportedCategory: Category) {
         if (JournalConstants.isVirtualDeletedCategory(exportedCategory) ||
@@ -353,9 +362,28 @@ class JournalRepository(
     suspend fun delete(entry: JournalEntry) {
         entryDao.softDelete(entry.id, System.currentTimeMillis())
     }
-    
+
+    suspend fun deleteEntries(ids: Set<UUID>) {
+        if (ids.isEmpty()) return
+        val timestamp = System.currentTimeMillis()
+        database.withTransaction {
+            ids.chunked(JournalConstants.SQLITE_MAX_BIND_PARAMS).forEach { chunk ->
+                entryDao.softDeleteByIds(chunk, timestamp)
+            }
+        }
+    }
+
     suspend fun hardDelete(entry: JournalEntry) {
         entryDao.hardDeleteById(entry.id)
+    }
+
+    suspend fun hardDeleteEntries(ids: Set<UUID>) {
+        if (ids.isEmpty()) return
+        database.withTransaction {
+            ids.chunked(JournalConstants.SQLITE_MAX_BIND_PARAMS).forEach { chunk ->
+                entryDao.hardDeleteByIds(chunk)
+            }
+        }
     }
 
     suspend fun restoreLatestDeletedEntry() {
@@ -367,6 +395,15 @@ class JournalRepository(
 
     suspend fun restoreEntry(id: UUID) {
         entryDao.restoreEntry(id)
+    }
+
+    suspend fun restoreEntries(ids: Set<UUID>) {
+        if (ids.isEmpty()) return
+        database.withTransaction {
+            ids.chunked(JournalConstants.SQLITE_MAX_BIND_PARAMS).forEach { chunk ->
+                entryDao.restoreByIds(chunk)
+            }
+        }
     }
 
     fun getDeletedEntriesCount(): Flow<Int> = entryDao.getDeletedEntriesCount()

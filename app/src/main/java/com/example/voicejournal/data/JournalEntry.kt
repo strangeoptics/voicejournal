@@ -1,12 +1,20 @@
 package com.example.voicejournal.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import kotlinx.serialization.Serializable
 import java.util.UUID
 
 @Serializable
-@Entity(tableName = "journal_entries")
+@Entity(
+    tableName = "journal_entries",
+    indices = [
+        Index(value = ["deletedAt", "start_datetime"]),
+        Index(value = ["start_datetime"]),
+        Index(value = ["stop_datetime"])
+    ]
+)
 data class JournalEntry(
     @PrimaryKey
     @Serializable(with = UuidSerializer::class)

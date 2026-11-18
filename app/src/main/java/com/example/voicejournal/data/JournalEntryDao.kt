@@ -8,24 +8,27 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import java.util.Locale
 import java.util.UUID
 
 @Dao
 interface JournalEntryDao {
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL ORDER BY start_datetime DESC")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL ORDER BY start_datetime DESC, id DESC")
     fun getEntriesWithCategories(): Flow<List<EntryWithCategories>>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL ORDER BY start_datetime DESC")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL ORDER BY start_datetime DESC, id DESC")
     fun getEntriesPagingSource(): PagingSource<Int, EntryWithCategories>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL AND id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL AND id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) ORDER BY start_datetime DESC, id DESC")
     fun getEntriesPagingSourceForCategory(categoryId: Int): PagingSource<Int, EntryWithCategories>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC")
+    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC, id DESC")
     fun getDeletedEntriesPagingSource(): PagingSource<Int, EntryWithCategories>
 
     @Transaction
@@ -62,7 +65,7 @@ interface JournalEntryDao {
 
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE id IN (:ids) ORDER BY start_datetime ASC")
-    suspend fun getEntriesByIds(ids: Set<UUID>): List<EntryWithCategories>
+    suspend fun getEntriesByIds(ids: Collection<UUID>): List<EntryWithCategories>
 
     @Transaction
     @Query("""
@@ -101,11 +104,20 @@ interface JournalEntryDao {
     @Query("UPDATE journal_entries SET deletedAt = :timestamp WHERE id = :id")
     suspend fun softDelete(id: UUID, timestamp: Long)
 
+    @Query("UPDATE journal_entries SET deletedAt = :timestamp WHERE id IN (:ids)")
+    suspend fun softDeleteByIds(ids: Collection<UUID>, timestamp: Long)
+
     @Query("DELETE FROM journal_entries WHERE id = :id")
     suspend fun hardDeleteById(id: UUID)
 
+    @Query("DELETE FROM journal_entries WHERE id IN (:ids)")
+    suspend fun hardDeleteByIds(ids: Collection<UUID>)
+
     @Query("UPDATE journal_entries SET deletedAt = NULL WHERE id = :id")
     suspend fun restoreEntry(id: UUID)
+
+    @Query("UPDATE journal_entries SET deletedAt = NULL WHERE id IN (:ids)")
+    suspend fun restoreByIds(ids: Collection<UUID>)
 
     @Transaction
     @Query("SELECT * FROM journal_entries WHERE deletedAt IS NOT NULL ORDER BY deletedAt DESC LIMIT 1")
@@ -174,15 +186,73 @@ interface JournalEntryDao {
     fun getEntriesWithCategoriesInDateRange(startDateMillis: Long, endDateMillis: Long): Flow<List<EntryWithCategories>>
 
     @Transaction
-    @Query("SELECT * FROM journal_entries WHERE deletedAt IS NULL AND LOWER(content) LIKE '%' || LOWER(:query) || '%' ORDER BY start_datetime DESC")
-    fun searchEntries(query: String): Flow<List<EntryWithCategories>>
+    @Query("""
+        SELECT * FROM journal_entries
+        WHERE deletedAt IS NULL
+          AND LOWER(
+              REPLACE(
+                  REPLACE(
+                      REPLACE(
+                          REPLACE(content, 'Ä', 'ä'),
+                      'Ö', 'ö'),
+                  'Ü', 'ü'),
+              'ẞ', 'ß')
+          ) LIKE '%' || :normalizedEscapedQuery || '%' ESCAPE '\'
+        ORDER BY start_datetime DESC, id DESC
+    """)
+    fun searchEntriesNormalized(normalizedEscapedQuery: String): Flow<List<EntryWithCategories>>
 
-    @Query("SELECT COUNT(*) FROM journal_entries WHERE deletedAt IS NULL AND start_datetime > (SELECT start_datetime FROM journal_entries WHERE id = :entryId)")
+    fun searchEntries(query: String): Flow<List<EntryWithCategories>> {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return flowOf(emptyList())
+
+        val lowered = trimmed.lowercase(Locale.GERMAN).replace("ẞ", "ß")
+        val hasUnsupportedNonAscii = lowered.any { ch -> ch.code > 127 && ch !in "äöüß" }
+        if (hasUnsupportedNonAscii) {
+            return getEntriesWithCategories().map { entries ->
+                entries.filter { it.entry.content.contains(trimmed, ignoreCase = true) }
+            }
+        }
+
+        val escaped = buildString(lowered.length) {
+            for (ch in lowered) {
+                when (ch) {
+                    '\\', '%', '_' -> {
+                        append('\\')
+                        append(ch)
+                    }
+                    else -> append(ch)
+                }
+            }
+        }
+        return searchEntriesNormalized(escaped)
+    }
+
+    @Query("""
+        SELECT COUNT(*) FROM journal_entries AS je,
+            (SELECT start_datetime, id FROM journal_entries WHERE id = :entryId AND deletedAt IS NULL) AS target
+        WHERE je.deletedAt IS NULL
+          AND (je.start_datetime > target.start_datetime
+               OR (je.start_datetime = target.start_datetime AND je.id > target.id))
+    """)
     suspend fun getPositionOfEntry(entryId: UUID): Int
 
-    @Query("SELECT COUNT(*) FROM journal_entries WHERE deletedAt IS NULL AND id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId) AND start_datetime > (SELECT start_datetime FROM journal_entries WHERE id = :entryId)")
+    @Query("""
+        SELECT COUNT(*) FROM journal_entries AS je,
+            (SELECT start_datetime, id FROM journal_entries WHERE id = :entryId AND deletedAt IS NULL) AS target
+        WHERE je.deletedAt IS NULL
+          AND je.id IN (SELECT entryId FROM journal_entry_category_cross_ref WHERE categoryId = :categoryId)
+          AND (je.start_datetime > target.start_datetime
+               OR (je.start_datetime = target.start_datetime AND je.id > target.id))
+    """)
     suspend fun getPositionOfEntryInCategory(entryId: UUID, categoryId: Int): Int
 
-    @Query("SELECT COUNT(*) FROM journal_entries WHERE deletedAt IS NOT NULL AND start_datetime > (SELECT start_datetime FROM journal_entries WHERE id = :entryId)")
+    @Query("""
+        SELECT COUNT(*) FROM journal_entries AS je,
+            (SELECT deletedAt, id FROM journal_entries WHERE id = :entryId AND deletedAt IS NOT NULL) AS target
+        WHERE je.deletedAt IS NOT NULL
+          AND (je.deletedAt > target.deletedAt
+               OR (je.deletedAt = target.deletedAt AND je.id > target.id))
+    """)
     suspend fun getPositionOfDeletedEntry(entryId: UUID): Int
 }

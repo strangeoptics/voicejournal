@@ -309,9 +309,9 @@ class MainViewModel(
     }
 
     fun deleteEntries(ids: Set<UUID>) {
+        if (ids.isEmpty()) return
         viewModelScope.launch {
-            val entries = repository.getEntriesByIds(ids)
-            entries.forEach { repository.delete(it.entry) }
+            repository.deleteEntries(ids)
             _selectedEntryIds.value = emptySet()
             _refreshTrigger.emit(Unit)
         }
@@ -325,10 +325,10 @@ class MainViewModel(
     }
 
     fun hardDeleteEntries(ids: Set<UUID>) {
+        if (ids.isEmpty()) return
         viewModelScope.launch {
             if (JournalConstants.isVirtualDeletedName(_selectedCategory.value)) {
-                val entries = repository.getEntriesByIds(ids)
-                entries.forEach { repository.hardDelete(it.entry) }
+                repository.hardDeleteEntries(ids)
                 _selectedEntryIds.value = emptySet()
                 _refreshTrigger.emit(Unit)
             }
@@ -336,9 +336,10 @@ class MainViewModel(
     }
 
     fun restoreEntries(ids: Set<UUID>) {
+        if (ids.isEmpty()) return
         viewModelScope.launch {
             if (JournalConstants.isVirtualDeletedName(_selectedCategory.value)) {
-                ids.forEach { repository.restoreEntry(it) }
+                repository.restoreEntries(ids)
                 _selectedEntryIds.value = emptySet()
                 _refreshTrigger.emit(Unit)
             }

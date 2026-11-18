@@ -10,7 +10,7 @@ data class JournalEntryDto(
     val id: UUID,
     val content: String,
     val start_datetime: Long,
-    var stop_datetime: Long? = null,
+    val stop_datetime: Long? = null,
     val hasImage: Boolean,
     val checked: Boolean = false,
     val categoryIds: List<Int>,
@@ -21,7 +21,7 @@ data class JournalEntryDto(
 data class CreateJournalEntryDto(
     val content: String,
     val start_datetime: Long,
-    var stop_datetime: Long? = null,
+    val stop_datetime: Long? = null,
     val hasImage: Boolean,
     val checked: Boolean = false,
     val categoryIds: List<Int>,

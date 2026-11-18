@@ -27,10 +27,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.voicejournal.EditEntryActivity
 import com.example.voicejournal.data.JournalEntry
+import com.example.voicejournal.util.DateFormatters
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import java.time.temporal.WeekFields
 import java.util.*
 import kotlin.math.abs
@@ -249,7 +249,7 @@ fun WeekView(
                         contentAlignment = androidx.compose.ui.Alignment.TopEnd // Align hour text to top right
                     ) {
                         Text(
-                            text = hour.format(DateTimeFormatter.ofPattern("HH:mm")),
+                            text = hour.format(DateFormatters.TIME_HM),
                             fontSize = 10.sp
                         )
                     }

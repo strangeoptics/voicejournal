@@ -26,7 +26,7 @@ data class JournalEntry(
     val id: UUID = UUID.randomUUID(),
     val content: String,
     val start_datetime: Long,
-    var stop_datetime: Long? = null,
+    val stop_datetime: Long? = null,
     val hasImage: Boolean = false,
     val checked: Boolean = false,
     val deletedAt: Long? = null,

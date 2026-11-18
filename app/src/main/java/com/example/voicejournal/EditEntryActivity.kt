@@ -39,13 +39,13 @@ import androidx.lifecycle.lifecycleScope
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.di.Injector
 import com.example.voicejournal.ui.components.TimeZonePickerDialog
-import com.example.voicejournal.ui.components.public
+import com.example.voicejournal.ui.components.PublicIcon
 import com.example.voicejournal.ui.theme.VoicejournalTheme
+import com.example.voicejournal.util.DateFormatters
 import com.example.voicejournal.util.SpeechRecognitionManager
 import com.example.voicejournal.util.TimeZoneUtils
 import java.time.Instant
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 class EditEntryActivity : ComponentActivity() {
@@ -456,7 +456,7 @@ fun EditEntryScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OutlinedTextField(
-                    value = startDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+                    value = startDateTime.format(DateFormatters.ISO_DATE),
                     onValueChange = {},
                     label = { Text("Start Date") },
                     readOnly = true,
@@ -465,7 +465,7 @@ fun EditEntryScreen(
                     trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = "Select Start Date") }
                 )
                 OutlinedTextField(
-                    value = startDateTime.format(DateTimeFormatter.ofPattern("HH:mm")),
+                    value = startDateTime.format(DateFormatters.TIME_HM),
                     onValueChange = {},
                     label = { Text("Start Time") },
                     readOnly = true,
@@ -481,7 +481,7 @@ fun EditEntryScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
-                    value = stopDateTime?.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) ?: "",
+                    value = stopDateTime?.format(DateFormatters.ISO_DATE) ?: "",
                     onValueChange = {},
                     label = { Text("Stop Date") },
                     readOnly = true,
@@ -490,7 +490,7 @@ fun EditEntryScreen(
                     trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = "Select Stop Date") }
                 )
                 OutlinedTextField(
-                    value = stopDateTime?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "",
+                    value = stopDateTime?.format(DateFormatters.TIME_HM) ?: "",
                     onValueChange = {},
                     label = { Text("Stop Time") },
                     readOnly = true,
@@ -522,7 +522,7 @@ fun EditEntryScreen(
                 readOnly = true,
                 modifier = Modifier.fillMaxWidth(),
                 interactionSource = timeZoneInteractionSource,
-                trailingIcon = { Icon(public, contentDescription = "Select Time Zone") }
+                trailingIcon = { Icon(PublicIcon, contentDescription = "Select Time Zone") }
             )
 
             Spacer(modifier = Modifier.height(16.dp))

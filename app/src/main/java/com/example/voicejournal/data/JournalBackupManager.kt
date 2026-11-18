@@ -3,6 +3,7 @@ package com.example.voicejournal.data
 import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
+import com.example.voicejournal.util.DateFormatters
 import com.example.voicejournal.util.TimeZoneUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -21,7 +22,6 @@ import java.io.IOException
 import java.io.InputStream
 import java.time.LocalDateTime
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.regex.Pattern
 
 internal enum class BackupJsonFormat {
@@ -53,9 +53,7 @@ class JournalBackupManager(
         const val MAX_SHARED_IMPORT_BYTES = 10L * 1024L * 1024L // 10 MB
 
         private val LEGACY_LINE_PATTERN: Pattern =
-            Pattern.compile("\\[(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})\\] (.*)")
-        private val LEGACY_DATE_FORMATTER: DateTimeFormatter =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+            Pattern.compile("\\[(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})] (.*)")
 
         internal fun readBoundedUtf8(
             inputStream: InputStream,
@@ -242,7 +240,7 @@ class JournalBackupManager(
             if (matcher.matches()) {
                 val dateTimeString = matcher.group(1) ?: return@forEach
                 val contentString = matcher.group(2) ?: ""
-                val startDatetime = LocalDateTime.parse(dateTimeString, LEGACY_DATE_FORMATTER)
+                val startDatetime = LocalDateTime.parse(dateTimeString, DateFormatters.LEGACY_TEXT_EXPORT)
                     .atZone(defaultZone)
                     .toInstant()
                     .toEpochMilli()

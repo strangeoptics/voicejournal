@@ -6,6 +6,7 @@ import com.example.voicejournal.data.JournalBackupManager
 import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.SpeechService
 import com.example.voicejournal.util.SpeechRecognitionManager
+import com.example.voicejournal.util.TimeZoneUtils
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -14,6 +15,8 @@ import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 class ExampleUnitTest {
 
@@ -192,5 +195,28 @@ class ExampleUnitTest {
 
         assertEquals("", SpeechRecognitionManager.parseGoogleSpeechTranscript("""{}"""))
         assertEquals("", SpeechRecognitionManager.parseGoogleSpeechTranscript("""{"results":[]}"""))
+    }
+
+    @Test
+    fun formatEntryDateTimeText_formatsSameAndCrossTimeZoneEntriesCorrectly() {
+        val berlin = ZoneId.of("Europe/Berlin")
+        val tokyo = ZoneId.of("Asia/Tokyo")
+        val startMillis = LocalDateTime.of(2026, 1, 15, 9, 30)
+            .atZone(tokyo)
+            .toInstant()
+            .toEpochMilli()
+        val stopMillis = LocalDateTime.of(2026, 1, 15, 11, 0)
+            .atZone(tokyo)
+            .toInstant()
+            .toEpochMilli()
+
+        assertEquals(
+            "15.01.2026 09:30 - 11:00",
+            TimeZoneUtils.formatEntryDateTimeText(startMillis, stopMillis, entryZone = tokyo, viewerZone = tokyo)
+        )
+        assertEquals(
+            "15.01.2026 09:30 - 11:00 (UTC+9)",
+            TimeZoneUtils.formatEntryDateTimeText(startMillis, stopMillis, entryZone = tokyo, viewerZone = berlin)
+        )
     }
 }

@@ -10,12 +10,12 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 @Suppress("CheckReturnValue")
-public val public: ImageVector
+val PublicIcon: ImageVector
   get() {
-    if (_public != null) {
-      return _public!!
+    if (_publicIcon != null) {
+      return _publicIcon!!
     }
-    _public =
+    _publicIcon =
       ImageVector.Builder(
           name = "public",
           defaultWidth = 24.dp,
@@ -89,7 +89,7 @@ public val public: ImageVector
           }
         }
         .build()
-    return _public!!
+    return _publicIcon!!
   }
 
-private var _public: ImageVector? = null
+private var _publicIcon: ImageVector? = null

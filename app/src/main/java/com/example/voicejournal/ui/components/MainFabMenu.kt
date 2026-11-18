@@ -20,7 +20,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.voicejournal.R
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -44,7 +46,7 @@ fun MainFabMenu(
                         onCreateManualEntryClicked()
                     }
                 ) {
-                    Icon(Icons.Filled.Create, contentDescription = "Create Entry Manually")
+                    Icon(Icons.Filled.Create, contentDescription = stringResource(R.string.fab_create_manual))
                 }
                 FloatingActionButton(
                     onClick = {
@@ -52,7 +54,7 @@ fun MainFabMenu(
                         onStartVoiceEntryClicked()
                     }
                 ) {
-                    Icon(Icons.Filled.Mic, contentDescription = "Sprechen")
+                    Icon(Icons.Filled.Mic, contentDescription = stringResource(R.string.fab_speak))
                 }
             }
         }
@@ -74,9 +76,9 @@ fun MainFabMenu(
                 contentAlignment = Alignment.Center
             ) {
                 when {
-                    isRecording -> Icon(Icons.Filled.Stop, contentDescription = "Stop recording")
-                    isExpanded -> Icon(Icons.Filled.Close, contentDescription = "Close Menu")
-                    else -> Icon(Icons.Filled.Add, contentDescription = "Add Entry")
+                    isRecording -> Icon(Icons.Filled.Stop, contentDescription = stringResource(R.string.fab_stop_recording))
+                    isExpanded -> Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.fab_close_menu))
+                    else -> Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.fab_add_entry))
                 }
             }
         }

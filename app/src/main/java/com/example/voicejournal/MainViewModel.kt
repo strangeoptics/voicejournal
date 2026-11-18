@@ -16,9 +16,8 @@ import com.example.voicejournal.data.JournalRepository
 import com.example.voicejournal.data.SettingsRepository
 import com.example.voicejournal.data.SpeechService
 import com.example.voicejournal.data.resolvedZoneId
-import com.example.voicejournal.data.startLocalDateTime
-import com.example.voicejournal.data.stopLocalDateTime
 import com.example.voicejournal.di.Injector
+import com.example.voicejournal.util.DateFormatters
 import com.example.voicejournal.util.TimeZoneUtils
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -36,7 +35,6 @@ import kotlinx.serialization.json.Json
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 
@@ -225,26 +223,15 @@ class MainViewModel(
     }
 
     private fun formatEntriesAsText(entries: List<EntryWithCategories>): String {
-        val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm", Locale.getDefault())
         val viewerZone = ZoneId.systemDefault()
         return entries.joinToString(separator = "\n\n") { entryWithCats ->
             val entry = entryWithCats.entry
-            val entryZone = entry.resolvedZoneId(viewerZone)
-            val start = entry.startLocalDateTime(viewerZone)
-            val stop = entry.stopLocalDateTime(viewerZone)
-            val baseTimeText = if (stop != null) {
-                "${start.format(formatter)} - ${stop.format(DateTimeFormatter.ofPattern("HH:mm"))}"
-            } else {
-                start.format(formatter)
-            }
-            val startInstant = java.time.Instant.ofEpochMilli(entry.start_datetime)
-            val entryOffset = entryZone.rules.getOffset(startInstant)
-            val viewerOffset = viewerZone.rules.getOffset(startInstant)
-            val timeText = if (entryOffset != viewerOffset) {
-                "$baseTimeText (${TimeZoneUtils.formatUtcOffset(entryOffset)})"
-            } else {
-                baseTimeText
-            }
+            val timeText = TimeZoneUtils.formatEntryDateTimeText(
+                startMillis = entry.start_datetime,
+                stopMillis = entry.stop_datetime,
+                entryZone = entry.resolvedZoneId(viewerZone),
+                viewerZone = viewerZone
+            )
             "[$timeText]\n${entry.content}"
         }
     }
@@ -375,8 +362,7 @@ class MainViewModel(
         viewModelScope.launch {
             val defaultZone = ZoneId.systemDefault()
             fun startDatetimeFromString(dateTimeString: String): Long {
-                val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
-                val localDateTime = java.time.LocalDateTime.parse(dateTimeString, formatter)
+                val localDateTime = java.time.LocalDateTime.parse(dateTimeString, DateFormatters.ISO_LOCAL_DATE_TIME_SECONDS)
                 return localDateTime.atZone(defaultZone).toInstant().toEpochMilli()
             }
 

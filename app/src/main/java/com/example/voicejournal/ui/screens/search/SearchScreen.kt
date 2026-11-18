@@ -27,15 +27,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.example.voicejournal.EditEntryActivity
 import com.example.voicejournal.MainActivity
+import com.example.voicejournal.R
 import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.data.localDate
 import com.example.voicejournal.ui.components.JournalEntryItem
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import com.example.voicejournal.util.DateFormatters
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,10 +51,10 @@ fun SearchScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Search") },
+                title = { Text(stringResource(R.string.title_activity_search)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateUp) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.nav_back))
                     }
                 }
             )
@@ -69,14 +70,14 @@ fun SearchScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = viewModel::onSearchQueryChange,
-                label = { Text("Search") },
+                label = { Text(stringResource(R.string.drawer_search)) },
                 modifier = Modifier.fillMaxWidth(),
                 trailingIcon = {
                     IconButton(onClick = {
                         viewModel.onSearchClicked()
                         keyboardController?.hide()
                     }) {
-                        Icon(Icons.Default.Search, contentDescription = "Search")
+                        Icon(Icons.Default.Search, contentDescription = stringResource(R.string.drawer_search))
                     }
                 },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -102,7 +103,7 @@ fun SearchResultsList(entries: List<EntryWithCategories>) {
         groupedEntries.forEach { (date, entriesOnDate) ->
             item(key = "header_$date") {
                 Text(
-                    text = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd, EE", Locale.GERMAN)),
+                    text = date.format(DateFormatters.DAY_HEADER_GERMAN),
                     modifier = Modifier.padding(8.dp)
                 )
             }

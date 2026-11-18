@@ -5,7 +5,6 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object TimeZoneUtils {
@@ -15,8 +14,6 @@ object TimeZoneUtils {
      * padded to 15 hours to safely bound SQLite UTC millisecond range queries for a [LocalDate].
      */
     const val MAX_UTC_OFFSET_HOURS = 15L
-
-    private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
     fun resolveZoneId(zoneId: String?, fallback: ZoneId = ZoneId.systemDefault()): ZoneId {
         if (zoneId.isNullOrBlank()) return fallback
@@ -58,13 +55,44 @@ object TimeZoneUtils {
         val startLocal = LocalDateTime.ofInstant(startInstant, entryZone)
         val baseText = if (stopMillis != null) {
             val stopLocal = LocalDateTime.ofInstant(Instant.ofEpochMilli(stopMillis), entryZone)
-            "${startLocal.format(timeFormatter)} - ${stopLocal.format(timeFormatter)}"
+            "${startLocal.format(DateFormatters.TIME_HM)} - ${stopLocal.format(DateFormatters.TIME_HM)}"
         } else {
-            startLocal.format(timeFormatter)
+            startLocal.format(DateFormatters.TIME_HM)
         }
 
-        val entryOffset = entryZone.rules.getOffset(startInstant)
-        val viewerOffset = viewerZone.rules.getOffset(startInstant)
+        return appendOffsetIfDifferent(baseText, startInstant, entryZone, viewerZone)
+    }
+
+    /**
+     * Formats full date and time (`dd.MM.yyyy HH:mm`, optionally `- HH:mm`) in [entryZone],
+     * appending the entry's UTC offset when it differs from [viewerZone] at [startMillis].
+     */
+    fun formatEntryDateTimeText(
+        startMillis: Long,
+        stopMillis: Long? = null,
+        entryZone: ZoneId,
+        viewerZone: ZoneId = ZoneId.systemDefault()
+    ): String {
+        val startInstant = Instant.ofEpochMilli(startMillis)
+        val startLocal = LocalDateTime.ofInstant(startInstant, entryZone)
+        val baseText = if (stopMillis != null) {
+            val stopLocal = LocalDateTime.ofInstant(Instant.ofEpochMilli(stopMillis), entryZone)
+            "${startLocal.format(DateFormatters.ENTRY_DATE_TIME)} - ${stopLocal.format(DateFormatters.TIME_HM)}"
+        } else {
+            startLocal.format(DateFormatters.ENTRY_DATE_TIME)
+        }
+
+        return appendOffsetIfDifferent(baseText, startInstant, entryZone, viewerZone)
+    }
+
+    private fun appendOffsetIfDifferent(
+        baseText: String,
+        instant: Instant,
+        entryZone: ZoneId,
+        viewerZone: ZoneId
+    ): String {
+        val entryOffset = entryZone.rules.getOffset(instant)
+        val viewerOffset = viewerZone.rules.getOffset(instant)
         return if (entryOffset != viewerOffset) {
             "$baseText (${formatUtcOffset(entryOffset)})"
         } else {

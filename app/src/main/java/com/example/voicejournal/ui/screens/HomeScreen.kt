@@ -34,9 +34,8 @@ import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.data.localDate
 import com.example.voicejournal.ui.components.FastScroller
 import com.example.voicejournal.ui.components.JournalEntryItem
+import com.example.voicejournal.util.DateFormatters
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -145,7 +144,7 @@ fun HomeScreen(
                                 color = if (isDateSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
                             ) {
                                 Text(
-                                    text = currentDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd, EE", Locale.GERMAN)),
+                                    text = currentDate.format(DateFormatters.DAY_HEADER_GERMAN),
                                     modifier = Modifier.padding(8.dp)
                                 )
                             }

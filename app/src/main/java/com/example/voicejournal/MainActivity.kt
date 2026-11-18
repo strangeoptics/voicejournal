@@ -44,13 +44,13 @@ import com.example.voicejournal.ui.components.TimeZonePickerDialog
 import com.example.voicejournal.ui.screens.HomeScreen
 import com.example.voicejournal.ui.screens.search.SearchActivity
 import com.example.voicejournal.ui.theme.VoicejournalTheme
+import com.example.voicejournal.util.DateFormatters
 import com.example.voicejournal.util.NotificationHelper
 import com.example.voicejournal.util.ShareExportHelper
 import com.example.voicejournal.util.SpeechRecognitionManager
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 
@@ -300,8 +300,7 @@ class MainActivity : ComponentActivity() {
                             },
                             onExportJournalClicked = {
                                 scope.launch { drawerState.close() }
-                                val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmm")
-                                val fileName = "journal_${LocalDateTime.now().format(formatter)}.json"
+                                val fileName = "journal_${LocalDateTime.now().format(DateFormatters.EXPORT_FILE_TIMESTAMP)}.json"
                                 exportLauncher.launch(fileName)
                             },
                             onShowNotificationClicked = {
@@ -491,7 +490,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openGooglePhotos(date: LocalDate) {
-        val formatter = DateTimeFormatter.ofPattern("d. MMMM yyyy", Locale.getDefault())
+        val formatter = DateFormatters.googlePhotosQuery(Locale.getDefault())
         val url = "https://photos.google.com/search/${date.format(formatter)}"
         val intent = Intent(Intent.ACTION_VIEW, url.toUri())
         try {

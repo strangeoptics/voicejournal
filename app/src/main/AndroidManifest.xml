@@ -52,7 +52,7 @@
             android:name=".ui.screens.importexport.ImportActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:label="Einträge importieren"
+            android:label="@string/title_activity_import"
             android:theme="@style/Theme.Voicejournal">
 
             <!-- Filter für Öffnen (ACTION_VIEW) von content://-URIs mit VJ-MimeType -->
@@ -133,11 +133,11 @@
         <activity
             android:name=".CalendarActivity"
             android:exported="false"
-            android:label="Calendar" />
+            android:label="@string/title_activity_calendar" />
         <activity
             android:name=".ui.screens.search.SearchActivity"
             android:exported="false"
-            android:label="Search" />
+            android:label="@string/title_activity_search" />
 
         <service
             android:name=".WebServerService"

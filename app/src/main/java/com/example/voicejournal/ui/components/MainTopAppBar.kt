@@ -28,6 +28,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
+import com.example.voicejournal.R
 import com.example.voicejournal.data.EntryWithCategories
 import java.util.UUID
 
@@ -60,19 +62,19 @@ fun MainTopAppBar(
     TopAppBar(
         title = {
             if (isMultiSelectActive) {
-                Text("${selectedEntryIds.size} ausgewählt")
+                Text(stringResource(R.string.selection_count, selectedEntryIds.size))
             } else {
-                Text("Voice Journal")
+                Text(stringResource(R.string.app_name))
             }
         },
         navigationIcon = {
             if (isMultiSelectActive) {
                 IconButton(onClick = onClearSelection) {
-                    Icon(Icons.Filled.Close, contentDescription = "Auswahl aufheben")
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.action_clear_selection))
                 }
             } else {
                 IconButton(onClick = onOpenDrawer) {
-                    Icon(Icons.Filled.MoreVert, contentDescription = "Navigation Menu")
+                    Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.nav_open_menu))
                 }
             }
         },
@@ -80,32 +82,32 @@ fun MainTopAppBar(
             if (isMultiSelectActive) {
                 if (selectedEntryIds.size == 1) {
                     IconButton(onClick = { onEditEntryById(selectedEntryIds.first()) }) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Eintrag bearbeiten")
+                        Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit_entry))
                     }
                 }
 
                 IconButton(onClick = onChangeTimeZoneClicked) {
-                    Icon(public, contentDescription = "Zeitzone ändern")
+                    Icon(PublicIcon, contentDescription = stringResource(R.string.action_change_timezone))
                 }
 
                 var shareMenuExpanded by remember { mutableStateOf(false) }
                 Box {
                     IconButton(onClick = { shareMenuExpanded = true }) {
-                        Icon(Icons.Filled.Share, contentDescription = "Teilen")
+                        Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.action_share))
                     }
                     DropdownMenu(
                         expanded = shareMenuExpanded,
                         onDismissRequest = { shareMenuExpanded = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Als Text teilen") },
+                            text = { Text(stringResource(R.string.action_share_as_text)) },
                             onClick = {
                                 shareMenuExpanded = false
                                 onShareAsTextClicked()
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Als .vj Datei exportieren") },
+                            text = { Text(stringResource(R.string.action_export_as_vj)) },
                             onClick = {
                                 shareMenuExpanded = false
                                 onExportAsVjClicked()
@@ -116,20 +118,20 @@ fun MainTopAppBar(
 
                 if (isRecycleBinSelected) {
                     IconButton(onClick = onRestoreSelectedClicked) {
-                        Icon(Icons.Filled.Restore, contentDescription = "Einträge wiederherstellen")
+                        Icon(Icons.Filled.Restore, contentDescription = stringResource(R.string.action_restore_entries))
                     }
                     IconButton(onClick = onRequestHardDeleteSelectedClicked) {
-                        Icon(Icons.Filled.DeleteForever, contentDescription = "Endgültig löschen")
+                        Icon(Icons.Filled.DeleteForever, contentDescription = stringResource(R.string.action_hard_delete))
                     }
                 } else {
                     IconButton(onClick = onDeleteSelectedClicked) {
-                        Icon(Icons.Filled.Delete, contentDescription = "Einträge löschen")
+                        Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.action_delete_entries))
                     }
                 }
             } else {
                 if (selectedEntry != null) {
                     IconButton(onClick = { onEditSelectedSingleEntry(selectedEntry) }) {
-                        Icon(Icons.Filled.Edit, contentDescription = "Eintrag bearbeiten")
+                        Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.action_edit_entry))
                     }
                 }
                 IconButton(onClick = onToggleCategoryTagsClicked) {
@@ -139,21 +141,21 @@ fun MainTopAppBar(
                         } else {
                             Icons.AutoMirrored.Filled.LabelOff
                         },
-                        contentDescription = "Toggle Category Tags"
+                        contentDescription = stringResource(R.string.action_toggle_category_tags)
                     )
                 }
                 if (hasGpsTrackForSelectedDate) {
                     IconButton(onClick = onOpenGpsTrackClicked) {
-                        Icon(Icons.Filled.Map, contentDescription = "Show GPS Track on Map")
+                        Icon(Icons.Filled.Map, contentDescription = stringResource(R.string.action_show_gps_on_map))
                     }
                 }
                 if (canUndo) {
                     IconButton(onClick = onUndoDeleteClicked) {
-                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
+                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = stringResource(R.string.action_undo))
                     }
                 }
                 IconButton(onClick = onCopyToClipboardClicked) {
-                    Icon(Icons.Filled.ContentPaste, contentDescription = "In die Zwischenablage kopieren")
+                    Icon(Icons.Filled.ContentPaste, contentDescription = stringResource(R.string.action_copy_to_clipboard))
                 }
             }
         },

@@ -32,9 +32,6 @@ import com.example.voicejournal.data.JournalEntry
 import com.example.voicejournal.data.resolvedZoneId
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.TimeZoneUtils
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 class ImportActivity : ComponentActivity() {
 
@@ -307,19 +304,12 @@ fun SwipeableEntryItem(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
-                val entryZone = entry.resolvedZoneId()
-                val viewerZone = ZoneId.systemDefault()
-                val startInstant = Instant.ofEpochMilli(entry.start_datetime)
-                val baseDateText = startInstant.atZone(entryZone).format(formatter)
-                val entryOffset = entryZone.rules.getOffset(startInstant)
-                val viewerOffset = viewerZone.rules.getOffset(startInstant)
-                val dateText = if (entryOffset != viewerOffset) {
-                    "$baseDateText (${TimeZoneUtils.formatUtcOffset(entryOffset)})"
-                } else {
-                    baseDateText
-                }
-                
+                val dateText = TimeZoneUtils.formatEntryDateTimeText(
+                    startMillis = entry.start_datetime,
+                    stopMillis = null,
+                    entryZone = entry.resolvedZoneId()
+                )
+
                 Text(text = dateText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(

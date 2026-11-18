@@ -2,12 +2,12 @@
 
 voicejournal is an Android app for writing a personal voice-enabled journal/diary (`minSdk = 34`, `targetSdk = 36`).
 Each entry (`app/src/main/java/com/example/voicejournal/data/JournalEntry.kt`) can be assigned to one or more categories (`app/src/main/java/com/example/voicejournal/data/Category.kt`).
-The main view (`app/src/main/java/com/example/voicejournal/ui/screens/HomeScreen.kt`), hosted by `MainActivity`, displays entries grouped by day with Paging 3 (`androidx.paging`) and a custom `FastScroller` (`app/src/main/java/com/example/voicejournal/ui/components/FastScroller.kt`).
+The main view (`app/src/main/java/com/example/voicejournal/ui/screens/HomeScreen.kt`), hosted by `MainActivity` (with `MainTopAppBar` and `MainFabMenu`), displays entries grouped by day with Paging 3 (`androidx.paging`) and a custom `FastScroller` (`app/src/main/java/com/example/voicejournal/ui/components/FastScroller.kt`).
 
 ## Core Features
 
 ### Voice Dictation & Smart Categorization
-Texts dictated via `SpeechRecognitionManager` (supporting Android `SpeechRecognizer` or Google Cloud Speech-to-Text REST API) are saved as `JournalEntry` objects or appended to the selected entry.
+Texts dictated via `SpeechRecognitionManager` (supporting Android `SpeechRecognizer` or Google Cloud Speech-to-Text REST API via type-safe `SpeechService` enum) are saved as `JournalEntry` objects or appended to the selected entry.
 When creating a new entry via voice, the **first word** acts as a smart category trigger:
 - If the first word matches a real category name (`Category.category`) or one of its comma-separated aliases (`Category.aliases`, case-insensitive), the entry is assigned to that category and the trigger word is stripped from the entry text.
 - Virtual recycle-bin categories (`"Gelöscht"`, ID `-1`) are excluded from category matching and assignment.
@@ -17,12 +17,13 @@ When creating a new entry via voice, the **first word** acts as a smart category
 A persistent notification (`NotificationHelper`) provides a quick shortcut to trigger speech recognition (`ongoing`, `autoCancel(false)`), reusing `MainActivity` via `Intent.FLAG_ACTIVITY_SINGLE_TOP` and `onNewIntent`.
 
 ### Multi-Select, Clipboard & Sharing / Import-Export
-- **Multi-Select & Sharing**: Long-pressing entries opens a contextual action bar supporting plain-text sharing and `.vj` export (via an isolated `FileProvider` cache subdirectory `cacheDir/shared_exports/`).
-- **Import (`ImportActivity`)**: Accepts `ACTION_VIEW`/`ACTION_SEND` `.vj`/JSON files, validates stream size (max 10 MB) and payload schema in `ImportViewModel`, and imports entries transactionally without overwriting existing category assignments.
-- **Full Backup**: Supports V3 JSON export (`"wt"` write+truncate) and transactional V1/V2/V3/legacy text import in `JournalRepository`.
+- **Multi-Select & Sharing**: Long-pressing entries opens a contextual action bar (`MainTopAppBar`) supporting plain-text sharing and `.vj` export via `ShareExportHelper` (using an isolated `FileProvider` cache subdirectory `cacheDir/shared_exports/`).
+- **Import (`ImportActivity`)**: Accepts `ACTION_VIEW`/`ACTION_SEND` `.vj`/JSON files, validates stream size (max 10 MB via `JournalBackupManager.readBoundedUtf8`) and payload schema in `ImportViewModel`, and imports entries transactionally without overwriting existing category assignments.
+- **Full Backup (`JournalBackupManager`)**: Supports V3 JSON export (`"wt"` write+truncate) and transactional V1/V2/V3/legacy text import (max 50 MB) in `JournalBackupManager` (`app/src/main/java/com/example/voicejournal/data/JournalBackupManager.kt`), delegated from `JournalRepository`.
 
-### Resilient Entry & Category Editing (MVVM & State Management)
-`EditEntryActivity` (`EditEntryViewModel`) and `EditCategoryActivity` (`EditCategoryViewModel`) manage all editable state in `StateFlow`, preserve cursor/selection state via `TextFieldValue`, survive configuration changes, and await `NonCancellable` database persistence before navigating back.
+### Resilient Entry, Category & Settings Management (MVVM & State Management)
+`EditEntryActivity` (`EditEntryViewModel`), `EditCategoryActivity` (`EditCategoryViewModel`), `CategoryManagerActivity` (`CategoryManagerViewModel`), and `SettingsActivity` (`SettingsViewModel`) manage state in `StateFlow`, preserve cursor/selection state via `TextFieldValue`, survive configuration changes, and await `NonCancellable` database persistence before navigating back.
+User preferences, GPS worker scheduling, and encrypted Google Cloud API key access are centralized in `SettingsRepository` (`app/src/main/java/com/example/voicejournal/data/SettingsRepository.kt`).
 
 ### Background GPS Track Logging
 Optional periodic GPS track logging via `WorkManager` (`LocationWorker`, minimum 15-minute `PeriodicWorkRequest` interval) using `FusedLocationProviderClient` and Google Maps route preview (with automatic waypoint downsampling to respect Google Maps URL limits).
@@ -31,11 +32,12 @@ Optional periodic GPS track logging via `WorkManager` (`LocationWorker`, minimum
 
 ### Core Architecture & Dependency Injection
 - **Language:** **Kotlin** (`2.2.x`, Coroutines, `StateFlow`/`Flow`).
-- **Architecture Pattern:** **MVVM** with Android Jetpack ViewModels (`MainViewModel`, `EditEntryViewModel`, `EditCategoryViewModel`, `ImportViewModel`, `SearchViewModel`, `CalendarViewModel`).
+- **Architecture Pattern:** **MVVM** with Android Jetpack ViewModels (`MainViewModel`, `SettingsViewModel`, `CategoryManagerViewModel`, `EditEntryViewModel`, `EditCategoryViewModel`, `ImportViewModel`, `SearchViewModel`, `CalendarViewModel`).
 - **Dependency Injection:** **Manual DI** via the singleton service locator `Injector` (`app/src/main/java/com/example/voicejournal/di/Injector.kt`) and typed `ViewModelProvider.Factory` classes (Hilt is **not** used).
 
 ### User Interface (UI)
-- **UI Toolkit:** **Jetpack Compose** with **Material 3** (`1.4.0`), **Paging 3 Compose**, and **Compose Navigation**.
+- **UI Toolkit:** **Jetpack Compose** with **Material 3** (`1.4.0`) and **Paging 3 Compose**.
+- **Formatting & Localization:** Shared thread-safe `DateTimeFormatter` instances in `DateFormatters` (`app/src/main/java/com/example/voicejournal/util/DateFormatters.kt`) and localized string resources in `res/values/strings.xml` and `res/values-de/strings.xml`.
 
 ### Data Persistence & Security
 - **Local Database:** **Room** (`AppDatabase`, schema version `18`, schemas exported to `app/schemas/`).

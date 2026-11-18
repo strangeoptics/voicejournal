@@ -23,8 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import com.example.voicejournal.ui.components.WeekView
 import com.example.voicejournal.ui.theme.VoicejournalTheme
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import com.example.voicejournal.util.DateFormatters
 
 @OptIn(ExperimentalMaterial3Api::class)
 class CalendarActivity : ComponentActivity() {
@@ -61,14 +60,12 @@ fun CalendarScreen(viewModel: CalendarViewModel, onFinish: () -> Unit) {
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = selectedDate?.let { date ->
-                            date.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM yyyy", Locale.GERMAN))
-                        } ?: when (numberOfDays) {
-                            1 -> currentDate.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM yyyy", Locale.GERMAN))
-                            3 -> currentDate.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.GERMAN))
-                            7 -> currentDate.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.GERMAN))
-                            else -> ""
-                        }
+                        text = selectedDate?.format(DateFormatters.CALENDAR_FULL_DATE_GERMAN)
+                            ?: when (numberOfDays) {
+                                1 -> currentDate.format(DateFormatters.CALENDAR_FULL_DATE_GERMAN)
+                                3, 7 -> currentDate.format(DateFormatters.CALENDAR_MONTH_YEAR_GERMAN)
+                                else -> ""
+                            }
                     )
                 },
                 navigationIcon = {

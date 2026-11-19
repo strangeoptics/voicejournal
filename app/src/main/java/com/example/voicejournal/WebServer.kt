@@ -108,6 +108,7 @@ class WebServer(private val repository: JournalRepository) {
 
                     val categories = repository.getCategoriesByIds(createDto.categoryIds)
                     repository.insert(entry, categories)
+                    repository.notifyEntryCreated(entry.id)
 
                     val newEntry = repository.getEntryById(entry.id)
                     if (newEntry != null) {

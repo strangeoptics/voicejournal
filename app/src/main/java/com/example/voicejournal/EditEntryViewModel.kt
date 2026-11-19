@@ -70,6 +70,9 @@ class EditEntryViewModel(
     private val _saveCompleted = MutableStateFlow(false)
     val saveCompleted: StateFlow<Boolean> = _saveCompleted.asStateFlow()
 
+    private val _createdEntryId = MutableStateFlow<UUID?>(null)
+    val createdEntryId: StateFlow<UUID?> = _createdEntryId.asStateFlow()
+
     private val _saveError = MutableStateFlow<String?>(null)
     val saveError: StateFlow<String?> = _saveError.asStateFlow()
 
@@ -191,6 +194,7 @@ class EditEntryViewModel(
                     )
                     if (entryId == null) {
                         repository.insert(entryToPersist, categories)
+                        _createdEntryId.value = entryToPersist.id
                     } else {
                         repository.update(entryToPersist, categories)
                     }

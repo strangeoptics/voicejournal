@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -98,16 +99,23 @@ fun HomeScreen(
         }
 
         val lazyListState = rememberLazyListState()
+        val itemSnapshotList = pagedEntries.itemSnapshotList
+        val targetScrollIndex = if (scrollToEntryId != null) {
+            itemSnapshotList.indexOfFirst { it?.entry?.id == scrollToEntryId }.takeIf { it >= 0 }
+        } else {
+            null
+        }
 
-        LaunchedEffect(pagedEntries.itemCount, scrollToEntryId) {
-            if (scrollToEntryId != null && pagedEntries.itemCount > 0) {
-                val targetIndex = (0 until pagedEntries.itemCount).find { index ->
-                    pagedEntries.peek(index)?.entry?.id == scrollToEntryId
-                }
-                if (targetIndex != null) {
-                    lazyListState.scrollToItem(targetIndex)
-                    onScrolledToEntry()
-                }
+        if (targetScrollIndex != null) {
+            SideEffect {
+                lazyListState.requestScrollToItem(targetScrollIndex)
+            }
+        }
+
+        LaunchedEffect(itemSnapshotList, scrollToEntryId) {
+            if (targetScrollIndex != null) {
+                lazyListState.scrollToItem(targetScrollIndex)
+                onScrolledToEntry()
             }
         }
 

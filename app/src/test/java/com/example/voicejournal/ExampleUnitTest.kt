@@ -219,4 +219,23 @@ class ExampleUnitTest {
             TimeZoneUtils.formatEntryDateTimeText(startMillis, stopMillis, entryZone = tokyo, viewerZone = berlin)
         )
     }
+
+    @Test
+    fun resolveTargetCategoryForEntry_keepsMatchingCurrentCategoryOrPicksFirstRealCategory() {
+        val journal = Category(id = 1, category = "journal", aliases = "")
+        val todo = Category(id = 2, category = "todo", aliases = "")
+        val deleted = Category(id = -1, category = "Gelöscht", aliases = "")
+
+        assertEquals(
+            "todo",
+            MainViewModel.resolveTargetCategoryForEntry(listOf(journal, todo), currentCategory = "todo")
+        )
+        assertEquals(
+            "journal",
+            MainViewModel.resolveTargetCategoryForEntry(listOf(deleted, journal, todo), currentCategory = "kaufen")
+        )
+        assertNull(
+            MainViewModel.resolveTargetCategoryForEntry(listOf(deleted), currentCategory = "journal")
+        )
+    }
 }

@@ -394,6 +394,21 @@ class MainActivity : ComponentActivity() {
                                 )
                             },
                             floatingActionButton = {
+                                val createEntryLauncher = rememberLauncherForActivityResult(
+                                    contract = ActivityResultContracts.StartActivityForResult(),
+                                    onResult = { result ->
+                                        if (result.resultCode == RESULT_OK) {
+                                            val createdId = result.data?.getStringExtra(EXTRA_ENTRY_ID)
+                                            if (createdId != null) {
+                                                try {
+                                                    viewModel.scrollToEntry(UUID.fromString(createdId))
+                                                } catch (_: IllegalArgumentException) {
+                                                    // Ignore invalid UUID
+                                                }
+                                            }
+                                        }
+                                    }
+                                )
                                 MainFabMenu(
                                     isRecording = isRecording,
                                     isExpanded = isFabMenuExpanded,
@@ -401,7 +416,7 @@ class MainActivity : ComponentActivity() {
                                     onCreateManualEntryClicked = {
                                         val initialCat = viewModel.selectedCategory.value
                                             .takeUnless { JournalConstants.isVirtualDeletedName(it) }
-                                        context.startActivity(
+                                        createEntryLauncher.launch(
                                             EditEntryActivity.newIntentForNewEntry(context, initialCat)
                                         )
                                     },

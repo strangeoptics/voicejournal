@@ -7,6 +7,9 @@ import androidx.paging.PagingData
 import androidx.room.withTransaction
 import com.example.voicejournal.util.TimeZoneUtils
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -83,6 +86,13 @@ class JournalRepository(
 
     val realCategories: Flow<List<Category>> = categoryDao.getAllCategories().map { categories ->
         categories.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
+    }
+
+    private val _entryCreatedEvents = MutableSharedFlow<UUID>(extraBufferCapacity = 1)
+    val entryCreatedEvents: SharedFlow<UUID> = _entryCreatedEvents.asSharedFlow()
+
+    fun notifyEntryCreated(entryId: UUID) {
+        _entryCreatedEvents.tryEmit(entryId)
     }
 
     suspend fun getEntriesPager(

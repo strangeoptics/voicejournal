@@ -127,6 +127,17 @@ class EditEntryActivity : ComponentActivity() {
                         isNewEntry = entryId == null,
                         allCategories = allCategories,
                         onNavigateUp = { finish() },
+                        onSaveCompleted = { createdId ->
+                            if (createdId != null) {
+                                setResult(
+                                    RESULT_OK,
+                                    Intent().putExtra(MainActivity.EXTRA_ENTRY_ID, createdId.toString())
+                                )
+                            } else {
+                                setResult(RESULT_OK)
+                            }
+                            finish()
+                        },
                         speechRecognitionManager = speechRecognitionManager,
                         viewModel = viewModel
                     )
@@ -176,6 +187,7 @@ fun EditEntryScreen(
     isNewEntry: Boolean,
     allCategories: List<Category>,
     onNavigateUp: () -> Unit,
+    onSaveCompleted: (UUID?) -> Unit = { onNavigateUp() },
     speechRecognitionManager: SpeechRecognitionManager,
     viewModel: EditEntryViewModel
 ) {
@@ -187,6 +199,7 @@ fun EditEntryScreen(
     val selectedCategories by viewModel.selectedCategories.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
     val saveCompleted by viewModel.saveCompleted.collectAsState()
+    val createdEntryId by viewModel.createdEntryId.collectAsState()
     val saveError by viewModel.saveError.collectAsState()
 
     val activeZone = remember(zoneId) {
@@ -332,7 +345,7 @@ fun EditEntryScreen(
 
     LaunchedEffect(saveCompleted) {
         if (saveCompleted) {
-            onNavigateUp()
+            onSaveCompleted(createdEntryId)
         }
     }
 

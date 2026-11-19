@@ -102,6 +102,19 @@ class MainViewModel(
 
             return Pair(defaultCat, trimmedText)
         }
+
+        internal fun resolveTargetCategoryForEntry(
+            entryCategories: List<Category>,
+            currentCategory: String
+        ): String? {
+            val realCategories = entryCategories.filterNot {
+                JournalConstants.isVirtualDeletedCategory(it)
+            }
+            if (realCategories.any { it.category == currentCategory }) {
+                return currentCategory
+            }
+            return realCategories.firstOrNull()?.category
+        }
     }
 
     private val _selectedCategory = MutableStateFlow("")
@@ -185,6 +198,11 @@ class MainViewModel(
         }
         viewModelScope.launch {
             _refreshTrigger.emit(Unit) // Emit initial value to trigger loading
+        }
+        viewModelScope.launch {
+            repository.entryCreatedEvents.collect { createdEntryId ->
+                scrollToEntry(createdEntryId)
+            }
         }
     }
 
@@ -321,15 +339,27 @@ class MainViewModel(
     }
 
     fun scrollToEntry(entryId: UUID) {
+        _scrollToEntryId.value = entryId
         viewModelScope.launch {
             val entry = repository.getEntryById(entryId)
-            if (entry != null) {
-                val entryCategory = entry.categories.firstOrNull()?.category
-                if (entryCategory != null && entryCategory != _selectedCategory.value) {
-                    _selectedCategory.value = entryCategory
+            if (entry == null) {
+                if (_scrollToEntryId.value == entryId) {
+                    _scrollToEntryId.value = null
                 }
+                return@launch
+            }
+            val currentCategory = _selectedCategory.value
+            val targetCategory = resolveTargetCategoryForEntry(entry.categories, currentCategory)
+            val categoryChanged = if (targetCategory != null && targetCategory != currentCategory) {
+                _selectedCategory.value = targetCategory
+                true
+            } else {
+                false
+            }
+            if (categoryChanged || _scrollToEntryId.value == entryId) {
                 _pagerAnchorEntryId.value = entryId
                 _scrollToEntryId.value = entryId
+                _refreshTrigger.emit(Unit)
             }
         }
     }
@@ -429,6 +459,8 @@ class MainViewModel(
                     if (_selectedCategory.value != targetCategory.category) {
                         _selectedCategory.value = targetCategory.category
                     }
+                    _pagerAnchorEntryId.value = entry.id
+                    _scrollToEntryId.value = entry.id
                     _refreshTrigger.emit(Unit)
                 }
             }

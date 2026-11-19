@@ -137,7 +137,8 @@ class CalendarViewModel(
         repository.getEntriesForCalendar(queryStartMillis, queryEndMillis).map { entriesWithCategories ->
             entriesWithCategories.mapNotNull { (entry, categories) ->
                 val startDateTime = entry.startLocalDateTime()
-                val rawEndDateTime = entry.stopLocalDateTime() ?: startDateTime.plusHours(1)
+                val explicitStopDateTime = entry.stopLocalDateTime()
+                val rawEndDateTime = explicitStopDateTime ?: startDateTime.plusHours(1)
                 val endDateTime = if (rawEndDateTime.isBefore(startDateTime)) startDateTime else rawEndDateTime
                 if (endDateTime.toLocalDate().isBefore(preloadStart) || startDateTime.toLocalDate().isAfter(preloadEnd)) {
                     return@mapNotNull null
@@ -154,7 +155,8 @@ class CalendarViewModel(
                         }
                     } ?: DEFAULT_APPOINTMENT_COLOR
 
-                val displayTitle = entry.content
+                val trimmedContent = entry.content.trim()
+                val displayTitle = trimmedContent
                     .lineSequence()
                     .firstOrNull { it.isNotBlank() }
                     ?.trim()
@@ -168,6 +170,8 @@ class CalendarViewModel(
                     title = displayTitle,
                     color = appointmentColor,
                     entryId = entry.id,
+                    fullText = trimmedContent,
+                    hasExplicitEndTime = explicitStopDateTime != null,
                 )
             }
         }

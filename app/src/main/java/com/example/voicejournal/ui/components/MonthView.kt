@@ -3,7 +3,7 @@ package com.example.voicejournal.ui.components
 import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,9 +42,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -131,6 +133,7 @@ fun MonthView(
     appointments: List<Appointment> = emptyList(),
     today: LocalDate = LocalDate.now(),
     onDayClick: (LocalDate) -> Unit = {},
+    onDayLongClick: (DayEntriesPreviewState) -> Unit = {},
     onMonthChanged: (YearMonth) -> Unit = {},
 ) {
     val configuration = LocalConfiguration.current
@@ -236,6 +239,7 @@ fun MonthView(
                 today = today,
                 locale = locale,
                 onDayClick = onDayClick,
+                onDayLongClick = onDayLongClick,
             )
         }
     }
@@ -275,6 +279,7 @@ private fun MonthPageGrid(
     today: LocalDate,
     locale: Locale,
     onDayClick: (LocalDate) -> Unit,
+    onDayLongClick: (DayEntriesPreviewState) -> Unit,
 ) {
     val density = LocalDensity.current
     val idealBadgeSize = with(density) { maxOf(24.dp, 13.sp.toDp() + 8.dp) }
@@ -324,18 +329,21 @@ private fun MonthPageGrid(
                         }
                     },
             ) {
-                weeks.forEach { weekDates ->
+                weeks.forEachIndexed { weekIndex, weekDates ->
                     Row(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth(),
                     ) {
-                        weekDates.forEach { date ->
+                        weekDates.forEachIndexed { dayIndex, date ->
+                            val dayAppointments = appointmentsByDate[date].orEmpty()
+                            val pivotX = (dayIndex + 0.5f) / 7f
+                            val pivotY = (((weekIndex + 0.5f) / weekCount.toFloat()) * 0.85f) + 0.12f
                             MonthDayCell(
                                 date = date,
                                 isCurrentMonth = (date.year == month.year) && (date.month == month.month),
                                 isToday = date == today,
-                                dailyAppointments = appointmentsByDate[date].orEmpty(),
+                                dailyAppointments = dayAppointments,
                                 availableChipAreaPx = availableChipAreaPx,
                                 chipSlotPx = chipSlotPx,
                                 overflowHeightPx = overflowHeightPx,
@@ -345,6 +353,19 @@ private fun MonthPageGrid(
                                 overflowHeight = overflowHeight,
                                 locale = locale,
                                 onClick = { onDayClick(date) },
+                                onLongClick = if (dayAppointments.isNotEmpty()) {
+                                    {
+                                        onDayLongClick(
+                                            DayEntriesPreviewState(
+                                                date = date,
+                                                pivotFractionX = pivotX,
+                                                pivotFractionY = pivotY,
+                                            ),
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxHeight(),
@@ -376,9 +397,11 @@ private fun MonthDayCell(
     overflowHeight: Dp,
     locale: Locale,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val haptic = LocalHapticFeedback.current
     val cellBackground = when {
         isToday -> colorScheme.primaryContainer.copy(alpha = 0.16f)
         !isCurrentMonth -> colorScheme.surfaceVariant.copy(alpha = 0.25f)
@@ -414,7 +437,15 @@ private fun MonthDayCell(
     Column(
         modifier = modifier
             .background(cellBackground)
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick?.let { callback ->
+                    {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        callback()
+                    }
+                },
+            )
             .clearAndSetSemantics {
                 role = Role.Button
                 contentDescription = accessibilityDescription

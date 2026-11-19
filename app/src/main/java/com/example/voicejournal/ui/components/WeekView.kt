@@ -3,7 +3,7 @@ package com.example.voicejournal.ui.components
 import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,9 +50,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -186,6 +188,8 @@ data class Appointment(
     val title: String,
     val color: Color = Color(0xFF1976D2),
     val entryId: UUID? = null,
+    val fullText: String = title,
+    val hasExplicitEndTime: Boolean = false,
 ) {
     val startDate: LocalDate get() = startDateTime.toLocalDate()
     val startTime: LocalTime get() = startDateTime.toLocalTime()
@@ -397,6 +401,7 @@ fun WeekView(
     hourHeight: Dp = 60.dp,
     minAppointmentHeight: Dp = MIN_APPOINTMENT_HEIGHT,
     onDayClick: (LocalDate) -> Unit = {},
+    onDayLongClick: (DayEntriesPreviewState) -> Unit = {},
     onAppointmentClick: (Appointment) -> Unit = {},
     onPeriodStartChanged: ((LocalDate) -> Unit)? = null,
     onNextPeriod: () -> Unit = {},
@@ -440,8 +445,8 @@ fun WeekView(
     val scrollState = rememberScrollState(initial = initialScrollPx)
     val currentAppointments by rememberUpdatedState(appointments)
 
-    LaunchedEffect(focusDateOnMount, hourSlotPx) {
-        val focusDate = focusDateOnMount ?: return@LaunchedEffect
+    LaunchedEffect(initialFocusDate, hourSlotPx) {
+        val focusDate = initialFocusDate ?: return@LaunchedEffect
         val (viewportPx, maxScrollPx) = snapshotFlow { scrollState.viewportSize to scrollState.maxValue }
             .first { (vp, max) -> vp > 0 && max < Int.MAX_VALUE }
 
@@ -651,6 +656,7 @@ fun WeekView(
                         }
                     }
                 },
+                onDayLongClick = onDayLongClick,
                 onAppointmentClick = onAppointmentClick,
             )
         }
@@ -674,9 +680,11 @@ private fun WeekPageContent(
     verticalTileGapPx: Int,
     scrollState: ScrollState,
     onDayClick: (LocalDate) -> Unit,
+    onDayLongClick: (DayEntriesPreviewState) -> Unit,
     onAppointmentClick: (Appointment) -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val haptic = LocalHapticFeedback.current
     val surfaceColor = colorScheme.surface
     val gridLineColor = colorScheme.outlineVariant.copy(alpha = 0.55f)
     val halfHourLineColor = colorScheme.outlineVariant.copy(alpha = 0.22f)
@@ -697,6 +705,7 @@ private fun WeekPageContent(
             daySummaries = daySummaries,
             headerHeight = headerHeight,
             onDayClick = onDayClick,
+            onDayLongClick = onDayLongClick,
         )
 
         HorizontalDivider(color = colorScheme.outlineVariant)
@@ -785,8 +794,9 @@ private fun WeekPageContent(
                         }
                     },
             ) {
-                pageDates.forEach { dateInWeek ->
+                pageDates.forEachIndexed { dayIndex, dateInWeek ->
                     val placements = placementsByDate[dateInWeek].orEmpty()
+                    val pivotX = (((dayIndex + 0.5f) / pageDates.size.toFloat()) * 0.88f) + 0.12f
                     DayColumnAppointmentsLayout(
                         placements = placements,
                         hourSlotPx = hourSlotPx,
@@ -797,6 +807,16 @@ private fun WeekPageContent(
                         surfaceColor = surfaceColor,
                         outlineColor = colorScheme.outline,
                         onAppointmentClick = onAppointmentClick,
+                        onAppointmentLongClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onDayLongClick(
+                                DayEntriesPreviewState(
+                                    date = dateInWeek,
+                                    pivotFractionX = pivotX,
+                                    pivotFractionY = 0.5f,
+                                ),
+                            )
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
@@ -816,8 +836,10 @@ private fun WeekHeaderRow(
     daySummaries: Map<LocalDate, DayHeaderSummary>,
     headerHeight: Dp,
     onDayClick: (LocalDate) -> Unit,
+    onDayLongClick: (DayEntriesPreviewState) -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val haptic = LocalHapticFeedback.current
     val surfaceLuminance = colorScheme.surface.luminance()
     val locale = Locale.getDefault()
 
@@ -828,10 +850,11 @@ private fun WeekHeaderRow(
             .background(colorScheme.surface),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        visibleDates.forEach { dateInWeek ->
+        visibleDates.forEachIndexed { dayIndex, dateInWeek ->
             val isToday = dateInWeek == today
             val isSelected = dateInWeek == selectedDate
             val summary = daySummaries[dateInWeek] ?: DayHeaderSummary()
+            val pivotX = (((dayIndex + 0.5f) / visibleDates.size.toFloat()) * 0.88f) + 0.12f
 
             val weekdayColor = when {
                 isToday -> colorScheme.primary
@@ -853,7 +876,23 @@ private fun WeekHeaderRow(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .clickable { onDayClick(dateInWeek) }
+                    .combinedClickable(
+                        onClick = { onDayClick(dateInWeek) },
+                        onLongClick = if (summary.entryCount > 0) {
+                            {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onDayLongClick(
+                                    DayEntriesPreviewState(
+                                        date = dateInWeek,
+                                        pivotFractionX = pivotX,
+                                        pivotFractionY = 0.14f,
+                                    ),
+                                )
+                            }
+                        } else {
+                            null
+                        },
+                    )
                     .padding(top = 4.dp, bottom = 3.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
@@ -934,6 +973,7 @@ private fun DayColumnAppointmentsLayout(
     surfaceColor: Color,
     outlineColor: Color,
     onAppointmentClick: (Appointment) -> Unit,
+    onAppointmentLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Layout(
@@ -944,9 +984,9 @@ private fun DayColumnAppointmentsLayout(
                     appointment = placement.appointment,
                     surfaceColor = surfaceColor,
                     outlineColor = outlineColor,
-                ) {
-                    onAppointmentClick(placement.appointment)
-                }
+                    onClick = { onAppointmentClick(placement.appointment) },
+                    onLongClick = onAppointmentLongClick,
+                )
             }
         },
     ) { measurables, constraints ->
@@ -990,6 +1030,7 @@ private fun AppointmentTile(
     surfaceColor: Color,
     outlineColor: Color,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
     val containerColor = appointment.color.copy(alpha = 0.84f).compositeOver(surfaceColor)
     val contentColor = if (containerColor.luminance() > 0.45f) {
@@ -1018,7 +1059,10 @@ private fun AppointmentTile(
                     size = Size(stripeWidth, size.height),
                 )
             }
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
             .padding(start = 6.dp, end = 3.dp, top = 2.dp, bottom = 2.dp),
     ) {
         Text(

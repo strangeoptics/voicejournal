@@ -52,4 +52,8 @@
     <string name="calendar_three_day_view">3-day view</string>
     <string name="calendar_week_view">Week view</string>
     <string name="calendar_month_view">Month view</string>
+    <string name="calendar_day_preview_entry_one">1 entry · Tap entry to edit</string>
+    <string name="calendar_day_preview_entry_many">%1$d entries · Tap entry to edit</string>
+    <string name="calendar_close">Close</string>
+    <string name="calendar_open_day_view">Open day view</string>
 </resources>

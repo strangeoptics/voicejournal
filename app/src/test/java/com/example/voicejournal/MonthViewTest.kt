@@ -184,4 +184,50 @@ class MonthViewTest {
             ),
         )
     }
+
+    @Test
+    fun dayEntriesPreviewHelpers_filterSortAndFormatTimesAuthentically() {
+        val targetDate = LocalDate.of(2026, 11, 19)
+        val pointEntry = com.example.voicejournal.ui.components.Appointment(
+            id = "b",
+            startDateTime = targetDate.atTime(14, 5),
+            endDateTime = targetDate.atTime(15, 5),
+            title = "Kurztitel",
+            fullText = "Vollständiger mehrzeiliger Tagebucheintrag am Nachmittag",
+            hasExplicitEndTime = false,
+        )
+        val rangeEntry = com.example.voicejournal.ui.components.Appointment(
+            id = "a",
+            startDateTime = targetDate.atTime(8, 30),
+            endDateTime = targetDate.atTime(9, 45),
+            title = "Termin",
+            hasExplicitEndTime = true,
+        )
+        val multiDayEntry = com.example.voicejournal.ui.components.Appointment(
+            id = "c",
+            startDateTime = targetDate.minusDays(1).atTime(18, 0),
+            endDateTime = targetDate.plusDays(1).atTime(10, 0),
+            title = "Reise",
+            hasExplicitEndTime = true,
+        )
+        val otherDayEntry = com.example.voicejournal.ui.components.Appointment(
+            id = "d",
+            startDateTime = targetDate.plusDays(2).atTime(12, 0),
+            endDateTime = targetDate.plusDays(2).atTime(13, 0),
+            title = "Später",
+        )
+
+        val filtered = com.example.voicejournal.ui.components.filterAndSortDayAppointments(
+            appointments = listOf(pointEntry, otherDayEntry, rangeEntry, multiDayEntry),
+            date = targetDate,
+        )
+        assertEquals(listOf("c", "a", "b"), filtered.map { it.id })
+
+        assertEquals("14:05", com.example.voicejournal.ui.components.formatAppointmentPreviewTime(pointEntry))
+        assertEquals("08:30 – 09:45", com.example.voicejournal.ui.components.formatAppointmentPreviewTime(rangeEntry))
+        assertEquals(
+            "18.11.2026 18:00 – 20.11.2026 10:00",
+            com.example.voicejournal.ui.components.formatAppointmentPreviewTime(multiDayEntry),
+        )
+    }
 }

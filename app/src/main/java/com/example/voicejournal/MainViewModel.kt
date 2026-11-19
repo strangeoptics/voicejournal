@@ -20,12 +20,12 @@ import com.example.voicejournal.di.Injector
 import com.example.voicejournal.util.DateFormatters
 import com.example.voicejournal.util.TimeZoneUtils
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -37,11 +37,17 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 
 class MainViewModel(
     private val repository: JournalRepository,
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    private data class PagerAnchor(
+        val entryId: UUID?,
+        val requestVersion: Long = 0L
+    )
 
     companion object {
         private val jsonFormat = Json {
@@ -52,13 +58,14 @@ class MainViewModel(
         internal fun parseRecognizedTextForCategory(
             text: String,
             categories: List<Category>,
-            currentCategoryName: String
+            currentCategoryId: Int?
         ): Pair<Category, String> {
             val trimmedText = text.trim()
             val realCategories = categories.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
-            val defaultCat = if (currentCategoryName.isNotBlank() && !JournalConstants.isVirtualDeletedName(currentCategoryName)) {
-                realCategories.find { it.category == currentCategoryName }
-                    ?: Category(category = currentCategoryName, aliases = "")
+            val defaultCat = if (currentCategoryId != null && currentCategoryId > 0) {
+                realCategories.find { it.id == currentCategoryId }
+                    ?: realCategories.firstOrNull()
+                    ?: Category(category = "journal", aliases = "")
             } else {
                 realCategories.firstOrNull() ?: Category(category = "journal", aliases = "")
             }
@@ -103,6 +110,56 @@ class MainViewModel(
             return Pair(defaultCat, trimmedText)
         }
 
+        internal fun parseRecognizedTextForCategory(
+            text: String,
+            categories: List<Category>,
+            currentCategoryName: String
+        ): Pair<Category, String> {
+            val realCategories = categories.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
+            val matchedId = if (
+                currentCategoryName.isNotBlank() &&
+                !JournalConstants.isVirtualDeletedName(currentCategoryName)
+            ) {
+                realCategories.find { it.category == currentCategoryName }?.id
+            } else {
+                null
+            }
+            val effectiveCategories = if (
+                matchedId == null &&
+                currentCategoryName.isNotBlank() &&
+                !JournalConstants.isVirtualDeletedName(currentCategoryName)
+            ) {
+                val synthetic = Category(id = Int.MAX_VALUE, category = currentCategoryName, aliases = "")
+                listOf(synthetic) + realCategories
+            } else {
+                categories
+            }
+            val effectiveId = matchedId ?: effectiveCategories.firstOrNull { it.id == Int.MAX_VALUE }?.id
+            val (chosen, remaining) = parseRecognizedTextForCategory(
+                text = text,
+                categories = effectiveCategories,
+                currentCategoryId = effectiveId
+            )
+            return if (chosen.id == Int.MAX_VALUE) {
+                Pair(chosen.copy(id = 0), remaining)
+            } else {
+                Pair(chosen, remaining)
+            }
+        }
+
+        internal fun resolveTargetCategoryIdForEntry(
+            entryCategories: List<Category>,
+            currentCategoryId: Int?
+        ): Int? {
+            val realCategories = entryCategories.filterNot {
+                JournalConstants.isVirtualDeletedCategory(it)
+            }
+            if (currentCategoryId != null && currentCategoryId > 0 && realCategories.any { it.id == currentCategoryId }) {
+                return currentCategoryId
+            }
+            return realCategories.firstOrNull()?.id
+        }
+
         internal fun resolveTargetCategoryForEntry(
             entryCategories: List<Category>,
             currentCategory: String
@@ -117,8 +174,15 @@ class MainViewModel(
         }
     }
 
-    private val _selectedCategory = MutableStateFlow("")
-    val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
+    private val _selectedCategoryId = MutableStateFlow<Int?>(null)
+    val selectedCategoryId: StateFlow<Int?> = _selectedCategoryId.asStateFlow()
+
+    val categories: StateFlow<List<Category>> = repository.allCategories
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val selectedCategory: StateFlow<Category?> = combine(_selectedCategoryId, categories) { selectedId, allCats ->
+        allCats.find { it.id == selectedId }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val _selectedEntry = MutableStateFlow<EntryWithCategories?>(null)
     val selectedEntry: StateFlow<EntryWithCategories?> = _selectedEntry.asStateFlow()
@@ -140,18 +204,9 @@ class MainViewModel(
     val isDeveloperModeEnabled: StateFlow<Boolean> = settingsRepository.isDeveloperModeEnabled
     val showCategoryTags: StateFlow<Boolean> = settingsRepository.showCategoryTags
 
-    private val _refreshTrigger = MutableSharedFlow<Unit>(replay = 1)
-
-
-    val canUndo: StateFlow<Boolean> = repository.getDeletedEntriesCount().map { it > 0 }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
-
-    val categoriesFlow: StateFlow<List<Category>> = repository.allCategories
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val categories: StateFlow<List<String>> = categoriesFlow.map { categories ->
-        categories.map { it.category }.distinct()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val canUndo: StateFlow<Boolean> = repository.getDeletedEntriesCount()
+        .map { it > 0 }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val gpsTrackPoints: StateFlow<List<GpsTrackPoint>> = selectedDate
@@ -177,7 +232,8 @@ class MainViewModel(
         date != null && points.size >= 2
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-    private val _pagerAnchorEntryId = MutableStateFlow<UUID?>(null)
+    private val anchorVersionCounter = AtomicLong(0L)
+    private val _pagerAnchor = MutableStateFlow(PagerAnchor(null))
     private val _scrollToEntryId = MutableStateFlow<UUID?>(null)
     val scrollToEntryId: StateFlow<UUID?> = _scrollToEntryId.asStateFlow()
 
@@ -188,16 +244,14 @@ class MainViewModel(
                 settingsRepository.markDefaultCategoriesAdded()
             }
             repository.normalizeCategoryOrderIndicesIfNeeded()
-            categories.collect {
-                if (it.isNotEmpty() && _selectedCategory.value.isEmpty()) {
-                    _selectedCategory.value = it.firstOrNull { name ->
-                        !JournalConstants.isVirtualDeletedName(name)
-                    } ?: it.first()
+            categories.collect { cats ->
+                val currentId = _selectedCategoryId.value
+                if (cats.isNotEmpty() && (currentId == null || cats.none { it.id == currentId })) {
+                    val fallback = cats.firstOrNull { !JournalConstants.isVirtualDeletedCategory(it) }
+                        ?: cats.first()
+                    _selectedCategoryId.value = fallback.id
                 }
             }
-        }
-        viewModelScope.launch {
-            _refreshTrigger.emit(Unit) // Emit initial value to trigger loading
         }
         viewModelScope.launch {
             repository.entryCreatedEvents.collect { createdEntryId ->
@@ -219,16 +273,14 @@ class MainViewModel(
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     val pagedEntries: Flow<PagingData<EntryWithCategories>> =
-        combine(
-            selectedCategory,
-            categoriesFlow,
-            _pagerAnchorEntryId,
-            _refreshTrigger // Just to trigger
-        ) { selectedCat, categories, anchorEntryId, _ ->
-            Triple(categories.find { it.category == selectedCat }, anchorEntryId, selectedCat)
-        }.flatMapLatest { (category, anchorEntryId, _) ->
-            repository.getEntriesPager(category?.id, anchorEntryId)
-        }.cachedIn(viewModelScope)
+        combine(_selectedCategoryId, _pagerAnchor) { categoryId, anchor ->
+            categoryId to anchor
+        }
+            .distinctUntilChanged()
+            .flatMapLatest { (categoryId, anchor) ->
+                repository.getEntriesPager(categoryId, anchor.entryId)
+            }
+            .cachedIn(viewModelScope)
 
     fun toggleEntrySelection(id: UUID) {
         _selectedEntryIds.value = _selectedEntryIds.value.toMutableSet().apply {
@@ -264,7 +316,7 @@ class MainViewModel(
         val entries = when {
             singleSelected != null -> listOf(singleSelected)
             _selectedEntryIds.value.isNotEmpty() -> repository.getEntriesByIds(_selectedEntryIds.value)
-            else -> repository.getEntriesForClipboard(_selectedCategory.value, _selectedDate.value)
+            else -> repository.getEntriesForClipboard(_selectedCategoryId.value, _selectedDate.value)
         }
         return formatEntriesAsText(entries)
     }
@@ -274,16 +326,18 @@ class MainViewModel(
         return jsonFormat.encodeToString(entries)
     }
 
-    fun onCategoryChange(category: String) {
-        _pagerAnchorEntryId.value = null
+    fun onCategoryChange(category: Category) {
+        _pagerAnchor.value = PagerAnchor(null)
         _scrollToEntryId.value = null
-        _selectedCategory.value = category
+        _selectedCategoryId.value = category.id
         _selectedEntry.value = null
         clearSelection()
     }
+
     fun onDateSelected(date: LocalDate) {
         _selectedDate.value = if (_selectedDate.value == date) null else date
     }
+
     fun onEntrySelected(entry: EntryWithCategories) {
         _selectedEntry.value = if (_selectedEntry.value == entry) null else entry
         if (_selectedEntry.value != null) {
@@ -296,7 +350,6 @@ class MainViewModel(
         viewModelScope.launch {
             repository.deleteEntries(ids)
             _selectedEntryIds.value = emptySet()
-            _refreshTrigger.emit(Unit)
         }
     }
 
@@ -305,24 +358,21 @@ class MainViewModel(
         viewModelScope.launch {
             repository.updateEntriesZoneId(ids, zoneId)
             _selectedEntryIds.value = emptySet()
-            _refreshTrigger.emit(Unit)
         }
     }
 
     fun onUndoDelete() {
         viewModelScope.launch {
             repository.restoreLatestDeletedEntry()
-            _refreshTrigger.emit(Unit)
         }
     }
 
     fun hardDeleteEntries(ids: Set<UUID>) {
         if (ids.isEmpty()) return
         viewModelScope.launch {
-            if (JournalConstants.isVirtualDeletedName(_selectedCategory.value)) {
+            if (_selectedCategoryId.value == JournalConstants.CATEGORY_DELETED_ID) {
                 repository.hardDeleteEntries(ids)
                 _selectedEntryIds.value = emptySet()
-                _refreshTrigger.emit(Unit)
             }
         }
     }
@@ -330,10 +380,9 @@ class MainViewModel(
     fun restoreEntries(ids: Set<UUID>) {
         if (ids.isEmpty()) return
         viewModelScope.launch {
-            if (JournalConstants.isVirtualDeletedName(_selectedCategory.value)) {
+            if (_selectedCategoryId.value == JournalConstants.CATEGORY_DELETED_ID) {
                 repository.restoreEntries(ids)
                 _selectedEntryIds.value = emptySet()
-                _refreshTrigger.emit(Unit)
             }
         }
     }
@@ -348,18 +397,17 @@ class MainViewModel(
                 }
                 return@launch
             }
-            val currentCategory = _selectedCategory.value
-            val targetCategory = resolveTargetCategoryForEntry(entry.categories, currentCategory)
-            val categoryChanged = if (targetCategory != null && targetCategory != currentCategory) {
-                _selectedCategory.value = targetCategory
+            val currentCategoryId = _selectedCategoryId.value
+            val targetCategoryId = resolveTargetCategoryIdForEntry(entry.categories, currentCategoryId)
+            val categoryChanged = if (targetCategoryId != null && targetCategoryId != currentCategoryId) {
+                _selectedCategoryId.value = targetCategoryId
                 true
             } else {
                 false
             }
             if (categoryChanged || _scrollToEntryId.value == entryId) {
-                _pagerAnchorEntryId.value = entryId
+                _pagerAnchor.value = PagerAnchor(entryId, anchorVersionCounter.incrementAndGet())
                 _scrollToEntryId.value = entryId
-                _refreshTrigger.emit(Unit)
             }
         }
     }
@@ -378,13 +426,11 @@ class MainViewModel(
 
     suspend fun importJournal(uri: Uri) {
         repository.importJournal(uri)
-        _refreshTrigger.emit(Unit)
     }
 
     fun deleteAllData() {
         viewModelScope.launch {
             repository.deleteAll()
-            _refreshTrigger.emit(Unit)
         }
     }
 
@@ -421,11 +467,10 @@ class MainViewModel(
                 JournalEntry(content = "Journal entry from two days ago.", start_datetime = startDatetimeFromString("${twoDaysAgo}T18:00:00"), zoneId = defaultZone.id) to listOf(journal),
                 JournalEntry(content = "Another app idea from two days ago.", start_datetime = startDatetimeFromString("${twoDaysAgo}T20:00:00"), zoneId = defaultZone.id) to listOf(eloisa)
             )
-            testEntries.forEach { (entry, categories) -> repository.insert(entry, categories) }
-            _refreshTrigger.emit(Unit)
+            testEntries.forEach { (entry, entryCategories) -> repository.insert(entry, entryCategories) }
         }
     }
-    
+
     fun processRecognizedText(recognizedText: String) {
         viewModelScope.launch {
             val entryToUpdate = _selectedEntry.value
@@ -435,33 +480,37 @@ class MainViewModel(
                 )
                 repository.update(updatedEntry, entryToUpdate.categories)
                 _selectedEntry.value = null // Deselect after update
-                _refreshTrigger.emit(Unit)
             } else {
-                val categories = categoriesFlow.value
-                val currentCategoryName = _selectedCategory.value
+                val availableCategories = categories.value
+                val currentCategoryId = _selectedCategoryId.value
 
-                val (targetCategory, contentToAdd) = parseRecognizedTextForCategory(recognizedText, categories, currentCategoryName)
+                val (targetCategory, contentToAdd) = parseRecognizedTextForCategory(
+                    text = recognizedText,
+                    categories = availableCategories,
+                    currentCategoryId = currentCategoryId
+                )
 
                 val currentZone = ZoneId.systemDefault()
                 val now = java.time.LocalDateTime.now(currentZone)
-                val start_datetime = _selectedDate.value?.atTime(now.toLocalTime())?.atZone(currentZone)?.toInstant()?.toEpochMilli()
+                val startDatetime = _selectedDate.value?.atTime(now.toLocalTime())?.atZone(currentZone)?.toInstant()?.toEpochMilli()
                     ?: System.currentTimeMillis()
                 _selectedDate.value = null
 
                 if (contentToAdd.isNotEmpty()) {
                     val entry = JournalEntry(
                         content = contentToAdd,
-                        start_datetime = start_datetime,
+                        start_datetime = startDatetime,
                         zoneId = currentZone.id
                     )
-                    repository.insert(entry, listOf(targetCategory))
-                    
-                    if (_selectedCategory.value != targetCategory.category) {
-                        _selectedCategory.value = targetCategory.category
+                    val persistedCategories = repository.insert(entry, listOf(targetCategory))
+                    val persistedCategoryId = persistedCategories.firstOrNull()?.id
+                        ?: targetCategory.id.takeIf { it > 0 }
+
+                    if (persistedCategoryId != null && _selectedCategoryId.value != persistedCategoryId) {
+                        _selectedCategoryId.value = persistedCategoryId
                     }
-                    _pagerAnchorEntryId.value = entry.id
+                    _pagerAnchor.value = PagerAnchor(entry.id, anchorVersionCounter.incrementAndGet())
                     _scrollToEntryId.value = entry.id
-                    _refreshTrigger.emit(Unit)
                 }
             }
         }
@@ -469,13 +518,7 @@ class MainViewModel(
 
     fun toggleEntryChecked(entry: JournalEntry) {
         viewModelScope.launch {
-            val newCheckedState = !entry.checked
-            repository.updateEntryChecked(entry.id, newCheckedState)
-            // No need to emit refreshTrigger if we use Flow from DB and update only one item?
-            // But if the list comes from Pager, invalidating it might be needed.
-            // However, with Room PagingSource, invalidation happens automatically on table change.
-            // But verify: updateChecked is an @Query.
-            // So PagingSource should invalidate.
+            repository.updateEntryChecked(entry.id, !entry.checked)
         }
     }
 }

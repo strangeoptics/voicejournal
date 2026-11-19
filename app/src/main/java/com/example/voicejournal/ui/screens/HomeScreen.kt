@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
+import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.EntryWithCategories
 import com.example.voicejournal.data.localDate
 import com.example.voicejournal.ui.components.FastScroller
@@ -44,13 +45,13 @@ import java.util.UUID
 fun HomeScreen(
     modifier: Modifier = Modifier,
     pagedEntries: LazyPagingItems<EntryWithCategories>,
-    categories: List<String> = emptyList(),
-    selectedCategory: String = "",
+    categories: List<Category> = emptyList(),
+    selectedCategory: Category? = null,
     truncationLength: Int,
     showCategoryTags: Boolean,
     selectedEntryIds: Set<UUID> = emptySet(),
     onToggleEntrySelection: (UUID) -> Unit = {},
-    onCategoryChange: (String) -> Unit = {},
+    onCategoryChange: (Category) -> Unit = {},
     selectedEntry: EntryWithCategories? = null,
     selectedDate: LocalDate? = null,
     onDateSelected: (LocalDate) -> Unit = {},
@@ -77,7 +78,7 @@ fun HomeScreen(
                 modifier = Modifier
                     .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                     .fillMaxWidth(),
-                value = selectedCategory,
+                value = selectedCategory?.category.orEmpty(),
                 onValueChange = {},
                 readOnly = true,
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
@@ -86,11 +87,11 @@ fun HomeScreen(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
             ) {
-                categories.forEach { selectionOption ->
+                categories.forEach { categoryOption ->
                     DropdownMenuItem(
-                        text = { Text(selectionOption) },
+                        text = { Text(categoryOption.category) },
                         onClick = {
-                            onCategoryChange(selectionOption)
+                            onCategoryChange(categoryOption)
                             expanded = false
                         }
                     )

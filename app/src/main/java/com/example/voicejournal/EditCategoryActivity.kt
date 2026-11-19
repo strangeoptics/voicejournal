@@ -39,12 +39,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.voicejournal.di.Injector
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 
 class EditCategoryActivity : ComponentActivity() {
 
-    private val categoryId by lazy { intent.getIntExtra(EXTRA_CATEGORY_ID, -1) }
+    private val categoryId by lazy {
+        intent.getIntExtra(EXTRA_CATEGORY_ID, EditCategoryViewModel.NEW_CATEGORY_ID)
+    }
 
     private val viewModel: EditCategoryViewModel by viewModels {
         EditCategoryViewModelFactory(Injector.provideJournalRepository(this), categoryId)
@@ -54,11 +57,11 @@ class EditCategoryActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             VoicejournalTheme {
-                val category by viewModel.category.collectAsState()
-                val isLoaded by viewModel.isLoaded.collectAsState()
-                val isSaving by viewModel.isSaving.collectAsState()
-                val saveCompleted by viewModel.saveCompleted.collectAsState()
-                val saveError by viewModel.saveError.collectAsState()
+                val category by viewModel.category.collectAsStateWithLifecycle()
+                val isLoaded by viewModel.isLoaded.collectAsStateWithLifecycle()
+                val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
+                val saveCompleted by viewModel.saveCompleted.collectAsStateWithLifecycle()
+                val saveError by viewModel.saveError.collectAsStateWithLifecycle()
 
                 LaunchedEffect(saveCompleted) {
                     if (saveCompleted) {
@@ -67,7 +70,7 @@ class EditCategoryActivity : ComponentActivity() {
                 }
 
                 LaunchedEffect(isLoaded, category) {
-                    if (categoryId != -1 && isLoaded && category == null) {
+                    if (categoryId != EditCategoryViewModel.NEW_CATEGORY_ID && isLoaded && category == null) {
                         Toast.makeText(
                             this@EditCategoryActivity,
                             "Kategorie nicht gefunden.",
@@ -88,9 +91,9 @@ class EditCategoryActivity : ComponentActivity() {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
-                } else if (categoryId == -1 || category != null) {
+                } else if (categoryId == EditCategoryViewModel.NEW_CATEGORY_ID || category != null) {
                     EditCategoryScreen(
-                        isNewCategory = categoryId == -1,
+                        isNewCategory = categoryId == EditCategoryViewModel.NEW_CATEGORY_ID,
                         isSaving = isSaving,
                         viewModel = viewModel,
                         onSave = { viewModel.saveCategory() },
@@ -106,7 +109,7 @@ class EditCategoryActivity : ComponentActivity() {
 
         fun newIntent(context: Context, categoryId: Int? = null): Intent {
             return Intent(context, EditCategoryActivity::class.java).apply {
-                putExtra(EXTRA_CATEGORY_ID, categoryId ?: -1)
+                putExtra(EXTRA_CATEGORY_ID, categoryId ?: EditCategoryViewModel.NEW_CATEGORY_ID)
             }
         }
     }
@@ -121,11 +124,11 @@ fun EditCategoryScreen(
     onSave: () -> Unit,
     onNavigateUp: () -> Unit
 ) {
-    val name by viewModel.name.collectAsState()
-    val aliases by viewModel.aliases.collectAsState()
-    val color by viewModel.color.collectAsState()
-    val checkable by viewModel.checkable.collectAsState()
-    val showDate by viewModel.showDate.collectAsState()
+    val name by viewModel.name.collectAsStateWithLifecycle()
+    val aliases by viewModel.aliases.collectAsStateWithLifecycle()
+    val color by viewModel.color.collectAsStateWithLifecycle()
+    val checkable by viewModel.checkable.collectAsStateWithLifecycle()
+    val showDate by viewModel.showDate.collectAsStateWithLifecycle()
     var showColorPickerDialog by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
@@ -163,9 +166,7 @@ fun EditCategoryScreen(
                 onValueChange = { viewModel.updateName(it) },
                 label = { Text("Category Name") },
                 modifier = Modifier.fillMaxWidth(),
-                // A category name should not be changed, as it could orphan relations
-                // However, for a new category it must be enabled.
-                enabled = isNewCategory
+                enabled = !isSaving
             )
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(

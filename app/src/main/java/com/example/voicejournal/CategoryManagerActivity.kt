@@ -37,7 +37,6 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -47,6 +46,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.ui.theme.VoicejournalTheme
@@ -62,7 +62,7 @@ class CategoryManagerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             VoicejournalTheme {
-                val categories by viewModel.categories.collectAsState()
+                val categories by viewModel.categories.collectAsStateWithLifecycle()
                 val context = LocalContext.current
 
                 Scaffold(

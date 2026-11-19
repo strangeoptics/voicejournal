@@ -164,7 +164,12 @@ interface JournalEntryDao {
             if (JournalConstants.isVirtualDeletedCategory(category) || category.category.isBlank()) {
                 continue
             }
-            val existing = categoryCache[category.category]
+            val existingById = if (category.id > 0) {
+                categoryCache.values.firstOrNull { it.id == category.id }
+            } else {
+                null
+            }
+            val existing = existingById ?: categoryCache[category.category]
             if (existing != null) {
                 resolvedList.add(existing)
             } else {
@@ -184,12 +189,16 @@ interface JournalEntryDao {
     }
 
     @Transaction
-    suspend fun insertWithCategories(entry: JournalEntry, categories: List<Category>, categoryDao: CategoryDao) {
+    suspend fun insertWithCategories(
+        entry: JournalEntry,
+        categories: List<Category>,
+        categoryDao: CategoryDao
+    ): List<Category> {
         insert(entry)
         val filtered = categories.filterNot {
             JournalConstants.isVirtualDeletedCategory(it) || it.category.isBlank()
         }
-        if (filtered.isEmpty()) return
+        if (filtered.isEmpty()) return emptyList()
         val categoryCache = categoryDao.getAllCategoriesList()
             .associateByTo(LinkedHashMap()) { it.category }
         val resolved = resolveCategories(filtered, categoryDao, categoryCache)
@@ -198,6 +207,7 @@ interface JournalEntryDao {
                 resolved.map { cat -> JournalEntryCategoryCrossRef(entry.id, cat.id) }
             )
         }
+        return resolved
     }
 
     @Transaction

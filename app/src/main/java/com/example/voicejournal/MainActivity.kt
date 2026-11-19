@@ -1,8 +1,6 @@
 package com.example.voicejournal
 
 import android.Manifest
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
@@ -14,15 +12,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -31,27 +25,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
-import androidx.core.net.toUri
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.paging.compose.collectAsLazyPagingItems
-import com.example.voicejournal.data.GpsTrackPoint
 import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.localDate
 import com.example.voicejournal.ui.components.AppDrawer
+import com.example.voicejournal.ui.components.MainActionDialogs
+import com.example.voicejournal.ui.components.MainDialogType
 import com.example.voicejournal.ui.components.MainFabMenu
 import com.example.voicejournal.ui.components.MainTopAppBar
-import com.example.voicejournal.ui.components.TimeZonePickerDialog
 import com.example.voicejournal.ui.screens.HomeScreen
 import com.example.voicejournal.ui.screens.search.SearchActivity
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.DateFormatters
+import com.example.voicejournal.util.ExternalNavigationHelper
 import com.example.voicejournal.util.NotificationHelper
 import com.example.voicejournal.util.ShareExportHelper
 import com.example.voicejournal.util.SpeechRecognitionManager
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 import java.time.LocalDateTime
-import java.util.Locale
 import java.util.UUID
 
 class MainActivity : ComponentActivity() {
@@ -69,9 +62,7 @@ class MainActivity : ComponentActivity() {
         }
         speechRecognitionManager = SpeechRecognitionManager(
             context = applicationContext,
-            onTextRecognized = { recognizedText ->
-                viewModel.processRecognizedText(recognizedText)
-            },
+            onTextRecognized = viewModel::processRecognizedText,
             scope = lifecycleScope,
             onError = { error ->
                 runOnUiThread {
@@ -87,86 +78,46 @@ class MainActivity : ComponentActivity() {
         setContent {
             VoicejournalTheme {
                 val context = LocalContext.current
-                val category by viewModel.selectedCategory.collectAsState()
-                val selectedEntry by viewModel.selectedEntry.collectAsState()
-                val selectedEntryIds by viewModel.selectedEntryIds.collectAsState()
-                val selectedDate by viewModel.selectedDate.collectAsState()
-                val isGpsTrackingEnabled by viewModel.isGpsTrackingEnabled.collectAsState()
-                val canUndo by viewModel.canUndo.collectAsState()
-                val categories by viewModel.categories.collectAsState()
-                val gpsTrackPoints by viewModel.gpsTrackPoints.collectAsState()
-                val hasGpsTrackForSelectedDate by viewModel.hasGpsTrackForSelectedDate.collectAsState()
-                val isRecording by speechRecognitionManager.isRecording.collectAsState()
-                val truncationLength by viewModel.truncationLength.collectAsState()
-                val isDeveloperModeEnabled by viewModel.isDeveloperModeEnabled.collectAsState()
-                val showCategoryTags by viewModel.showCategoryTags.collectAsState()
+                val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
+                val selectedCategoryId by viewModel.selectedCategoryId.collectAsStateWithLifecycle()
+                val selectedEntry by viewModel.selectedEntry.collectAsStateWithLifecycle()
+                val selectedEntryIds by viewModel.selectedEntryIds.collectAsStateWithLifecycle()
+                val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
+                val isGpsTrackingEnabled by viewModel.isGpsTrackingEnabled.collectAsStateWithLifecycle()
+                val canUndo by viewModel.canUndo.collectAsStateWithLifecycle()
+                val categories by viewModel.categories.collectAsStateWithLifecycle()
+                val gpsTrackPoints by viewModel.gpsTrackPoints.collectAsStateWithLifecycle()
+                val hasGpsTrackForSelectedDate by viewModel.hasGpsTrackForSelectedDate.collectAsStateWithLifecycle()
+                val isRecording by speechRecognitionManager.isRecording.collectAsStateWithLifecycle()
+                val truncationLength by viewModel.truncationLength.collectAsStateWithLifecycle()
+                val isDeveloperModeEnabled by viewModel.isDeveloperModeEnabled.collectAsStateWithLifecycle()
+                val showCategoryTags by viewModel.showCategoryTags.collectAsStateWithLifecycle()
                 val pagedEntries = viewModel.pagedEntries.collectAsLazyPagingItems()
-                val scrollToEntryId by viewModel.scrollToEntryId.collectAsState()
+                val scrollToEntryId by viewModel.scrollToEntryId.collectAsStateWithLifecycle()
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
-                var showDeleteConfirmationDialog by rememberSaveable { mutableStateOf(false) }
-                var showHardDeleteSelectionDialog by rememberSaveable { mutableStateOf(false) }
-                var showBatchTimeZoneDialog by rememberSaveable { mutableStateOf(false) }
+                var activeDialog by rememberSaveable { mutableStateOf<MainDialogType?>(null) }
                 var isFabMenuExpanded by rememberSaveable { mutableStateOf(false) }
 
-                if (showBatchTimeZoneDialog) {
-                    TimeZonePickerDialog(
-                        selectedZoneId = null,
-                        onZoneSelected = { chosenZoneId ->
-                            viewModel.updateEntriesZoneId(selectedEntryIds, chosenZoneId)
-                            showBatchTimeZoneDialog = false
-                            Toast.makeText(context, "Zeitzone aktualisiert", Toast.LENGTH_SHORT).show()
-                        },
-                        onDismiss = { showBatchTimeZoneDialog = false }
-                    )
-                }
-
-                if (showHardDeleteSelectionDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showHardDeleteSelectionDialog = false },
-                        title = { Text("Auswahl endgültig löschen") },
-                        text = { Text("Möchtest du diese ${selectedEntryIds.size} Einträge wirklich unwiderruflich löschen?") },
-                        confirmButton = {
-                            TextButton(
-                                onClick = {
-                                    viewModel.hardDeleteEntries(selectedEntryIds)
-                                    showHardDeleteSelectionDialog = false
-                                }
-                            ) {
-                                Text("Löschen")
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showHardDeleteSelectionDialog = false }) {
-                                Text("Abbrechen")
-                            }
-                        }
-                    )
-                }
-
-                if (showDeleteConfirmationDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showDeleteConfirmationDialog = false },
-                        title = { Text("Alle Einträge löschen") },
-                        text = { Text("Möchtest du wirklich alle aktiven Tagebucheinträge in den Papierkorb (\"Gelöscht\") verschieben?") },
-                        confirmButton = {
-                            TextButton(
-                                onClick = {
-                                    viewModel.deleteAllData()
-                                    showDeleteConfirmationDialog = false
-                                }
-                            ) {
-                                Text("Verschieben")
-                            }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { showDeleteConfirmationDialog = false }) {
-                                Text("Abbrechen")
-                            }
-                        }
-                    )
-                }
+                MainActionDialogs(
+                    activeDialog = activeDialog,
+                    selectedCount = selectedEntryIds.size,
+                    onBatchZoneSelected = { chosenZoneId ->
+                        viewModel.updateEntriesZoneId(selectedEntryIds, chosenZoneId)
+                        activeDialog = null
+                        Toast.makeText(context, "Zeitzone aktualisiert", Toast.LENGTH_SHORT).show()
+                    },
+                    onConfirmHardDeleteSelection = {
+                        viewModel.hardDeleteEntries(selectedEntryIds)
+                        activeDialog = null
+                    },
+                    onConfirmSoftDeleteAll = {
+                        viewModel.deleteAllData()
+                        activeDialog = null
+                    },
+                    onDismiss = { activeDialog = null }
+                )
 
                 val backgroundLocationLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestPermission(),
@@ -322,11 +273,11 @@ class MainActivity : ComponentActivity() {
                             },
                             onShowGpsTrackClicked = {
                                 scope.launch { drawerState.close() }
-                                openGoogleMapsWithTrack(gpsTrackPoints)
+                                ExternalNavigationHelper.openGoogleMapsWithTrack(context, gpsTrackPoints)
                             },
                             onDeleteAllClicked = {
                                 scope.launch { drawerState.close() }
-                                showDeleteConfirmationDialog = true
+                                activeDialog = MainDialogType.SOFT_DELETE_ALL
                             }
                         )
                     },
@@ -337,7 +288,7 @@ class MainActivity : ComponentActivity() {
                                 MainTopAppBar(
                                     selectedEntryIds = selectedEntryIds,
                                     selectedEntry = selectedEntry,
-                                    isRecycleBinSelected = JournalConstants.isVirtualDeletedName(category),
+                                    isRecycleBinSelected = selectedCategoryId == JournalConstants.CATEGORY_DELETED_ID,
                                     showCategoryTags = showCategoryTags,
                                     hasGpsTrackForSelectedDate = hasGpsTrackForSelectedDate,
                                     canUndo = canUndo,
@@ -351,7 +302,7 @@ class MainActivity : ComponentActivity() {
                                         context.startActivity(EditEntryActivity.newIntent(context, entry.entry.id))
                                         viewModel.onEntrySelected(entry)
                                     },
-                                    onChangeTimeZoneClicked = { showBatchTimeZoneDialog = true },
+                                    onChangeTimeZoneClicked = { activeDialog = MainDialogType.BATCH_TIME_ZONE },
                                     onShareAsTextClicked = {
                                         scope.launch {
                                             val text = viewModel.getEntriesForSharing(selectedEntryIds)
@@ -373,22 +324,19 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     onRestoreSelectedClicked = { viewModel.restoreEntries(selectedEntryIds) },
-                                    onRequestHardDeleteSelectedClicked = { showHardDeleteSelectionDialog = true },
+                                    onRequestHardDeleteSelectedClicked = {
+                                        activeDialog = MainDialogType.HARD_DELETE_SELECTION
+                                    },
                                     onDeleteSelectedClicked = { viewModel.deleteEntries(selectedEntryIds) },
                                     onToggleCategoryTagsClicked = viewModel::toggleShowCategoryTags,
-                                    onOpenGpsTrackClicked = { openGoogleMapsWithTrack(gpsTrackPoints) },
+                                    onOpenGpsTrackClicked = {
+                                        ExternalNavigationHelper.openGoogleMapsWithTrack(context, gpsTrackPoints)
+                                    },
                                     onUndoDeleteClicked = viewModel::onUndoDelete,
                                     onCopyToClipboardClicked = {
                                         scope.launch {
                                             val clipboardText = viewModel.getEntriesTextForClipboard()
-                                            if (clipboardText.isBlank()) {
-                                                Toast.makeText(context, "Keine Einträge zum Kopieren vorhanden", Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                val clipboardManager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                                                val clip = ClipData.newPlainText("VoiceJournal", clipboardText)
-                                                clipboardManager.setPrimaryClip(clip)
-                                                Toast.makeText(context, "In die Zwischenablage kopiert", Toast.LENGTH_SHORT).show()
-                                            }
+                                            ExternalNavigationHelper.copyEntriesTextToClipboard(context, clipboardText)
                                         }
                                     }
                                 )
@@ -414,10 +362,9 @@ class MainActivity : ComponentActivity() {
                                     isExpanded = isFabMenuExpanded,
                                     onExpandedChange = { isFabMenuExpanded = it },
                                     onCreateManualEntryClicked = {
-                                        val initialCat = viewModel.selectedCategory.value
-                                            .takeUnless { JournalConstants.isVirtualDeletedName(it) }
+                                        val initialCatId = selectedCategoryId?.takeIf { it > 0 }
                                         createEntryLauncher.launch(
-                                            EditEntryActivity.newIntentForNewEntry(context, initialCat)
+                                            EditEntryActivity.newIntentForNewEntry(context, initialCatId)
                                         )
                                     },
                                     onStartVoiceEntryClicked = requestOrStartVoiceRecording,
@@ -429,7 +376,7 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.padding(innerPadding),
                                 pagedEntries = pagedEntries,
                                 categories = categories,
-                                selectedCategory = category,
+                                selectedCategory = selectedCategory,
                                 onCategoryChange = viewModel::onCategoryChange,
                                 selectedEntry = selectedEntry,
                                 selectedEntryIds = selectedEntryIds,
@@ -437,9 +384,14 @@ class MainActivity : ComponentActivity() {
                                 selectedDate = selectedDate,
                                 onDateSelected = viewModel::onDateSelected,
                                 onEntrySelected = viewModel::onEntrySelected,
-                                onDateLongClicked = ::openGooglePhotos,
+                                onDateLongClicked = { date ->
+                                    ExternalNavigationHelper.openGooglePhotos(context, date)
+                                },
                                 onPhotoIconClicked = { entryWithCategories ->
-                                    openGooglePhotos(entryWithCategories.entry.localDate())
+                                    ExternalNavigationHelper.openGooglePhotos(
+                                        context,
+                                        entryWithCategories.entry.localDate()
+                                    )
                                 },
                                 truncationLength = truncationLength,
                                 showCategoryTags = showCategoryTags,
@@ -504,54 +456,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun openGooglePhotos(date: LocalDate) {
-        val formatter = DateFormatters.googlePhotosQuery(Locale.getDefault())
-        val url = "https://photos.google.com/search/${date.format(formatter)}"
-        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
-        try {
-            startActivity(intent)
-        } catch (_: Exception) {
-            Toast.makeText(this, "Could not open browser.", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun openGoogleMapsWithTrack(points: List<GpsTrackPoint>) {
-        if (points.size < 2) {
-            Toast.makeText(this, "Not enough GPS points to show a track.", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val origin = "${points.first().latitude},${points.first().longitude}"
-        val destination = "${points.last().latitude},${points.last().longitude}"
-        val sampledIntermediate = sampleWaypoints(points.subList(1, points.size - 1))
-        val waypointsParam = if (sampledIntermediate.isNotEmpty()) {
-            "&waypoints=" + sampledIntermediate.joinToString("|") { "${it.latitude},${it.longitude}" }
-        } else {
-            ""
-        }
-
-        val url = "https://www.google.com/maps/dir/?api=1&origin=$origin&destination=$destination$waypointsParam&travelmode=driving"
-
-        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
-        try {
-            startActivity(intent)
-        } catch (_: Exception) {
-            Toast.makeText(this, "Could not open Google Maps.", Toast.LENGTH_SHORT).show()
-        }
-    }
-
     companion object {
         const val EXTRA_ENTRY_ID = "ENTRY_ID"
-        internal const val MAX_MAPS_WAYPOINTS = 9
 
-        internal fun <T> sampleWaypoints(intermediate: List<T>, maxWaypoints: Int = MAX_MAPS_WAYPOINTS): List<T> {
-            if (maxWaypoints <= 0 || intermediate.isEmpty()) return emptyList()
-            if (intermediate.size <= maxWaypoints) return intermediate
-            if (maxWaypoints == 1) return listOf(intermediate[intermediate.size / 2])
-            return (0 until maxWaypoints).map { step ->
-                val index = ((step.toLong() * (intermediate.size - 1)) / (maxWaypoints - 1)).toInt()
-                intermediate[index]
-            }
-        }
+        internal fun <T> sampleWaypoints(
+            intermediate: List<T>,
+            maxWaypoints: Int = ExternalNavigationHelper.MAX_MAPS_WAYPOINTS
+        ): List<T> = ExternalNavigationHelper.sampleWaypoints(intermediate, maxWaypoints)
     }
 }

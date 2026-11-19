@@ -13,10 +13,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.voicejournal.ui.screens.SettingsScreen
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import java.net.Inet4Address
@@ -32,16 +32,16 @@ class SettingsActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             VoicejournalTheme {
-                val isGpsTrackingEnabled by viewModel.isGpsTrackingEnabled.collectAsState()
-                val isWebServerEnabled by viewModel.isWebServerEnabled.collectAsState()
-                val gpsInterval by viewModel.gpsInterval.collectAsState()
-                val speechService by viewModel.speechService.collectAsState()
-                val googleCloudApiKey by viewModel.googleCloudApiKey.collectAsState()
-                val maxRecordingTime by viewModel.maxRecordingTime.collectAsState()
-                val silenceThreshold by viewModel.silenceThreshold.collectAsState()
-                val silenceTimeRequired by viewModel.silenceTimeRequired.collectAsState()
-                val truncationLength by viewModel.truncationLength.collectAsState()
-                val isDeveloperModeEnabled by viewModel.isDeveloperModeEnabled.collectAsState()
+                val isGpsTrackingEnabled by viewModel.isGpsTrackingEnabled.collectAsStateWithLifecycle()
+                val isWebServerEnabled by viewModel.isWebServerEnabled.collectAsStateWithLifecycle()
+                val gpsInterval by viewModel.gpsInterval.collectAsStateWithLifecycle()
+                val speechService by viewModel.speechService.collectAsStateWithLifecycle()
+                val googleCloudApiKey by viewModel.googleCloudApiKey.collectAsStateWithLifecycle()
+                val maxRecordingTime by viewModel.maxRecordingTime.collectAsStateWithLifecycle()
+                val silenceThreshold by viewModel.silenceThreshold.collectAsStateWithLifecycle()
+                val silenceTimeRequired by viewModel.silenceTimeRequired.collectAsStateWithLifecycle()
+                val truncationLength by viewModel.truncationLength.collectAsStateWithLifecycle()
+                val isDeveloperModeEnabled by viewModel.isDeveloperModeEnabled.collectAsStateWithLifecycle()
 
                 val ipAddress = remember(isWebServerEnabled) {
                     getIpAddress(applicationContext) ?: "Unavailable"

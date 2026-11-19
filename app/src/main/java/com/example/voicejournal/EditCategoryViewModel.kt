@@ -21,10 +21,41 @@ class EditCategoryViewModel(
     private val categoryId: Int
 ) : ViewModel() {
 
+    companion object {
+        const val NEW_CATEGORY_ID = 0
+
+        internal fun validateCategoryName(
+            rawName: String,
+            categoryId: Int,
+            existingCategories: List<Category>
+        ): String? {
+            if (categoryId == JournalConstants.CATEGORY_DELETED_ID) {
+                return "Die Papierkorb-Kategorie kann nicht bearbeitet werden."
+            }
+            val trimmedName = rawName.trim()
+            if (trimmedName.isEmpty()) {
+                return "Bitte einen gültigen Kategorienamen eingeben."
+            }
+            if (JournalConstants.isVirtualDeletedName(trimmedName)) {
+                return "Der Name '${JournalConstants.CATEGORY_DELETED_NAME}' ist für den Papierkorb reserviert."
+            }
+            val conflicting = existingCategories.find { existing ->
+                existing.id != categoryId &&
+                    existing.category.equals(trimmedName, ignoreCase = true)
+            }
+            if (conflicting != null) {
+                return "Eine Kategorie mit dem Namen '${conflicting.category}' existiert bereits."
+            }
+            return null
+        }
+    }
+
+    private val isNewCategory: Boolean = categoryId == NEW_CATEGORY_ID
+
     private val _category = MutableStateFlow<Category?>(null)
     val category: StateFlow<Category?> = _category.asStateFlow()
 
-    private val _isLoaded = MutableStateFlow(categoryId == -1)
+    private val _isLoaded = MutableStateFlow(isNewCategory)
     val isLoaded: StateFlow<Boolean> = _isLoaded.asStateFlow()
 
     private val _name = MutableStateFlow(TextFieldValue(""))
@@ -52,9 +83,13 @@ class EditCategoryViewModel(
     val saveError: StateFlow<String?> = _saveError.asStateFlow()
 
     init {
-        if (categoryId != -1) {
+        if (!isNewCategory) {
             viewModelScope.launch {
-                val loaded = repository.realCategories.first().find { it.id == categoryId }
+                val loaded = if (categoryId == JournalConstants.CATEGORY_DELETED_ID) {
+                    null
+                } else {
+                    repository.realCategories.first().find { it.id == categoryId }
+                }
                 _category.value = loaded
                 if (loaded != null) {
                     _name.value = TextFieldValue(loaded.category, selection = TextRange(loaded.category.length))
@@ -69,7 +104,7 @@ class EditCategoryViewModel(
     }
 
     fun updateName(newName: TextFieldValue) {
-        if (categoryId == -1) {
+        if (categoryId != JournalConstants.CATEGORY_DELETED_ID) {
             _name.value = newName
         }
     }
@@ -101,13 +136,18 @@ class EditCategoryViewModel(
     fun saveCategory() {
         if (_isSaving.value || _saveCompleted.value) return
 
-        val trimmedName = _name.value.text.trim()
+        val rawName = _name.value.text
+        val trimmedName = rawName.trim()
         if (trimmedName.isEmpty()) {
             _saveError.value = "Bitte einen gültigen Kategorienamen eingeben."
             return
         }
         if (JournalConstants.isVirtualDeletedName(trimmedName)) {
             _saveError.value = "Der Name '${JournalConstants.CATEGORY_DELETED_NAME}' ist für den Papierkorb reserviert."
+            return
+        }
+        if (categoryId == JournalConstants.CATEGORY_DELETED_ID) {
+            _saveError.value = "Die Papierkorb-Kategorie kann nicht bearbeitet werden."
             return
         }
 
@@ -123,14 +163,24 @@ class EditCategoryViewModel(
         viewModelScope.launch {
             try {
                 withContext(NonCancellable) {
-                    val resolvedOrderIndex = if (categoryId != -1) {
+                    val realCategories = repository.getRealCategoriesList()
+                    val validationError = validateCategoryName(
+                        rawName = trimmedName,
+                        categoryId = categoryId,
+                        existingCategories = realCategories
+                    )
+                    if (validationError != null) {
+                        throw IllegalArgumentException(validationError)
+                    }
+
+                    val resolvedOrderIndex = if (!isNewCategory) {
                         existingOrderIndex.coerceIn(0, Int.MAX_VALUE - 2)
                     } else {
-                        JournalConstants.nextSafeOrderIndex(repository.getRealCategoriesList())
+                        JournalConstants.nextSafeOrderIndex(realCategories)
                     }
 
                     val categoryToSave = Category(
-                        id = categoryId.takeIf { it != -1 } ?: 0,
+                        id = if (isNewCategory) 0 else categoryId,
                         category = trimmedName,
                         aliases = currentAliases,
                         orderIndex = resolvedOrderIndex,
@@ -138,15 +188,9 @@ class EditCategoryViewModel(
                         checkable = currentCheckable,
                         showDate = currentShowDate
                     )
-                    if (categoryId != -1) {
+                    if (!isNewCategory) {
                         repository.updateCategory(categoryToSave)
                     } else {
-                        val existing = repository.getRealCategoriesList().find {
-                            it.category.equals(trimmedName, ignoreCase = true)
-                        }
-                        if (existing != null) {
-                            throw IllegalArgumentException("Eine Kategorie mit dem Namen '${existing.category}' existiert bereits.")
-                        }
                         repository.insertCategory(categoryToSave)
                     }
                 }

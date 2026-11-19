@@ -13,7 +13,16 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -24,28 +33,52 @@ import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.di.Injector
-import com.example.voicejournal.ui.components.TimeZonePickerDialog
 import com.example.voicejournal.ui.components.PublicIcon
+import com.example.voicejournal.ui.components.TimeZonePickerDialog
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.DateFormatters
 import com.example.voicejournal.util.SpeechRecognitionManager
 import com.example.voicejournal.util.TimeZoneUtils
 import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.UUID
 
 class EditEntryActivity : ComponentActivity() {
@@ -54,8 +87,10 @@ class EditEntryActivity : ComponentActivity() {
         intent.getStringExtra(EXTRA_ENTRY_ID)?.let { UUID.fromString(it) }
     }
 
-    private val categoryId: String? by lazy {
-        intent.getStringExtra(EXTRA_CATEGORY_ID)
+    private val initialCategoryId: Int? by lazy {
+        intent.takeIf { it.hasExtra(EXTRA_CATEGORY_ID) }
+            ?.getIntExtra(EXTRA_CATEGORY_ID, -1)
+            ?.takeIf { it > 0 }
     }
 
     private val viewModel: EditEntryViewModel by viewModels {
@@ -63,7 +98,7 @@ class EditEntryActivity : ComponentActivity() {
             Injector.provideJournalRepository(this),
             Injector.provideSettingsRepository(this),
             entryId,
-            categoryId
+            initialCategoryId
         )
     }
 
@@ -74,35 +109,7 @@ class EditEntryActivity : ComponentActivity() {
 
         speechRecognitionManager = SpeechRecognitionManager(
             context = applicationContext,
-            onTextRecognized = { recognizedText ->
-                val textState = viewModel.entryContent.value
-                val originalText = textState.text
-                val selMin = textState.selection.min.coerceIn(0, originalText.length)
-                val selMax = textState.selection.max.coerceIn(selMin, originalText.length)
-
-                val newText: String
-                val newCursorPos: Int
-
-                if (selMax > selMin) {
-                    // 1. Selection exists (including reverse selection): replace selected range
-                    newText = originalText.replaceRange(selMin, selMax, recognizedText)
-                    newCursorPos = selMin + recognizedText.length
-                } else if (selMin >= originalText.length) {
-                    // 2. Cursor at the very end: append on a new line
-                    newText = if (originalText.isNotEmpty()) {
-                        originalText + "\n" + recognizedText
-                    } else {
-                        recognizedText
-                    }
-                    newCursorPos = newText.length
-                } else {
-                    // 3. Cursor is in the middle or at the start: insert at cursor
-                    newText = originalText.replaceRange(selMin, selMax, recognizedText)
-                    newCursorPos = selMin + recognizedText.length
-                }
-
-                viewModel.updateContent(TextFieldValue(newText, selection = TextRange(newCursorPos)))
-            },
+            onTextRecognized = viewModel::insertDictatedText,
             scope = lifecycleScope,
             onError = { error ->
                 runOnUiThread {
@@ -119,8 +126,8 @@ class EditEntryActivity : ComponentActivity() {
 
         setContent {
             VoicejournalTheme {
-                val entry by viewModel.entry.collectAsState()
-                val allCategories by viewModel.allCategories.collectAsState()
+                val entry by viewModel.entry.collectAsStateWithLifecycle()
+                val allCategories by viewModel.allCategories.collectAsStateWithLifecycle()
 
                 entry?.let {
                     EditEntryScreen(
@@ -173,12 +180,23 @@ class EditEntryActivity : ComponentActivity() {
                 putExtra(EXTRA_ENTRY_ID, entryId.toString())
             }
         }
-        fun newIntentForNewEntry(context: Context, categoryId: String? = null): Intent {
+
+        fun newIntentForNewEntry(context: Context, categoryId: Int? = null): Intent {
             return Intent(context, EditEntryActivity::class.java).apply {
-                categoryId?.let { putExtra(EXTRA_CATEGORY_ID, it) }
+                if (categoryId != null && categoryId > 0) {
+                    putExtra(EXTRA_CATEGORY_ID, categoryId)
+                }
             }
         }
     }
+}
+
+private enum class ActiveEntryPicker {
+    START_DATE,
+    START_TIME,
+    STOP_DATE,
+    STOP_TIME,
+    TIME_ZONE
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -191,16 +209,16 @@ fun EditEntryScreen(
     speechRecognitionManager: SpeechRecognitionManager,
     viewModel: EditEntryViewModel
 ) {
-    val entryContent by viewModel.entryContent.collectAsState()
-    val hasImage by viewModel.hasImage.collectAsState()
-    val startDateTimeMillis by viewModel.startDateTime.collectAsState()
-    val stopDateTimeMillis by viewModel.stopDateTime.collectAsState()
-    val zoneId by viewModel.zoneId.collectAsState()
-    val selectedCategories by viewModel.selectedCategories.collectAsState()
-    val isSaving by viewModel.isSaving.collectAsState()
-    val saveCompleted by viewModel.saveCompleted.collectAsState()
-    val createdEntryId by viewModel.createdEntryId.collectAsState()
-    val saveError by viewModel.saveError.collectAsState()
+    val entryContent by viewModel.entryContent.collectAsStateWithLifecycle()
+    val hasImage by viewModel.hasImage.collectAsStateWithLifecycle()
+    val startDateTimeMillis by viewModel.startDateTime.collectAsStateWithLifecycle()
+    val stopDateTimeMillis by viewModel.stopDateTime.collectAsStateWithLifecycle()
+    val zoneId by viewModel.zoneId.collectAsStateWithLifecycle()
+    val selectedCategoryIds by viewModel.selectedCategoryIds.collectAsStateWithLifecycle()
+    val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
+    val saveCompleted by viewModel.saveCompleted.collectAsStateWithLifecycle()
+    val createdEntryId by viewModel.createdEntryId.collectAsStateWithLifecycle()
+    val saveError by viewModel.saveError.collectAsStateWithLifecycle()
 
     val activeZone = remember(zoneId) {
         TimeZoneUtils.resolveZoneId(zoneId)
@@ -216,132 +234,23 @@ fun EditEntryScreen(
         }
     }
 
-    var showStartDatePicker by rememberSaveable { mutableStateOf(false) }
-    var showStartTimePicker by rememberSaveable { mutableStateOf(false) }
-    var showStopDatePicker by rememberSaveable { mutableStateOf(false) }
-    var showStopTimePicker by rememberSaveable { mutableStateOf(false) }
-    var showTimeZonePicker by rememberSaveable { mutableStateOf(false) }
+    var activePicker by rememberSaveable { mutableStateOf<ActiveEntryPicker?>(null) }
 
-    if (showStartDatePicker) {
-        val startDatePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = TimeZoneUtils.localDateToDatePickerMillis(startDateTime.toLocalDate())
-        )
-        DatePickerDialog(
-            onDismissRequest = { showStartDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    startDatePickerState.selectedDateMillis?.let { millis ->
-                        val selectedDate = TimeZoneUtils.datePickerMillisToLocalDate(millis)
-                        val newDateTime = startDateTime.with(selectedDate)
-                        viewModel.updateStartDateTime(newDateTime.atZone(activeZone).toInstant().toEpochMilli())
-                    }
-                    showStartDatePicker = false
-                }) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showStartDatePicker = false }) { Text("Cancel") }
-            }
-        ) {
-            DatePicker(state = startDatePickerState)
-        }
-    }
-
-    if (showStartTimePicker) {
-        val startTimePickerState = rememberTimePickerState(
-            initialHour = startDateTime.hour,
-            initialMinute = startDateTime.minute,
-            is24Hour = true
-        )
-        AlertDialog(
-            onDismissRequest = { showStartTimePicker = false },
-            title = { Text("Select Time") },
-            text = {
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    TimePicker(state = startTimePickerState)
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val newDateTime = startDateTime.withHour(startTimePickerState.hour).withMinute(startTimePickerState.minute)
-                    viewModel.updateStartDateTime(newDateTime.atZone(activeZone).toInstant().toEpochMilli())
-                    showStartTimePicker = false
-                }) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showStartTimePicker = false }) { Text("Cancel") }
-            }
-        )
-    }
-
-    if (showStopDatePicker) {
-        val initialStopDate = stopDateTime?.toLocalDate() ?: LocalDateTime.now(activeZone).toLocalDate()
-        val stopDatePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = TimeZoneUtils.localDateToDatePickerMillis(initialStopDate)
-        )
-        DatePickerDialog(
-            onDismissRequest = { showStopDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    stopDatePickerState.selectedDateMillis?.let { millis ->
-                        val selectedDate = TimeZoneUtils.datePickerMillisToLocalDate(millis)
-                        val newDateTime = (stopDateTime ?: LocalDateTime.now(activeZone)).with(selectedDate)
-                        viewModel.updateStopDateTime(newDateTime.atZone(activeZone).toInstant().toEpochMilli())
-                    }
-                    showStopDatePicker = false
-                }) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showStopDatePicker = false }) { Text("Cancel") }
-            }
-        ) {
-            DatePicker(state = stopDatePickerState)
-        }
-    }
-
-    if (showStopTimePicker) {
-        val initialStopDateTime = stopDateTime ?: LocalDateTime.now(activeZone)
-        val stopTimePickerState = rememberTimePickerState(
-            initialHour = initialStopDateTime.hour,
-            initialMinute = initialStopDateTime.minute,
-            is24Hour = true
-        )
-        AlertDialog(
-            onDismissRequest = { showStopTimePicker = false },
-            title = { Text("Select Time") },
-            text = {
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    TimePicker(state = stopTimePickerState)
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val newDateTime = (stopDateTime ?: LocalDateTime.now(activeZone))
-                        .withHour(stopTimePickerState.hour)
-                        .withMinute(stopTimePickerState.minute)
-                    viewModel.updateStopDateTime(newDateTime.atZone(activeZone).toInstant().toEpochMilli())
-                    showStopTimePicker = false
-                }) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showStopTimePicker = false }) { Text("Cancel") }
-            }
-        )
-    }
-
-    if (showTimeZonePicker) {
-        TimeZonePickerDialog(
-            selectedZoneId = zoneId,
-            referenceMillis = startDateTimeMillis,
-            onZoneSelected = { selected ->
-                viewModel.updateZoneId(selected)
-                showTimeZonePicker = false
-            },
-            onDismiss = { showTimeZonePicker = false }
-        )
-    }
+    EntryPickerDialogs(
+        activePicker = activePicker,
+        startDateTime = startDateTime,
+        stopDateTime = stopDateTime,
+        activeZone = activeZone,
+        zoneId = zoneId,
+        referenceMillis = startDateTimeMillis,
+        onUpdateStartMillis = viewModel::updateStartDateTime,
+        onUpdateStopMillis = viewModel::updateStopDateTime,
+        onUpdateZoneId = viewModel::updateZoneId,
+        onDismiss = { activePicker = null }
+    )
 
     val context = LocalContext.current
-    val isRecording by speechRecognitionManager.isRecording.collectAsState()
+    val isRecording by speechRecognitionManager.isRecording.collectAsStateWithLifecycle()
 
     LaunchedEffect(saveCompleted) {
         if (saveCompleted) {
@@ -356,11 +265,11 @@ fun EditEntryScreen(
         }
     }
 
-    val speechService by viewModel.speechService.collectAsState()
-    val googleCloudApiKey by viewModel.googleCloudApiKey.collectAsState()
-    val maxRecordingTime by viewModel.maxRecordingTime.collectAsState()
-    val silenceThreshold by viewModel.silenceThreshold.collectAsState()
-    val silenceTimeRequired by viewModel.silenceTimeRequired.collectAsState()
+    val speechService by viewModel.speechService.collectAsStateWithLifecycle()
+    val googleCloudApiKey by viewModel.googleCloudApiKey.collectAsStateWithLifecycle()
+    val maxRecordingTime by viewModel.maxRecordingTime.collectAsStateWithLifecycle()
+    val silenceThreshold by viewModel.silenceThreshold.collectAsStateWithLifecycle()
+    val silenceTimeRequired by viewModel.silenceTimeRequired.collectAsStateWithLifecycle()
 
     val startDictation = {
         speechRecognitionManager.startListening(
@@ -436,55 +345,25 @@ fun EditEntryScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            val startDateInteractionSource = remember { MutableInteractionSource() }
-            LaunchedEffect(startDateInteractionSource) {
-                startDateInteractionSource.interactions.collect { interaction ->
-                    if (interaction is PressInteraction.Release) { showStartDatePicker = true }
-                }
-            }
-
-            val startTimeInteractionSource = remember { MutableInteractionSource() }
-            LaunchedEffect(startTimeInteractionSource) {
-                startTimeInteractionSource.interactions.collect { interaction ->
-                    if (interaction is PressInteraction.Release) { showStartTimePicker = true }
-                }
-            }
-            
-            val stopDateInteractionSource = remember { MutableInteractionSource() }
-            LaunchedEffect(stopDateInteractionSource) {
-                stopDateInteractionSource.interactions.collect { interaction ->
-                    if (interaction is PressInteraction.Release) { showStopDatePicker = true }
-                }
-            }
-
-            val stopTimeInteractionSource = remember { MutableInteractionSource() }
-            LaunchedEffect(stopTimeInteractionSource) {
-                stopTimeInteractionSource.interactions.collect { interaction ->
-                    if (interaction is PressInteraction.Release) { showStopTimePicker = true }
-                }
-            }
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedTextField(
+                ReadOnlyPickerField(
                     value = startDateTime.format(DateFormatters.ISO_DATE),
-                    onValueChange = {},
-                    label = { Text("Start Date") },
-                    readOnly = true,
-                    modifier = Modifier.weight(1f),
-                    interactionSource = startDateInteractionSource,
-                    trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = "Select Start Date") }
+                    label = "Start Date",
+                    trailingIcon = Icons.Default.DateRange,
+                    trailingIconContentDescription = "Select Start Date",
+                    onClick = { activePicker = ActiveEntryPicker.START_DATE },
+                    modifier = Modifier.weight(1f)
                 )
-                OutlinedTextField(
+                ReadOnlyPickerField(
                     value = startDateTime.format(DateFormatters.TIME_HM),
-                    onValueChange = {},
-                    label = { Text("Start Time") },
-                    readOnly = true,
-                    modifier = Modifier.weight(1f),
-                    interactionSource = startTimeInteractionSource,
-                    trailingIcon = { Icon(Icons.Default.Schedule, contentDescription = "Select Start Time") }
+                    label = "Start Time",
+                    trailingIcon = Icons.Default.Schedule,
+                    trailingIconContentDescription = "Select Start Time",
+                    onClick = { activePicker = ActiveEntryPicker.START_TIME },
+                    modifier = Modifier.weight(1f)
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -493,23 +372,21 @@ fun EditEntryScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
+                ReadOnlyPickerField(
                     value = stopDateTime?.format(DateFormatters.ISO_DATE) ?: "",
-                    onValueChange = {},
-                    label = { Text("Stop Date") },
-                    readOnly = true,
-                    modifier = Modifier.weight(1f),
-                    interactionSource = stopDateInteractionSource,
-                    trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = "Select Stop Date") }
+                    label = "Stop Date",
+                    trailingIcon = Icons.Default.DateRange,
+                    trailingIconContentDescription = "Select Stop Date",
+                    onClick = { activePicker = ActiveEntryPicker.STOP_DATE },
+                    modifier = Modifier.weight(1f)
                 )
-                OutlinedTextField(
+                ReadOnlyPickerField(
                     value = stopDateTime?.format(DateFormatters.TIME_HM) ?: "",
-                    onValueChange = {},
-                    label = { Text("Stop Time") },
-                    readOnly = true,
-                    modifier = Modifier.weight(1f),
-                    interactionSource = stopTimeInteractionSource,
-                    trailingIcon = { Icon(Icons.Default.Schedule, contentDescription = "Select Stop Time") }
+                    label = "Stop Time",
+                    trailingIcon = Icons.Default.Schedule,
+                    trailingIconContentDescription = "Select Stop Time",
+                    onClick = { activePicker = ActiveEntryPicker.STOP_TIME },
+                    modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = { viewModel.updateStopDateTime(null) }) {
                     Icon(Icons.Default.Clear, contentDescription = "Clear Stop Time")
@@ -518,24 +395,17 @@ fun EditEntryScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            val timeZoneInteractionSource = remember { MutableInteractionSource() }
-            LaunchedEffect(timeZoneInteractionSource) {
-                timeZoneInteractionSource.interactions.collect { interaction ->
-                    if (interaction is PressInteraction.Release) { showTimeZonePicker = true }
-                }
-            }
             val zoneDisplayText = remember(zoneId, activeZone, startDateTimeMillis) {
                 val formatted = TimeZoneUtils.formatZoneLabel(activeZone, startDateTimeMillis)
                 if (zoneId == null) "System ($formatted)" else formatted
             }
-            OutlinedTextField(
+            ReadOnlyPickerField(
                 value = zoneDisplayText,
-                onValueChange = {},
-                label = { Text("Time Zone") },
-                readOnly = true,
-                modifier = Modifier.fillMaxWidth(),
-                interactionSource = timeZoneInteractionSource,
-                trailingIcon = { Icon(PublicIcon, contentDescription = "Select Time Zone") }
+                label = "Time Zone",
+                trailingIcon = PublicIcon,
+                trailingIconContentDescription = "Select Time Zone",
+                onClick = { activePicker = ActiveEntryPicker.TIME_ZONE },
+                modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -551,9 +421,9 @@ fun EditEntryScreen(
             allCategories.forEach { category ->
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Checkbox(
-                        checked = selectedCategories.contains(category.category),
+                        checked = selectedCategoryIds.contains(category.id),
                         onCheckedChange = { isChecked ->
-                            viewModel.toggleCategory(category.category, isChecked)
+                            viewModel.toggleCategory(category.id, isChecked)
                         }
                     )
                     Text(category.category)
@@ -561,4 +431,173 @@ fun EditEntryScreen(
             }
         }
     }
+}
+
+@Composable
+private fun ReadOnlyPickerField(
+    value: String,
+    label: String,
+    trailingIcon: ImageVector,
+    trailingIconContentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val currentOnClick by rememberUpdatedState(onClick)
+    LaunchedEffect(interactionSource) {
+        interactionSource.interactions.collect { interaction ->
+            if (interaction is PressInteraction.Release) {
+                currentOnClick()
+            }
+        }
+    }
+    OutlinedTextField(
+        value = value,
+        onValueChange = {},
+        label = { Text(label) },
+        readOnly = true,
+        modifier = modifier,
+        interactionSource = interactionSource,
+        trailingIcon = { Icon(trailingIcon, contentDescription = trailingIconContentDescription) }
+    )
+}
+
+@Composable
+private fun EntryPickerDialogs(
+    activePicker: ActiveEntryPicker?,
+    startDateTime: LocalDateTime,
+    stopDateTime: LocalDateTime?,
+    activeZone: ZoneId,
+    zoneId: String?,
+    referenceMillis: Long,
+    onUpdateStartMillis: (Long) -> Unit,
+    onUpdateStopMillis: (Long?) -> Unit,
+    onUpdateZoneId: (String?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    when (activePicker) {
+        ActiveEntryPicker.START_DATE -> {
+            EntryDatePickerDialog(
+                initialDate = startDateTime.toLocalDate(),
+                onDateSelected = { selectedDate ->
+                    onUpdateStartMillis(startDateTime.with(selectedDate).atZone(activeZone).toInstant().toEpochMilli())
+                    onDismiss()
+                },
+                onDismiss = onDismiss
+            )
+        }
+        ActiveEntryPicker.START_TIME -> {
+            EntryTimePickerDialog(
+                initialHour = startDateTime.hour,
+                initialMinute = startDateTime.minute,
+                onTimeSelected = { hour, minute ->
+                    val updated = startDateTime.withHour(hour).withMinute(minute)
+                    onUpdateStartMillis(updated.atZone(activeZone).toInstant().toEpochMilli())
+                    onDismiss()
+                },
+                onDismiss = onDismiss
+            )
+        }
+        ActiveEntryPicker.STOP_DATE -> {
+            val baseDateTime = stopDateTime ?: LocalDateTime.now(activeZone)
+            EntryDatePickerDialog(
+                initialDate = baseDateTime.toLocalDate(),
+                onDateSelected = { selectedDate ->
+                    val updated = (stopDateTime ?: LocalDateTime.now(activeZone)).with(selectedDate)
+                    onUpdateStopMillis(updated.atZone(activeZone).toInstant().toEpochMilli())
+                    onDismiss()
+                },
+                onDismiss = onDismiss
+            )
+        }
+        ActiveEntryPicker.STOP_TIME -> {
+            val baseDateTime = stopDateTime ?: LocalDateTime.now(activeZone)
+            EntryTimePickerDialog(
+                initialHour = baseDateTime.hour,
+                initialMinute = baseDateTime.minute,
+                onTimeSelected = { hour, minute ->
+                    val updated = (stopDateTime ?: LocalDateTime.now(activeZone))
+                        .withHour(hour)
+                        .withMinute(minute)
+                    onUpdateStopMillis(updated.atZone(activeZone).toInstant().toEpochMilli())
+                    onDismiss()
+                },
+                onDismiss = onDismiss
+            )
+        }
+        ActiveEntryPicker.TIME_ZONE -> {
+            TimeZonePickerDialog(
+                selectedZoneId = zoneId,
+                referenceMillis = referenceMillis,
+                onZoneSelected = { selected ->
+                    onUpdateZoneId(selected)
+                    onDismiss()
+                },
+                onDismiss = onDismiss
+            )
+        }
+        null -> Unit
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EntryDatePickerDialog(
+    initialDate: LocalDate,
+    onDateSelected: (LocalDate) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = TimeZoneUtils.localDateToDatePickerMillis(initialDate)
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = {
+                val selectedMillis = datePickerState.selectedDateMillis
+                if (selectedMillis != null) {
+                    onDateSelected(TimeZoneUtils.datePickerMillisToLocalDate(selectedMillis))
+                } else {
+                    onDismiss()
+                }
+            }) { Text("OK") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    ) {
+        DatePicker(state = datePickerState)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EntryTimePickerDialog(
+    initialHour: Int,
+    initialMinute: Int,
+    onTimeSelected: (Int, Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val timePickerState = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = true
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select Time") },
+        text = {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                TimePicker(state = timePickerState)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onTimeSelected(timePickerState.hour, timePickerState.minute) }) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }

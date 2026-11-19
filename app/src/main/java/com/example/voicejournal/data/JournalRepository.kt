@@ -144,10 +144,10 @@ class JournalRepository(
     }
 
     suspend fun getEntriesForClipboard(
-        categoryName: String,
+        categoryId: Int?,
         selectedDate: LocalDate?
     ): List<EntryWithCategories> {
-        if (JournalConstants.isVirtualDeletedName(categoryName)) {
+        if (categoryId == JournalConstants.CATEGORY_DELETED_ID) {
             val deleted = entryDao.getPaginatedDeletedEntries(500, 0)
             return if (selectedDate != null) {
                 deleted.filter { it.entry.localDate() == selectedDate }
@@ -156,24 +156,20 @@ class JournalRepository(
             }
         }
 
-        val category = if (categoryName.isNotBlank()) {
-            categoryDao.getCategoryByName(categoryName)
-        } else {
-            null
-        }
+        val validCategoryId = categoryId?.takeIf { it > 0 }
 
         if (selectedDate != null) {
             val (queryStartMillis, queryEndMillis) = TimeZoneUtils.utcQueryBoundsForLocalDates(selectedDate)
-            val candidates = if (category != null) {
-                entryDao.getEntriesWithCategoriesInDateRangeForCategory(category.id, queryStartMillis, queryEndMillis).first()
+            val candidates = if (validCategoryId != null) {
+                entryDao.getEntriesWithCategoriesInDateRangeForCategory(validCategoryId, queryStartMillis, queryEndMillis).first()
             } else {
                 entryDao.getEntriesWithCategoriesInDateRange(queryStartMillis, queryEndMillis).first()
             }
             return candidates.filter { it.entry.localDate() == selectedDate }
         }
 
-        return if (category != null) {
-            entryDao.getEntriesForCategory(category.id)
+        return if (validCategoryId != null) {
+            entryDao.getEntriesForCategory(validCategoryId)
         } else {
             entryDao.getPaginatedEntriesWithCategories(500, 0)
         }
@@ -213,9 +209,9 @@ class JournalRepository(
         categoryDao.updateCategories(filtered)
     }
 
-    suspend fun insert(entry: JournalEntry, categories: List<Category>) {
+    suspend fun insert(entry: JournalEntry, categories: List<Category>): List<Category> {
         val filtered = categories.filterNot { JournalConstants.isVirtualDeletedCategory(it) }
-        entryDao.insertWithCategories(entry, filtered, categoryDao)
+        return entryDao.insertWithCategories(entry, filtered, categoryDao)
     }
 
     suspend fun update(entry: JournalEntry, categories: List<Category>) {

@@ -22,7 +22,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +34,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.voicejournal.ui.components.Appointment
 import com.example.voicejournal.ui.components.DayEntriesPreviewOverlay
 import com.example.voicejournal.ui.components.DayEntriesPreviewState
@@ -65,11 +65,11 @@ class CalendarActivity : ComponentActivity() {
 fun CalendarScreen(viewModel: CalendarViewModel, onFinish: () -> Unit) {
     val context = LocalContext.current
 
-    val viewMode by viewModel.viewMode.collectAsState()
-    val currentMonth by viewModel.currentMonth.collectAsState()
-    val appointments by viewModel.appointments.collectAsState()
-    val selectedDate by viewModel.selectedDate.collectAsState()
-    val visibleDates by viewModel.visibleDates.collectAsState()
+    val viewMode by viewModel.viewMode.collectAsStateWithLifecycle()
+    val currentMonth by viewModel.currentMonth.collectAsStateWithLifecycle()
+    val appointments by viewModel.appointments.collectAsStateWithLifecycle()
+    val selectedDate by viewModel.selectedDate.collectAsStateWithLifecycle()
+    val visibleDates by viewModel.visibleDates.collectAsStateWithLifecycle()
 
     var previewEpochDay by rememberSaveable { mutableStateOf<Long?>(null) }
     var previewPivotX by rememberSaveable { mutableFloatStateOf(0.5f) }

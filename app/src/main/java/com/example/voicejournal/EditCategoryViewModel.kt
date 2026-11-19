@@ -73,6 +73,9 @@ class EditCategoryViewModel(
     private val _showDate = MutableStateFlow(true)
     val showDate: StateFlow<Boolean> = _showDate.asStateFlow()
 
+    private val _deleteLineOnDoubleTap = MutableStateFlow(false)
+    val deleteLineOnDoubleTap: StateFlow<Boolean> = _deleteLineOnDoubleTap.asStateFlow()
+
     private val _isSaving = MutableStateFlow(false)
     val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
 
@@ -97,6 +100,7 @@ class EditCategoryViewModel(
                     _color.value = TextFieldValue(loaded.color, selection = TextRange(loaded.color.length))
                     _checkable.value = loaded.checkable
                     _showDate.value = loaded.showDate
+                    _deleteLineOnDoubleTap.value = loaded.deleteLineOnDoubleTap
                 }
                 _isLoaded.value = true
             }
@@ -129,6 +133,10 @@ class EditCategoryViewModel(
         _showDate.value = value
     }
 
+    fun updateDeleteLineOnDoubleTap(value: Boolean) {
+        _deleteLineOnDoubleTap.value = value
+    }
+
     fun clearSaveError() {
         _saveError.value = null
     }
@@ -155,6 +163,7 @@ class EditCategoryViewModel(
         val currentColor = _color.value.text
         val currentCheckable = _checkable.value
         val currentShowDate = _showDate.value
+        val currentDeleteLineOnDoubleTap = _deleteLineOnDoubleTap.value
         val existingOrderIndex = _category.value?.orderIndex ?: 0
 
         _isSaving.value = true
@@ -186,7 +195,8 @@ class EditCategoryViewModel(
                         orderIndex = resolvedOrderIndex,
                         color = currentColor,
                         checkable = currentCheckable,
-                        showDate = currentShowDate
+                        showDate = currentShowDate,
+                        deleteLineOnDoubleTap = currentDeleteLineOnDoubleTap
                     )
                     if (!isNewCategory) {
                         repository.updateCategory(categoryToSave)

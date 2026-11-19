@@ -15,10 +15,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -43,6 +48,7 @@ import com.example.voicejournal.util.ExternalNavigationHelper
 import com.example.voicejournal.util.NotificationHelper
 import com.example.voicejournal.util.ShareExportHelper
 import com.example.voicejournal.util.SpeechRecognitionManager
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.util.UUID
@@ -96,9 +102,27 @@ class MainActivity : ComponentActivity() {
                 val scrollToEntryId by viewModel.scrollToEntryId.collectAsStateWithLifecycle()
 
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+                val snackbarHostState = remember { SnackbarHostState() }
                 val scope = rememberCoroutineScope()
                 var activeDialog by rememberSaveable { mutableStateOf<MainDialogType?>(null) }
                 var isFabMenuExpanded by rememberSaveable { mutableStateOf(false) }
+
+                LaunchedEffect(viewModel) {
+                    viewModel.undoPromptEvents.collectLatest { promptType ->
+                        val message = when (promptType) {
+                            UndoPromptType.LINE_DELETED -> context.getString(R.string.snackbar_line_deleted)
+                            UndoPromptType.ENTRY_DELETED -> context.getString(R.string.snackbar_entry_deleted)
+                        }
+                        val result = snackbarHostState.showSnackbar(
+                            message = message,
+                            actionLabel = context.getString(R.string.action_undo),
+                            duration = SnackbarDuration.Short
+                        )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            viewModel.onUndoDelete()
+                        }
+                    }
+                }
 
                 MainActionDialogs(
                     activeDialog = activeDialog,
@@ -284,6 +308,7 @@ class MainActivity : ComponentActivity() {
                     content = {
                         Scaffold(
                             modifier = Modifier.fillMaxSize(),
+                            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
                             topBar = {
                                 MainTopAppBar(
                                     selectedEntryIds = selectedEntryIds,
@@ -332,7 +357,10 @@ class MainActivity : ComponentActivity() {
                                     onOpenGpsTrackClicked = {
                                         ExternalNavigationHelper.openGoogleMapsWithTrack(context, gpsTrackPoints)
                                     },
-                                    onUndoDeleteClicked = viewModel::onUndoDelete,
+                                    onUndoDeleteClicked = {
+                                        snackbarHostState.currentSnackbarData?.dismiss()
+                                        viewModel.onUndoDelete()
+                                    },
                                     onCopyToClipboardClicked = {
                                         scope.launch {
                                             val clipboardText = viewModel.getEntriesTextForClipboard()
@@ -397,7 +425,8 @@ class MainActivity : ComponentActivity() {
                                 showCategoryTags = showCategoryTags,
                                 scrollToEntryId = scrollToEntryId,
                                 onScrolledToEntry = viewModel::onScrolledToEntry,
-                                onCheckedChange = { entry -> viewModel.toggleEntryChecked(entry.entry) }
+                                onCheckedChange = { entry -> viewModel.toggleEntryChecked(entry.entry) },
+                                onDeleteLineInEntry = viewModel::deleteLineInEntry
                             )
                         }
                     }

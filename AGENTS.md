@@ -1,7 +1,7 @@
 # voicejournal Project
 
 voicejournal is an Android app for writing a personal voice-enabled journal, task list, and appointment diary (`minSdk = 34`, `targetSdk = 36`, `compileSdk = 36`).
-Each entry (`app/src/main/java/com/example/voicejournal/data/JournalEntry.kt`) has a `UUID` primary key, start/optional stop timestamps, checkable state, image flag, and per-entry IANA timezone (`zoneId`), and can be assigned to one or more categories (`app/src/main/java/com/example/voicejournal/data/Category.kt`, supporting custom colors, sort order, voice aliases, checkable To-Do mode, and optional date headers).
+Each entry (`app/src/main/java/com/example/voicejournal/data/JournalEntry.kt`) has a `UUID` primary key, start/optional stop timestamps, checkable state, image flag, and per-entry IANA timezone (`zoneId`), and can be assigned to one or more categories (`app/src/main/java/com/example/voicejournal/data/Category.kt`, supporting custom colors, sort order, voice aliases, checkable To-Do mode, untruncated double-tap line-deletion shopping-list mode via `deleteLineOnDoubleTap`, and optional date headers).
 The main view (`app/src/main/java/com/example/voicejournal/ui/screens/HomeScreen.kt`), hosted by `MainActivity` (with `MainTopAppBar`, `MainFabMenu`, and `AppDrawer`), displays entries grouped by day with Paging 3 (`androidx.paging`), a custom `FastScroller` (`app/src/main/java/com/example/voicejournal/ui/components/FastScroller.kt`), and automatic category switching + scroll-to-entry (`JournalRepository.createdEntryEvents`) whenever a new entry is created.
 
 ## Core Features
@@ -50,8 +50,8 @@ Optional periodic GPS track logging via `WorkManager` (`LocationWorker`, minimum
 - **Formatting, Timezones & Localization:** Shared thread-safe `DateTimeFormatter` instances in `DateFormatters` (`app/src/main/java/com/example/voicejournal/util/DateFormatters.kt`), timezone resolution and offset-aware formatting in `TimeZoneUtils` (`app/src/main/java/com/example/voicejournal/util/TimeZoneUtils.kt`), and localized string resources in `res/values/strings.xml` and `res/values-de/strings.xml`.
 
 ### Data Persistence & Security
-- **Local Database:** **Room** (`2.8.x`, `AppDatabase`, schema version `18`, schemas exported to `app/schemas/`).
-- **Zero Data Loss Policy:** Explicit `Migration` chain (`MIGRATION_1_2` through `MIGRATION_17_18`) — `fallbackToDestructiveMigration` is strictly forbidden.
+- **Local Database:** **Room** (`2.8.x`, `AppDatabase`, schema version `19`, schemas exported to `app/schemas/`).
+- **Zero Data Loss Policy:** Explicit `Migration` chain (`MIGRATION_1_2` through `MIGRATION_18_19`) — `fallbackToDestructiveMigration` is strictly forbidden.
   - Uses **Soft Delete** (`deletedAt: Long?`). Active views filter `deletedAt IS NULL`; the virtual read-only category `"Gelöscht"` (ID `-1`) serves as the recycle bin, where entries can be restored or permanently deleted after confirmation.
   - Stores per-entry IANA timezone ID (`zoneId: String?` on `JournalEntry`, falling back to `ZoneId.systemDefault()` when `null`) so entries retain their authentic creation local date/time across travel timezones while keeping chronological UTC ordering (`start_datetime`).
 - **Credential Storage:** `SecureApiKeyStore` encrypts the Google Cloud Speech API key using Android Keystore `AES/GCM/NoPadding` (256-bit) inside excluded `SharedPreferences` (`voice_journal_secure_prefs`), excluded from cloud backup and device transfer in `backup_rules.xml` and `data_extraction_rules.xml`.
@@ -64,4 +64,4 @@ Optional periodic GPS track logging via `WorkManager` (`LocationWorker`, minimum
 - **Project Reference Docs:**
   - `DATABASE.html`: Interactive Room v18 entity-relationship and schema diagram.
   - `GLOSSARY.html`: UI & domain glossary defining canonical German/English component terms for prompts and UI consistency.
-- **Unit Tests (`app/src/test/`):** JUnit 4 suites covering voice category parsing & target category resolution (`ExampleUnitTest.kt`), travel timezone utilities (`TimeZoneSupportTest.kt`), week timeline overlap/scroll behavior (`WeekViewBugFixTest.kt`), and month grid / day preview overlay logic (`MonthViewTest.kt`).
+- **Unit Tests (`app/src/test/`):** JUnit 4 suites covering voice category parsing & target category resolution (`ExampleUnitTest.kt`), travel timezone utilities (`TimeZoneSupportTest.kt`), shopping-list double-tap line deletion & LIFO undo (`LineDeleteAndUndoTest.kt`), week timeline overlap/scroll behavior (`WeekViewBugFixTest.kt`), and month grid / day preview overlay logic (`MonthViewTest.kt`).

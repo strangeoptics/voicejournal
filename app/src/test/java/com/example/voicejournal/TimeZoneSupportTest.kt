@@ -162,7 +162,7 @@ class TimeZoneSupportTest {
     @Test
     fun migrationChain1To18_isContiguousAndExecutesAlterTableAddZoneId() {
         val migrations = AppDatabase.ALL_MIGRATIONS
-        assertEquals(17, migrations.size)
+        assertEquals(18, migrations.size)
         migrations.forEachIndexed { index, migration ->
             assertEquals(index + 1, migration.startVersion)
             assertEquals(index + 2, migration.endVersion)

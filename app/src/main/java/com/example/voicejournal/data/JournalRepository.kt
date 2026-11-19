@@ -62,13 +62,27 @@ object JournalConstants {
     }
 }
 
-class JournalRepository(
-    private val database: AppDatabase,
+class JournalRepository internal constructor(
     private val entryDao: JournalEntryDao,
     private val categoryDao: CategoryDao,
     private val gpsTrackPointDao: GpsTrackPointDao,
-    private val backupManager: JournalBackupManager
+    private val backupManager: JournalBackupManager,
+    private val runInTransaction: suspend (suspend () -> Unit) -> Unit
 ) {
+
+    constructor(
+        database: AppDatabase,
+        entryDao: JournalEntryDao,
+        categoryDao: CategoryDao,
+        gpsTrackPointDao: GpsTrackPointDao,
+        backupManager: JournalBackupManager
+    ) : this(
+        entryDao = entryDao,
+        categoryDao = categoryDao,
+        gpsTrackPointDao = gpsTrackPointDao,
+        backupManager = backupManager,
+        runInTransaction = { block -> database.withTransaction { block() } }
+    )
 
     private val virtualDeletedCategory = Category(
         id = JournalConstants.CATEGORY_DELETED_ID,
@@ -77,7 +91,8 @@ class JournalRepository(
         orderIndex = Int.MAX_VALUE, // Put it at the end
         color = "#FFCDD2", // Light red
         checkable = false,
-        showDate = true
+        showDate = true,
+        deleteLineOnDoubleTap = false
     )
 
     val allCategories: Flow<List<Category>> = categoryDao.getAllCategories().map { categories ->
@@ -132,6 +147,9 @@ class JournalRepository(
         entryDao.getEntriesForCalendar(startTime, endTime)
 
     suspend fun getEntryById(entryId: UUID): EntryWithCategories? = entryDao.getEntryById(entryId)
+
+    suspend fun getEntryByIdIncludingDeleted(entryId: UUID): EntryWithCategories? =
+        entryDao.getEntryByIdIncludingDeleted(entryId)
 
     suspend fun getEntriesByIds(ids: Set<UUID>): List<EntryWithCategories> {
         if (ids.isEmpty()) return emptyList()
@@ -224,7 +242,7 @@ class JournalRepository(
     suspend fun updateEntriesZoneId(ids: Set<UUID>, zoneId: String?) {
         if (ids.isEmpty()) return
         val sanitized = TimeZoneUtils.sanitizeZoneId(zoneId)
-        database.withTransaction {
+        runInTransaction {
             ids.chunked(JournalConstants.SQLITE_MAX_BIND_PARAMS).forEach { chunk ->
                 entryDao.updateZoneIdByIds(chunk, sanitized)
             }
@@ -234,7 +252,7 @@ class JournalRepository(
     suspend fun deleteEntries(ids: Set<UUID>) {
         if (ids.isEmpty()) return
         val timestamp = System.currentTimeMillis()
-        database.withTransaction {
+        runInTransaction {
             ids.chunked(JournalConstants.SQLITE_MAX_BIND_PARAMS).forEach { chunk ->
                 entryDao.softDeleteByIds(chunk, timestamp)
             }
@@ -243,7 +261,7 @@ class JournalRepository(
 
     suspend fun hardDeleteEntries(ids: Set<UUID>) {
         if (ids.isEmpty()) return
-        database.withTransaction {
+        runInTransaction {
             ids.chunked(JournalConstants.SQLITE_MAX_BIND_PARAMS).forEach { chunk ->
                 entryDao.hardDeleteByIds(chunk)
             }
@@ -259,7 +277,7 @@ class JournalRepository(
 
     suspend fun restoreEntries(ids: Set<UUID>) {
         if (ids.isEmpty()) return
-        database.withTransaction {
+        runInTransaction {
             ids.chunked(JournalConstants.SQLITE_MAX_BIND_PARAMS).forEach { chunk ->
                 entryDao.restoreByIds(chunk)
             }

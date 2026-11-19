@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -129,6 +130,7 @@ fun EditCategoryScreen(
     val color by viewModel.color.collectAsStateWithLifecycle()
     val checkable by viewModel.checkable.collectAsStateWithLifecycle()
     val showDate by viewModel.showDate.collectAsStateWithLifecycle()
+    val deleteLineOnDoubleTap by viewModel.deleteLineOnDoubleTap.collectAsStateWithLifecycle()
     var showColorPickerDialog by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
@@ -219,6 +221,19 @@ fun EditCategoryScreen(
             ) {
                 Checkbox(checked = showDate, onCheckedChange = { viewModel.updateShowDate(it) })
                 Text("Show Date")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { viewModel.updateDeleteLineOnDoubleTap(!deleteLineOnDoubleTap) }
+            ) {
+                Checkbox(
+                    checked = deleteLineOnDoubleTap,
+                    onCheckedChange = { viewModel.updateDeleteLineOnDoubleTap(it) }
+                )
+                Text(stringResource(R.string.category_delete_line_on_double_tap))
             }
         }
     }

@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
 import com.example.voicejournal.data.Category
 import com.example.voicejournal.data.EntryWithCategories
+import com.example.voicejournal.data.JournalConstants
 import com.example.voicejournal.data.localDate
 import com.example.voicejournal.ui.components.FastScroller
 import com.example.voicejournal.ui.components.JournalEntryItem
@@ -60,7 +61,8 @@ fun HomeScreen(
     onPhotoIconClicked: (EntryWithCategories) -> Unit = {},
     scrollToEntryId: UUID?,
     onScrolledToEntry: () -> Unit,
-    onCheckedChange: (EntryWithCategories) -> Unit
+    onCheckedChange: (EntryWithCategories) -> Unit,
+    onDeleteLineInEntry: (EntryWithCategories, Int) -> Unit = { _, _ -> }
 ) {
     Column(
         modifier = modifier.fillMaxSize(),
@@ -163,6 +165,7 @@ fun HomeScreen(
                         val isSelected = selectedEntry == entryWithCategories
                         val isMultiSelected = selectedEntryIds.contains(entryWithCategories.entry.id)
                         val isSelectionMode = selectedEntryIds.isNotEmpty()
+                        val isRecycleBin = selectedCategory?.id == JournalConstants.CATEGORY_DELETED_ID
 
                         JournalEntryItem(
                             entryWithCategories = entryWithCategories,
@@ -174,7 +177,12 @@ fun HomeScreen(
                             onEntrySelected = onEntrySelected,
                             onToggleSelection = onToggleEntrySelection,
                             onPhotoIconClicked = onPhotoIconClicked,
-                            onCheckedChange = { onCheckedChange(entryWithCategories) }
+                            onCheckedChange = { onCheckedChange(entryWithCategories) },
+                            onDeleteLineAt = if (!isRecycleBin) {
+                                { lineIndex -> onDeleteLineInEntry(entryWithCategories, lineIndex) }
+                            } else {
+                                null
+                            }
                         )
                     }
                 }

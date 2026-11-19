@@ -56,4 +56,9 @@
     <string name="calendar_day_preview_entry_many">%1$d Einträge · Tippen zum Bearbeiten</string>
     <string name="calendar_close">Schließen</string>
     <string name="calendar_open_day_view">Tagesansicht öffnen</string>
+
+    <!-- Categories & Line Deletion -->
+    <string name="category_delete_line_on_double_tap">Zeile bei Doppeltipp löschen (Einkaufslisten-Modus, ungekürzt)</string>
+    <string name="snackbar_line_deleted">Zeile gelöscht</string>
+    <string name="snackbar_entry_deleted">Eintrag gelöscht</string>
 </resources>

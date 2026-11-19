@@ -56,4 +56,9 @@
     <string name="calendar_day_preview_entry_many">%1$d entries · Tap entry to edit</string>
     <string name="calendar_close">Close</string>
     <string name="calendar_open_day_view">Open day view</string>
+
+    <!-- Categories & Line Deletion -->
+    <string name="category_delete_line_on_double_tap">Delete line on double-tap (Shopping list mode, untruncated)</string>
+    <string name="snackbar_line_deleted">Line deleted</string>
+    <string name="snackbar_entry_deleted">Entry deleted</string>
 </resources>

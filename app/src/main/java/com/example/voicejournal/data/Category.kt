@@ -23,5 +23,7 @@ data class Category(
     val color: String = "#FFFFFF", // Default color white
     val checkable: Boolean = false,
     @ColumnInfo(defaultValue = "1")
-    val showDate: Boolean = true
+    val showDate: Boolean = true,
+    @ColumnInfo(defaultValue = "0")
+    val deleteLineOnDoubleTap: Boolean = false
 )

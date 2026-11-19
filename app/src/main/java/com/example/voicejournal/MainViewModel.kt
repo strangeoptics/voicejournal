@@ -20,15 +20,18 @@ import com.example.voicejournal.di.Injector
 import com.example.voicejournal.util.DateFormatters
 import com.example.voicejournal.util.TimeZoneUtils
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -38,6 +41,175 @@ import java.time.ZoneId
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
+
+internal sealed interface LineRemovalResult {
+    data object NoChange : LineRemovalResult
+    data class ContentUpdated(val updatedContent: String) : LineRemovalResult
+    data object DeleteEntireEntry : LineRemovalResult
+}
+
+internal sealed interface UndoAction {
+    data class RestoreEntryContent(
+        val entryId: UUID,
+        val previousContent: String
+    ) : UndoAction
+
+    data class RestoreSoftDeletedEntries(
+        val entryIds: Set<UUID>
+    ) : UndoAction
+}
+
+enum class UndoPromptType {
+    LINE_DELETED,
+    ENTRY_DELETED
+}
+
+internal sealed interface LineDeleteOutcome {
+    data object Unchanged : LineDeleteOutcome
+    data class EntryUpdated(val updated: EntryWithCategories) : LineDeleteOutcome
+    data class EntrySoftDeleted(val entryId: UUID) : LineDeleteOutcome
+}
+
+internal class LineDeleteUndoManager(
+    private val repository: JournalRepository
+) {
+    private val _undoStack = MutableStateFlow<List<UndoAction>>(emptyList())
+    val undoStack: StateFlow<List<UndoAction>> = _undoStack.asStateFlow()
+
+    private val _undoPromptEvents = MutableSharedFlow<UndoPromptType>(extraBufferCapacity = 1)
+    val undoPromptEvents: SharedFlow<UndoPromptType> = _undoPromptEvents.asSharedFlow()
+
+    val canUndo: Flow<Boolean> = combine(
+        _undoStack,
+        repository.getDeletedEntriesCount()
+    ) { stack, deletedCount ->
+        stack.isNotEmpty() || deletedCount > 0
+    }
+
+    private fun pushUndoAction(action: UndoAction) {
+        _undoStack.update { current ->
+            (current + action).takeLast(MainViewModel.MAX_UNDO_HISTORY)
+        }
+    }
+
+    suspend fun deleteLineInEntry(
+        entryWithCategories: EntryWithCategories,
+        lineIndex: Int,
+        isRecycleBinSelected: Boolean
+    ): LineDeleteOutcome {
+        if (isRecycleBinSelected) return LineDeleteOutcome.Unchanged
+        if (entryWithCategories.entry.deletedAt != null) return LineDeleteOutcome.Unchanged
+        if (entryWithCategories.categories.none { it.deleteLineOnDoubleTap }) return LineDeleteOutcome.Unchanged
+
+        val current = repository.getEntryById(entryWithCategories.entry.id) ?: return LineDeleteOutcome.Unchanged
+        if (current.categories.none { it.deleteLineOnDoubleTap }) return LineDeleteOutcome.Unchanged
+        if (current.entry.content != entryWithCategories.entry.content) return LineDeleteOutcome.Unchanged
+
+        return when (val result = MainViewModel.removeLineAt(current.entry.content, lineIndex)) {
+            LineRemovalResult.NoChange -> LineDeleteOutcome.Unchanged
+            is LineRemovalResult.ContentUpdated -> {
+                pushUndoAction(
+                    UndoAction.RestoreEntryContent(
+                        entryId = current.entry.id,
+                        previousContent = current.entry.content
+                    )
+                )
+                val updatedEntry = current.entry.copy(content = result.updatedContent)
+                repository.update(updatedEntry, current.categories)
+                _undoPromptEvents.tryEmit(UndoPromptType.LINE_DELETED)
+                LineDeleteOutcome.EntryUpdated(current.copy(entry = updatedEntry))
+            }
+            LineRemovalResult.DeleteEntireEntry -> {
+                val idSet = setOf(current.entry.id)
+                repository.deleteEntries(idSet)
+                pushUndoAction(UndoAction.RestoreSoftDeletedEntries(idSet))
+                _undoPromptEvents.tryEmit(UndoPromptType.ENTRY_DELETED)
+                LineDeleteOutcome.EntrySoftDeleted(current.entry.id)
+            }
+        }
+    }
+
+    suspend fun deleteEntries(ids: Set<UUID>) {
+        if (ids.isEmpty()) return
+        repository.deleteEntries(ids)
+        pushUndoAction(UndoAction.RestoreSoftDeletedEntries(ids))
+    }
+
+    suspend fun undo(): EntryWithCategories? {
+        while (true) {
+            var popped: UndoAction? = null
+            _undoStack.update { current ->
+                if (current.isEmpty()) {
+                    current
+                } else {
+                    popped = current.last()
+                    current.dropLast(1)
+                }
+            }
+            val action = popped
+            if (action == null) {
+                repository.restoreLatestDeletedEntry()
+                return null
+            }
+            when (action) {
+                is UndoAction.RestoreEntryContent -> {
+                    val existing = repository.getEntryByIdIncludingDeleted(action.entryId)
+                    if (existing != null) {
+                        if (existing.entry.deletedAt != null) {
+                            repository.restoreEntries(setOf(action.entryId))
+                        }
+                        val restoredEntry = existing.entry.copy(
+                            content = action.previousContent,
+                            deletedAt = null
+                        )
+                        repository.update(restoredEntry, existing.categories)
+                        return existing.copy(entry = restoredEntry)
+                    }
+                }
+                is UndoAction.RestoreSoftDeletedEntries -> {
+                    val existingDeleted = repository.getEntriesByIds(action.entryIds)
+                        .filter { it.entry.deletedAt != null }
+                    if (existingDeleted.isNotEmpty()) {
+                        repository.restoreEntries(existingDeleted.mapTo(LinkedHashSet()) { it.entry.id })
+                        return null
+                    }
+                }
+            }
+        }
+    }
+
+    suspend fun hardDeleteEntries(ids: Set<UUID>) {
+        if (ids.isEmpty()) return
+        repository.hardDeleteEntries(ids)
+        _undoStack.update { stack ->
+            stack.mapNotNull { action ->
+                when (action) {
+                    is UndoAction.RestoreEntryContent -> action.takeUnless { it.entryId in ids }
+                    is UndoAction.RestoreSoftDeletedEntries -> {
+                        val remainingIds = action.entryIds - ids
+                        if (remainingIds.isEmpty()) null else action.copy(entryIds = remainingIds)
+                    }
+                }
+            }
+        }
+    }
+
+    suspend fun restoreEntries(ids: Set<UUID>) {
+        if (ids.isEmpty()) return
+        repository.restoreEntries(ids)
+        _undoStack.update { stack ->
+            stack.mapNotNull { action ->
+                when (action) {
+                    is UndoAction.RestoreEntryContent -> action
+                    is UndoAction.RestoreSoftDeletedEntries -> {
+                        val remainingIds = action.entryIds - ids
+                        if (remainingIds.isEmpty()) null else action.copy(entryIds = remainingIds)
+                    }
+                }
+            }
+        }
+    }
+}
 
 class MainViewModel(
     private val repository: JournalRepository,
@@ -50,9 +222,27 @@ class MainViewModel(
     )
 
     companion object {
+        internal const val MAX_UNDO_HISTORY = 50
+
         private val jsonFormat = Json {
             prettyPrint = true
             encodeDefaults = true
+        }
+
+        internal fun splitContentIntoLines(content: String): List<String> {
+            return content.replace("\r\n", "\n").replace('\r', '\n').split('\n')
+        }
+
+        internal fun removeLineAt(content: String, lineIndex: Int): LineRemovalResult {
+            val lines = splitContentIntoLines(content)
+            if (lineIndex !in lines.indices) {
+                return LineRemovalResult.NoChange
+            }
+            val remaining = lines.filterIndexed { idx, _ -> idx != lineIndex }
+            if (remaining.isEmpty() || remaining.all { it.isBlank() }) {
+                return LineRemovalResult.DeleteEntireEntry
+            }
+            return LineRemovalResult.ContentUpdated(remaining.joinToString("\n"))
         }
 
         internal fun parseRecognizedTextForCategory(
@@ -204,8 +394,10 @@ class MainViewModel(
     val isDeveloperModeEnabled: StateFlow<Boolean> = settingsRepository.isDeveloperModeEnabled
     val showCategoryTags: StateFlow<Boolean> = settingsRepository.showCategoryTags
 
-    val canUndo: StateFlow<Boolean> = repository.getDeletedEntriesCount()
-        .map { it > 0 }
+    private val undoManager = LineDeleteUndoManager(repository)
+    val undoPromptEvents: SharedFlow<UndoPromptType> = undoManager.undoPromptEvents
+
+    val canUndo: StateFlow<Boolean> = undoManager.canUndo
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -345,10 +537,33 @@ class MainViewModel(
         }
     }
 
+    fun deleteLineInEntry(entryWithCategories: EntryWithCategories, lineIndex: Int) {
+        viewModelScope.launch {
+            val isRecycleBin = _selectedCategoryId.value == JournalConstants.CATEGORY_DELETED_ID
+            when (val outcome = undoManager.deleteLineInEntry(entryWithCategories, lineIndex, isRecycleBin)) {
+                LineDeleteOutcome.Unchanged -> Unit
+                is LineDeleteOutcome.EntryUpdated -> {
+                    if (_selectedEntry.value?.entry?.id == outcome.updated.entry.id) {
+                        _selectedEntry.value = outcome.updated
+                    }
+                }
+                is LineDeleteOutcome.EntrySoftDeleted -> {
+                    if (_selectedEntry.value?.entry?.id == outcome.entryId) {
+                        _selectedEntry.value = null
+                    }
+                    _selectedEntryIds.value = _selectedEntryIds.value - outcome.entryId
+                }
+            }
+        }
+    }
+
     fun deleteEntries(ids: Set<UUID>) {
         if (ids.isEmpty()) return
         viewModelScope.launch {
-            repository.deleteEntries(ids)
+            undoManager.deleteEntries(ids)
+            if (_selectedEntry.value?.entry?.id in ids) {
+                _selectedEntry.value = null
+            }
             _selectedEntryIds.value = emptySet()
         }
     }
@@ -363,7 +578,10 @@ class MainViewModel(
 
     fun onUndoDelete() {
         viewModelScope.launch {
-            repository.restoreLatestDeletedEntry()
+            val restored = undoManager.undo()
+            if (restored != null && _selectedEntry.value?.entry?.id == restored.entry.id) {
+                _selectedEntry.value = restored
+            }
         }
     }
 
@@ -371,7 +589,7 @@ class MainViewModel(
         if (ids.isEmpty()) return
         viewModelScope.launch {
             if (_selectedCategoryId.value == JournalConstants.CATEGORY_DELETED_ID) {
-                repository.hardDeleteEntries(ids)
+                undoManager.hardDeleteEntries(ids)
                 _selectedEntryIds.value = emptySet()
             }
         }
@@ -381,7 +599,7 @@ class MainViewModel(
         if (ids.isEmpty()) return
         viewModelScope.launch {
             if (_selectedCategoryId.value == JournalConstants.CATEGORY_DELETED_ID) {
-                repository.restoreEntries(ids)
+                undoManager.restoreEntries(ids)
                 _selectedEntryIds.value = emptySet()
             }
         }

@@ -1,11 +1,15 @@
 package com.example.voicejournal
 
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.voicejournal.ui.components.Appointment
 import com.example.voicejournal.ui.components.calculateAppointmentColumns
 import com.example.voicejournal.ui.components.calculateOverlappingAppointmentLayout
 import com.example.voicejournal.ui.components.startOfWeek
+import com.example.voicejournal.ui.components.summarizeDayHeader
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 import java.util.Locale
@@ -151,5 +155,42 @@ class WeekViewBugFixTest {
         val p3 = calculateAppointmentColumns(listOf(multiDay), day3).single()
         assertEquals(0.0, p3.startMinutes, 0.001)
         assertEquals(9 * 60.0 + 15.0, p3.endMinutes, 0.001)
+    }
+
+    @Test
+    fun summarizeDayHeader_prioritizesDistinctCategoryColorsAndMarksOverflowAboveThree() {
+        val date = LocalDate.of(2026, 11, 19)
+
+        val emptySummary = summarizeDayHeader(emptyList())
+        assertEquals(0, emptySummary.entryCount)
+        assertTrue(emptySummary.dotColors.isEmpty())
+        assertFalse(emptySummary.hasOverflow)
+
+        val twoSameColor = calculateAppointmentColumns(
+            listOf(
+                Appointment("1", date.atTime(8, 0), date.atTime(9, 0), "A", color = Color.Red),
+                Appointment("2", date.atTime(10, 0), date.atTime(11, 0), "B", color = Color.Red),
+            ),
+            date,
+        )
+        val twoSummary = summarizeDayHeader(twoSameColor)
+        assertEquals(2, twoSummary.entryCount)
+        assertEquals(listOf(Color.Red, Color.Red), twoSummary.dotColors)
+        assertFalse(twoSummary.hasOverflow)
+
+        val fiveMixed = calculateAppointmentColumns(
+            listOf(
+                Appointment("1", date.atTime(8, 0), date.atTime(8, 30), "A", color = Color.Red),
+                Appointment("2", date.atTime(9, 0), date.atTime(9, 30), "B", color = Color.Red),
+                Appointment("3", date.atTime(10, 0), date.atTime(10, 30), "C", color = Color.Red),
+                Appointment("4", date.atTime(14, 0), date.atTime(14, 30), "D", color = Color.Blue),
+                Appointment("5", date.atTime(21, 0), date.atTime(21, 30), "E", color = Color.Green),
+            ),
+            date,
+        )
+        val fiveSummary = summarizeDayHeader(fiveMixed)
+        assertEquals(5, fiveSummary.entryCount)
+        assertEquals(listOf(Color.Red, Color.Blue, Color.Green), fiveSummary.dotColors)
+        assertTrue(fiveSummary.hasOverflow)
     }
 }

@@ -70,6 +70,7 @@ import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.seconds
 
 private const val MINUTES_PER_DAY = 24 * 60.0
+const val MAX_HEADER_DOTS = 3
 private val HOURS_OF_DAY: List<LocalTime> = (0..23).map { LocalTime.of(it, 0) }
 private val HOUR_COLUMN_WIDTH: Dp = 52.dp
 private val SWIPE_THRESHOLD: Dp = 56.dp
@@ -105,6 +106,56 @@ data class AppointmentColumnPlacement(
     val startMinutes: Double,
     val endMinutes: Double,
 )
+
+@Immutable
+data class DayHeaderSummary(
+    val entryCount: Int = 0,
+    val dotColors: List<Color> = emptyList(),
+    val hasOverflow: Boolean = false,
+)
+
+fun summarizeDayHeader(
+    placements: List<AppointmentColumnPlacement>,
+    maxDots: Int = MAX_HEADER_DOTS,
+): DayHeaderSummary {
+    if (placements.isEmpty() || maxDots <= 0) {
+        return DayHeaderSummary(
+            entryCount = placements.size,
+            hasOverflow = placements.isNotEmpty() && maxDots == 0,
+        )
+    }
+    val allColors = placements.map { it.appointment.color }
+    if (allColors.size <= maxDots) {
+        return DayHeaderSummary(
+            entryCount = allColors.size,
+            dotColors = allColors,
+            hasOverflow = false,
+        )
+    }
+    val distinctColors = allColors.distinct()
+    val selectedColors = if (distinctColors.size >= maxDots) {
+        distinctColors.take(maxDots)
+    } else {
+        buildList(maxDots) {
+            addAll(distinctColors)
+            val usedIndices = HashSet<Int>(distinctColors.size)
+            for (color in distinctColors) {
+                usedIndices.add(allColors.indexOf(color))
+            }
+            for (i in allColors.indices) {
+                if (size >= maxDots) break
+                if (i !in usedIndices) {
+                    add(allColors[i])
+                }
+            }
+        }
+    }
+    return DayHeaderSummary(
+        entryCount = allColors.size,
+        dotColors = selectedColors,
+        hasOverflow = true,
+    )
+}
 
 @Immutable
 data class AppointmentLayoutInfo(
@@ -290,6 +341,9 @@ fun WeekView(
             calculateAppointmentColumns(daily, date)
         }
     }
+    val daySummaries = remember(placementsByDate) {
+        placementsByDate.mapValues { (_, placements) -> summarizeDayHeader(placements) }
+    }
 
     var totalDrag by remember { mutableFloatStateOf(0f) }
 
@@ -310,6 +364,7 @@ fun WeekView(
             visibleDates = visibleDates,
             today = today,
             selectedDate = selectedDate,
+            daySummaries = daySummaries,
             onDayClick = onDayClick,
         )
 
@@ -476,9 +531,11 @@ private fun WeekHeaderRow(
     visibleDates: List<LocalDate>,
     today: LocalDate,
     selectedDate: LocalDate?,
+    daySummaries: Map<LocalDate, DayHeaderSummary>,
     onDayClick: (LocalDate) -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val surfaceLuminance = colorScheme.surface.luminance()
     val locale = Locale.getDefault()
 
     Row(
@@ -492,6 +549,7 @@ private fun WeekHeaderRow(
         visibleDates.forEach { dateInWeek ->
             val isToday = dateInWeek == today
             val isSelected = dateInWeek == selectedDate
+            val summary = daySummaries[dateInWeek] ?: DayHeaderSummary()
 
             val weekdayColor = when {
                 isToday -> colorScheme.primary
@@ -512,9 +570,9 @@ private fun WeekHeaderRow(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 52.dp)
+                    .heightIn(min = 56.dp)
                     .clickable { onDayClick(dateInWeek) }
-                    .padding(vertical = 4.dp),
+                    .padding(top = 4.dp, bottom = 3.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -539,6 +597,44 @@ private fun WeekHeaderRow(
                         fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Medium,
                         color = badgeContentColor,
                     )
+                }
+                Spacer(modifier = Modifier.height(3.dp))
+                Box(
+                    modifier = Modifier.height(8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (summary.dotColors.isNotEmpty()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            summary.dotColors.forEach { dotColor ->
+                                val lowContrast = abs(dotColor.luminance() - surfaceLuminance) < 0.12f
+                                Box(
+                                    modifier = Modifier
+                                        .size(5.dp)
+                                        .clip(CircleShape)
+                                        .background(dotColor)
+                                        .border(
+                                            width = 0.5.dp,
+                                            color = colorScheme.outline.copy(
+                                                alpha = if (lowContrast) 0.85f else 0.35f,
+                                            ),
+                                            shape = CircleShape,
+                                        ),
+                                )
+                            }
+                            if (summary.hasOverflow) {
+                                Text(
+                                    text = "+",
+                                    fontSize = 8.sp,
+                                    lineHeight = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -698,6 +794,20 @@ private fun SampleWeekViewPreviewContent() {
             endDateTime = thursdayDate.atTime(10, 15),
             title = "White Category Note",
             color = Color(0xFFFFFFFF),
+        ),
+        Appointment(
+            id = "7",
+            startDateTime = thursdayDate.atTime(13, 0),
+            endDateTime = thursdayDate.atTime(14, 0),
+            title = "Lunch Journal",
+            color = Color(0xFF4DB6AC),
+        ),
+        Appointment(
+            id = "8",
+            startDateTime = thursdayDate.atTime(21, 30),
+            endDateTime = thursdayDate.atTime(22, 0),
+            title = "Evening Reflection (Off-screen)",
+            color = Color(0xFFFFB74D),
         ),
         Appointment(
             id = "6",

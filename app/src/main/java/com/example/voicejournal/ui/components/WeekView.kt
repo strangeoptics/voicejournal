@@ -4,9 +4,6 @@ import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,11 +13,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -30,11 +29,17 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,10 +63,13 @@ import androidx.compose.ui.unit.sp
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.DateFormatters
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import java.time.temporal.WeekFields
 import java.util.Locale
@@ -71,9 +80,12 @@ import kotlin.time.Duration.Companion.seconds
 
 private const val MINUTES_PER_DAY = 24 * 60.0
 const val MAX_HEADER_DOTS = 3
+const val PAGER_PAGE_COUNT = 20_000
+const val PAGER_CENTER_PAGE = PAGER_PAGE_COUNT / 2
+private const val MAX_ANIMATED_PAGE_JUMP = 4
+
 private val HOURS_OF_DAY: List<LocalTime> = (0..23).map { LocalTime.of(it, 0) }
 private val HOUR_COLUMN_WIDTH: Dp = 52.dp
-private val SWIPE_THRESHOLD: Dp = 56.dp
 private val APPOINTMENT_SHAPE = RoundedCornerShape(4.dp)
 private val DARK_TEXT_ON_LIGHT_TILE = Color(0xFF1C1B1F)
 val MIN_APPOINTMENT_HEIGHT: Dp = 20.dp
@@ -81,6 +93,60 @@ val MIN_APPOINTMENT_HEIGHT: Dp = 20.dp
 fun startOfWeek(date: LocalDate, locale: Locale = Locale.getDefault()): LocalDate {
     val firstDayOfWeek = WeekFields.of(locale).firstDayOfWeek
     return date.with(TemporalAdjusters.previousOrSame(firstDayOfWeek))
+}
+
+fun visibleDatesForPage(
+    anchorStartDate: LocalDate,
+    stepDays: Int,
+    pageOffset: Int,
+): List<LocalDate> {
+    val safeStep = stepDays.coerceAtLeast(1)
+    val pageStart = anchorStartDate.plusDays(pageOffset.toLong() * safeStep.toLong())
+    return (0 until safeStep).map { pageStart.plusDays(it.toLong()) }
+}
+
+fun pageIndexForStartDate(
+    anchorStartDate: LocalDate,
+    stepDays: Int,
+    targetStartDate: LocalDate,
+): Int? {
+    val safeStep = stepDays.coerceAtLeast(1).toLong()
+    val diffDays = ChronoUnit.DAYS.between(anchorStartDate, targetStartDate)
+    if (diffDays % safeStep != 0L) return null
+    val targetPage = PAGER_CENTER_PAGE.toLong() + (diffDays / safeStep)
+    return if (targetPage in 0L until PAGER_PAGE_COUNT.toLong()) targetPage.toInt() else null
+}
+
+/**
+ * Computes a vertical scroll target (in pixels) to bring the earliest entry on a clicked day
+ * into view if and only if none of that day's entries are currently visible in the viewport.
+ */
+fun computeAutoScrollTargetPx(
+    placements: List<AppointmentColumnPlacement>,
+    scrollTopPx: Int,
+    viewportHeightPx: Int,
+    hourSlotPx: Int,
+    minHeightPx: Int,
+    maxScrollPx: Int,
+): Int? {
+    if (placements.isEmpty() || viewportHeightPx <= 0 || maxScrollPx <= 0) return null
+
+    val scrollBottomPx = scrollTopPx + viewportHeightPx
+    val anyEntryVisible = placements.any { placement ->
+        val topPx = ((placement.startMinutes / 60.0) * hourSlotPx).roundToInt()
+        val durationMinutes = (placement.endMinutes - placement.startMinutes).coerceAtLeast(0.0)
+        val rawHeightPx = ((durationMinutes / 60.0) * hourSlotPx).roundToInt()
+        val heightPx = rawHeightPx.coerceAtLeast(minHeightPx)
+        val bottomPx = topPx + heightPx
+        val visibleOverlap = minOf(bottomPx, scrollBottomPx) - maxOf(topPx, scrollTopPx)
+        visibleOverlap >= minOf(minHeightPx, heightPx)
+    }
+    if (anyEntryVisible) return null
+
+    val earliestStartMinutes = placements.minOf { it.startMinutes }
+    val earliestTopPx = ((earliestStartMinutes / 60.0) * hourSlotPx).roundToInt()
+    val topContextPaddingPx = hourSlotPx / 2
+    return (earliestTopPx - topContextPaddingPx).coerceIn(0, maxScrollPx)
 }
 
 @Immutable
@@ -118,13 +184,13 @@ fun summarizeDayHeader(
     placements: List<AppointmentColumnPlacement>,
     maxDots: Int = MAX_HEADER_DOTS,
 ): DayHeaderSummary {
-    if (placements.isEmpty() || maxDots <= 0) {
+    if ((placements.isEmpty()) || (maxDots <= 0)) {
         return DayHeaderSummary(
             entryCount = placements.size,
             hasOverflow = placements.isNotEmpty() && maxDots == 0,
         )
     }
-    val allColors = placements.map { it.appointment.color }
+    val allColors = placements.map { placement -> placement.appointment.color }
     if (allColors.size <= maxDots) {
         return DayHeaderSummary(
             entryCount = allColors.size,
@@ -211,8 +277,8 @@ fun calculateAppointmentColumns(
             )
         }
         .sortedWith(
-            compareBy<EffectiveInterval>({ it.startMinutes })
-                .thenByDescending { it.collisionEndMinutes },
+            compareBy<EffectiveInterval> { interval -> interval.startMinutes }
+                .thenByDescending { interval -> interval.collisionEndMinutes },
         )
         .toList()
 
@@ -302,12 +368,14 @@ fun WeekView(
     minAppointmentHeight: Dp = MIN_APPOINTMENT_HEIGHT,
     onDayClick: (LocalDate) -> Unit = {},
     onAppointmentClick: (Appointment) -> Unit = {},
+    onPeriodStartChanged: ((LocalDate) -> Unit)? = null,
     onNextPeriod: () -> Unit = {},
     onPreviousPeriod: () -> Unit = {},
 ) {
     if (visibleDates.isEmpty()) return
 
     val density = LocalDensity.current
+    val coroutineScope = rememberCoroutineScope()
 
     val hourSlotPx = with(density) { hourHeight.roundToPx().coerceAtLeast(1) }
     val scrollState = rememberScrollState(initial = hourSlotPx * 8)
@@ -315,17 +383,83 @@ fun WeekView(
     val totalDayHeightPx = hourSlotPx * HOURS_OF_DAY.size
     val totalDayHeight = with(density) { totalDayHeightPx.toDp() }
     val minAppointmentHeightPx = with(density) { minAppointmentHeight.roundToPx().coerceAtLeast(1) }
-    val swipeThresholdPx = with(density) { SWIPE_THRESHOLD.toPx() }
     val horizontalTileGapPx = with(density) { 1.dp.roundToPx() }
     val verticalTileGapPx = with(density) { 1.dp.roundToPx() }
+    val headerHeight = with(density) { (22.sp.toDp() + 38.dp).coerceAtLeast(60.dp) }
 
-    val todayIndex = remember(visibleDates, today) { visibleDates.indexOf(today) }
-    val selectedIndex = remember(visibleDates, selectedDate) {
-        selectedDate?.let { visibleDates.indexOf(it) } ?: -1
+    val requestedStartDate = visibleDates.first()
+    val stepDays = visibleDates.size
+
+    var anchorStartDate by remember { mutableStateOf(requestedStartDate) }
+    var anchorStepDays by remember { mutableIntStateOf(stepDays) }
+    var pagerGeneration by remember { mutableIntStateOf(0) }
+
+    if (
+        (anchorStepDays != stepDays) ||
+        (pageIndexForStartDate(anchorStartDate, stepDays, requestedStartDate) == null)
+    ) {
+        anchorStartDate = requestedStartDate
+        anchorStepDays = stepDays
+        pagerGeneration++
     }
 
-    val liveTime by produceState(initialValue = LocalTime.now(), key1 = todayIndex >= 0, key2 = currentTime) {
-        if (currentTime != null || todayIndex < 0) return@produceState
+    val pagerState = key(pagerGeneration) {
+        rememberPagerState(
+            initialPage = PAGER_CENTER_PAGE,
+            pageCount = { PAGER_PAGE_COUNT },
+        )
+    }
+
+    var isProgrammaticScroll by remember(pagerGeneration) { mutableStateOf(value = false) }
+    val currentRequestedStart by rememberUpdatedState(requestedStartDate)
+    val currentOnPeriodStartChanged by rememberUpdatedState(onPeriodStartChanged)
+    val currentOnNextPeriod by rememberUpdatedState(onNextPeriod)
+    val currentOnPreviousPeriod by rememberUpdatedState(onPreviousPeriod)
+
+    LaunchedEffect(pagerState, anchorStartDate, anchorStepDays) {
+        var lastReportedPage = pagerState.settledPage
+        snapshotFlow { pagerState.settledPage }
+            .distinctUntilChanged()
+            .collect { settledPage ->
+                if (isProgrammaticScroll) {
+                    lastReportedPage = settledPage
+                    return@collect
+                }
+                val pageOffset = settledPage - PAGER_CENTER_PAGE
+                val settledStart = anchorStartDate.plusDays(pageOffset.toLong() * anchorStepDays.toLong())
+                if (settledStart != currentRequestedStart) {
+                    val periodCallback = currentOnPeriodStartChanged
+                    if (periodCallback != null) {
+                        periodCallback(settledStart)
+                    } else if (settledPage > lastReportedPage) {
+                        currentOnNextPeriod()
+                    } else if (settledPage < lastReportedPage) {
+                        currentOnPreviousPeriod()
+                    }
+                }
+                lastReportedPage = settledPage
+            }
+    }
+
+    LaunchedEffect(requestedStartDate, pagerGeneration) {
+        val targetPage = pageIndexForStartDate(anchorStartDate, anchorStepDays, requestedStartDate)
+            ?: return@LaunchedEffect
+        if (targetPage != pagerState.settledPage) {
+            isProgrammaticScroll = true
+            try {
+                if (abs(targetPage - pagerState.currentPage) <= MAX_ANIMATED_PAGE_JUMP) {
+                    pagerState.animateScrollToPage(targetPage)
+                } else {
+                    pagerState.scrollToPage(targetPage)
+                }
+            } finally {
+                isProgrammaticScroll = false
+            }
+        }
+    }
+
+    val liveTime by produceState(initialValue = LocalTime.now(), key1 = currentTime) {
+        if (currentTime != null) return@produceState
         while (true) {
             value = LocalTime.now()
             delay((60 - value.second).seconds)
@@ -333,69 +467,25 @@ fun WeekView(
     }
     val effectiveCurrentTime = currentTime ?: liveTime
 
-    val placementsByDate = remember(appointments, visibleDates) {
-        visibleDates.associateWith { date ->
-            val daily = appointments.filter {
-                !it.startDate.isAfter(date) && !it.endDate.isBefore(date)
-            }
-            calculateAppointmentColumns(daily, date)
-        }
-    }
-    val daySummaries = remember(placementsByDate) {
-        placementsByDate.mapValues { (_, placements) -> summarizeDayHeader(placements) }
-    }
-
-    var totalDrag by remember { mutableFloatStateOf(0f) }
-
     val colorScheme = MaterialTheme.colorScheme
     val surfaceColor = colorScheme.surface
-    val gridLineColor = colorScheme.outlineVariant.copy(alpha = 0.55f)
-    val halfHourLineColor = colorScheme.outlineVariant.copy(alpha = 0.22f)
-    val todayColumnTint = colorScheme.primaryContainer.copy(alpha = 0.18f)
-    val selectedColumnTint = colorScheme.secondaryContainer.copy(alpha = 0.16f)
-    val nowIndicatorColor = colorScheme.error
 
-    Column(
+    Row(
         modifier = modifier
             .fillMaxSize()
             .background(surfaceColor),
     ) {
-        WeekHeaderRow(
-            visibleDates = visibleDates,
-            today = today,
-            selectedDate = selectedDate,
-            daySummaries = daySummaries,
-            onDayClick = onDayClick,
-        )
-
-        HorizontalDivider(color = colorScheme.outlineVariant)
-
-        Row(
+        // Pinned Left Column: Header Corner + Synchronized Hour Labels
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .draggable(
-                    orientation = Orientation.Horizontal,
-                    state = rememberDraggableState { delta ->
-                        totalDrag += delta
-                    },
-                    onDragStarted = {
-                        totalDrag = 0f
-                    },
-                    onDragStopped = {
-                        if (abs(totalDrag) > swipeThresholdPx) {
-                            if (totalDrag < 0f) {
-                                onNextPeriod()
-                            } else {
-                                onPreviousPeriod()
-                            }
-                        }
-                    },
-                ),
+                .width(HOUR_COLUMN_WIDTH)
+                .fillMaxHeight(),
         ) {
-            // Synchronized Hour Labels Column
+            Spacer(modifier = Modifier.height(headerHeight))
+            HorizontalDivider(color = colorScheme.outlineVariant)
             Column(
                 modifier = Modifier
-                    .width(HOUR_COLUMN_WIDTH)
+                    .fillMaxSize()
                     .verticalScroll(scrollState),
             ) {
                 HOURS_OF_DAY.forEach { hour ->
@@ -414,112 +504,218 @@ fun WeekView(
                     }
                 }
             }
+        }
 
-            // Synchronized Multi-Day Time Grid
-            Box(
+        // Smoothly Paged Day Headers + Synchronized 24h Time Grids
+        HorizontalPager(
+            state = pagerState,
+            beyondViewportPageCount = 1,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+        ) { page ->
+            val pageDates = remember(anchorStartDate, anchorStepDays, page) {
+                visibleDatesForPage(
+                    anchorStartDate = anchorStartDate,
+                    stepDays = anchorStepDays,
+                    pageOffset = page - PAGER_CENTER_PAGE,
+                )
+            }
+            val pagePlacementsByDate = remember(appointments, pageDates) {
+                pageDates.associateWith { date ->
+                    val daily = appointments.filter {
+                        !it.startDate.isAfter(date) && !it.endDate.isBefore(date)
+                    }
+                    calculateAppointmentColumns(daily, date)
+                }
+            }
+            val pageSummaries = remember(pagePlacementsByDate) {
+                pagePlacementsByDate.mapValues { (_, placements) -> summarizeDayHeader(placements) }
+            }
+
+            WeekPageContent(
+                pageDates = pageDates,
+                placementsByDate = pagePlacementsByDate,
+                daySummaries = pageSummaries,
+                today = today,
+                selectedDate = selectedDate,
+                effectiveCurrentTime = effectiveCurrentTime,
+                headerHeight = headerHeight,
+                hourSlotPx = hourSlotPx,
+                totalDayHeightPx = totalDayHeightPx,
+                totalDayHeight = totalDayHeight,
+                minAppointmentHeightPx = minAppointmentHeightPx,
+                horizontalTileGapPx = horizontalTileGapPx,
+                verticalTileGapPx = verticalTileGapPx,
+                scrollState = scrollState,
+                onDayClick = { clickedDate ->
+                    val clickedPlacements = pagePlacementsByDate[clickedDate].orEmpty()
+                    val targetScrollPx = computeAutoScrollTargetPx(
+                        placements = clickedPlacements,
+                        scrollTopPx = scrollState.value,
+                        viewportHeightPx = scrollState.viewportSize,
+                        hourSlotPx = hourSlotPx,
+                        minHeightPx = minAppointmentHeightPx,
+                        maxScrollPx = scrollState.maxValue,
+                    )
+                    onDayClick(clickedDate)
+                    if (targetScrollPx != null) {
+                        coroutineScope.launch {
+                            scrollState.animateScrollTo(targetScrollPx)
+                        }
+                    }
+                },
+                onAppointmentClick = onAppointmentClick,
+            )
+        }
+    }
+}
+
+@Composable
+private fun WeekPageContent(
+    pageDates: List<LocalDate>,
+    placementsByDate: Map<LocalDate, List<AppointmentColumnPlacement>>,
+    daySummaries: Map<LocalDate, DayHeaderSummary>,
+    today: LocalDate,
+    selectedDate: LocalDate?,
+    effectiveCurrentTime: LocalTime,
+    headerHeight: Dp,
+    hourSlotPx: Int,
+    totalDayHeightPx: Int,
+    totalDayHeight: Dp,
+    minAppointmentHeightPx: Int,
+    horizontalTileGapPx: Int,
+    verticalTileGapPx: Int,
+    scrollState: ScrollState,
+    onDayClick: (LocalDate) -> Unit,
+    onAppointmentClick: (Appointment) -> Unit,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val surfaceColor = colorScheme.surface
+    val gridLineColor = colorScheme.outlineVariant.copy(alpha = 0.55f)
+    val halfHourLineColor = colorScheme.outlineVariant.copy(alpha = 0.22f)
+    val todayColumnTint = colorScheme.primaryContainer.copy(alpha = 0.18f)
+    val selectedColumnTint = colorScheme.secondaryContainer.copy(alpha = 0.16f)
+    val nowIndicatorColor = colorScheme.error
+
+    val todayIndex = remember(pageDates, today) { pageDates.indexOf(today) }
+    val selectedIndex = remember(pageDates, selectedDate) {
+        selectedDate?.let { pageDates.indexOf(it) } ?: -1
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        WeekHeaderRow(
+            visibleDates = pageDates,
+            today = today,
+            selectedDate = selectedDate,
+            daySummaries = daySummaries,
+            headerHeight = headerHeight,
+            onDayClick = onDayClick,
+        )
+
+        HorizontalDivider(color = colorScheme.outlineVariant)
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState),
+        ) {
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(scrollState),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(totalDayHeight)
-                        .drawBehind {
-                            val dayCount = visibleDates.size
-                            val colWidth = size.width / dayCount
-                            val strokePx = 1.dp.toPx()
+                    .fillMaxWidth()
+                    .height(totalDayHeight)
+                    .drawBehind {
+                        val dayCount = pageDates.size
+                        val colWidth = size.width / dayCount
+                        val strokePx = 1.dp.toPx()
 
-                            if (todayIndex in 0 until dayCount) {
-                                drawRect(
-                                    color = todayColumnTint,
-                                    topLeft = Offset(todayIndex * colWidth, 0f),
-                                    size = Size(colWidth, size.height),
-                                )
-                            }
-                            if (selectedIndex in 0 until dayCount && selectedIndex != todayIndex) {
-                                drawRect(
-                                    color = selectedColumnTint,
-                                    topLeft = Offset(selectedIndex * colWidth, 0f),
-                                    size = Size(colWidth, size.height),
-                                )
-                            }
+                        if (todayIndex in 0 until dayCount) {
+                            drawRect(
+                                color = todayColumnTint,
+                                topLeft = Offset(todayIndex * colWidth, 0f),
+                                size = Size(colWidth, size.height),
+                            )
+                        }
+                        if (selectedIndex in 0 until dayCount && selectedIndex != todayIndex) {
+                            drawRect(
+                                color = selectedColumnTint,
+                                topLeft = Offset(selectedIndex * colWidth, 0f),
+                                size = Size(colWidth, size.height),
+                            )
+                        }
 
-                            // Vertical column dividers
-                            for (i in 0 until dayCount) {
-                                val x = i * colWidth
+                        for (i in 0 until dayCount) {
+                            val x = i * colWidth
+                            drawLine(
+                                color = gridLineColor,
+                                start = Offset(x, 0f),
+                                end = Offset(x, size.height),
+                                strokeWidth = strokePx,
+                            )
+                        }
+
+                        for (h in HOURS_OF_DAY.indices) {
+                            val hourY = (h * hourSlotPx).toFloat()
+                            if (h > 0) {
                                 drawLine(
                                     color = gridLineColor,
-                                    start = Offset(x, 0f),
-                                    end = Offset(x, size.height),
+                                    start = Offset(0f, hourY),
+                                    end = Offset(size.width, hourY),
                                     strokeWidth = strokePx,
                                 )
                             }
-
-                            // Horizontal hour and half-hour grid lines (pixel-aligned with hourSlotPx)
-                            for (h in HOURS_OF_DAY.indices) {
-                                val hourY = (h * hourSlotPx).toFloat()
-                                if (h > 0) {
-                                    drawLine(
-                                        color = gridLineColor,
-                                        start = Offset(0f, hourY),
-                                        end = Offset(size.width, hourY),
-                                        strokeWidth = strokePx,
-                                    )
-                                }
-                                val halfHourY = hourY + hourSlotPx * 0.5f
-                                drawLine(
-                                    color = halfHourLineColor,
-                                    start = Offset(0f, halfHourY),
-                                    end = Offset(size.width, halfHourY),
-                                    strokeWidth = strokePx,
-                                )
-                            }
+                            val halfHourY = hourY + hourSlotPx * 0.5f
+                            drawLine(
+                                color = halfHourLineColor,
+                                start = Offset(0f, halfHourY),
+                                end = Offset(size.width, halfHourY),
+                                strokeWidth = strokePx,
+                            )
                         }
-                        .drawWithContent {
-                            drawContent()
-                            val dayCount = visibleDates.size
-                            if (todayIndex in 0 until dayCount) {
-                                val colWidth = size.width / dayCount
-                                val colStart = todayIndex * colWidth
-                                val colEnd = colStart + colWidth
-                                val nowY = ((effectiveCurrentTime.toSecondOfDay() / 3600f) * hourSlotPx)
-                                    .coerceIn(0f, size.height)
-                                val lineStrokePx = 2.dp.toPx()
-                                val dotRadiusPx = 4.dp.toPx()
-
-                                drawLine(
-                                    color = nowIndicatorColor,
-                                    start = Offset(colStart, nowY),
-                                    end = Offset(colEnd, nowY),
-                                    strokeWidth = lineStrokePx,
-                                )
-                                drawCircle(
-                                    color = nowIndicatorColor,
-                                    radius = dotRadiusPx,
-                                    center = Offset(colStart + dotRadiusPx, nowY),
-                                )
-                            }
-                        },
-                ) {
-                    visibleDates.forEach { dateInWeek ->
-                        val placements = placementsByDate[dateInWeek].orEmpty()
-                        DayColumnAppointmentsLayout(
-                            placements = placements,
-                            hourSlotPx = hourSlotPx,
-                            totalDayHeightPx = totalDayHeightPx,
-                            minHeightPx = minAppointmentHeightPx,
-                            horizontalGapPx = horizontalTileGapPx,
-                            verticalGapPx = verticalTileGapPx,
-                            surfaceColor = surfaceColor,
-                            outlineColor = colorScheme.outline,
-                            onAppointmentClick = onAppointmentClick,
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .padding(horizontal = 2.dp),
-                        )
                     }
+                    .drawWithContent {
+                        drawContent()
+                        val dayCount = pageDates.size
+                        if (todayIndex in 0 until dayCount) {
+                            val colWidth = size.width / dayCount
+                            val colStart = todayIndex * colWidth
+                            val colEnd = colStart + colWidth
+                            val nowY = ((effectiveCurrentTime.toSecondOfDay() / 3600f) * hourSlotPx)
+                                .coerceIn(0f, size.height)
+                            val lineStrokePx = 2.dp.toPx()
+                            val dotRadiusPx = 4.dp.toPx()
+
+                            drawLine(
+                                color = nowIndicatorColor,
+                                start = Offset(colStart, nowY),
+                                end = Offset(colEnd, nowY),
+                                strokeWidth = lineStrokePx,
+                            )
+                            drawCircle(
+                                color = nowIndicatorColor,
+                                radius = dotRadiusPx,
+                                center = Offset(colStart + dotRadiusPx, nowY),
+                            )
+                        }
+                    },
+            ) {
+                pageDates.forEach { dateInWeek ->
+                    val placements = placementsByDate[dateInWeek].orEmpty()
+                    DayColumnAppointmentsLayout(
+                        placements = placements,
+                        hourSlotPx = hourSlotPx,
+                        totalDayHeightPx = totalDayHeightPx,
+                        minHeightPx = minAppointmentHeightPx,
+                        horizontalGapPx = horizontalTileGapPx,
+                        verticalGapPx = verticalTileGapPx,
+                        surfaceColor = surfaceColor,
+                        outlineColor = colorScheme.outline,
+                        onAppointmentClick = onAppointmentClick,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .padding(horizontal = 2.dp),
+                    )
                 }
             }
         }
@@ -532,6 +728,7 @@ private fun WeekHeaderRow(
     today: LocalDate,
     selectedDate: LocalDate?,
     daySummaries: Map<LocalDate, DayHeaderSummary>,
+    headerHeight: Dp,
     onDayClick: (LocalDate) -> Unit,
 ) {
     val colorScheme = MaterialTheme.colorScheme
@@ -541,11 +738,10 @@ private fun WeekHeaderRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(headerHeight)
             .background(colorScheme.surface),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Spacer(modifier = Modifier.width(HOUR_COLUMN_WIDTH))
-
         visibleDates.forEach { dateInWeek ->
             val isToday = dateInWeek == today
             val isSelected = dateInWeek == selectedDate
@@ -570,7 +766,7 @@ private fun WeekHeaderRow(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 56.dp)
+                    .fillMaxHeight()
                     .clickable { onDayClick(dateInWeek) }
                     .padding(top = 4.dp, bottom = 3.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -662,13 +858,14 @@ private fun DayColumnAppointmentsLayout(
                     appointment = placement.appointment,
                     surfaceColor = surfaceColor,
                     outlineColor = outlineColor,
-                    onClick = { onAppointmentClick(placement.appointment) },
-                )
+                ) {
+                    onAppointmentClick(placement.appointment)
+                }
             }
         },
     ) { measurables, constraints ->
         val dayWidthPx = constraints.maxWidth.coerceAtLeast(1)
-        val placeables = ArrayList<androidx.compose.ui.layout.Placeable>(measurables.size)
+        val placeables = ArrayList<Placeable>(measurables.size)
         val positionsX = IntArray(measurables.size)
         val positionsY = IntArray(measurables.size)
 

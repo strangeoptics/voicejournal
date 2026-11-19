@@ -3,12 +3,18 @@ package com.example.voicejournal
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.voicejournal.ui.components.Appointment
+import com.example.voicejournal.ui.components.PAGER_CENTER_PAGE
 import com.example.voicejournal.ui.components.calculateAppointmentColumns
 import com.example.voicejournal.ui.components.calculateOverlappingAppointmentLayout
+import com.example.voicejournal.ui.components.computeAutoScrollTargetPx
+import com.example.voicejournal.ui.components.pageIndexForStartDate
 import com.example.voicejournal.ui.components.startOfWeek
 import com.example.voicejournal.ui.components.summarizeDayHeader
+import com.example.voicejournal.ui.components.visibleDatesForPage
+import com.example.voicejournal.util.DateFormatters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -192,5 +198,117 @@ class WeekViewBugFixTest {
         assertEquals(5, fiveSummary.entryCount)
         assertEquals(listOf(Color.Red, Color.Blue, Color.Green), fiveSummary.dotColors)
         assertTrue(fiveSummary.hasOverflow)
+    }
+
+    @Test
+    fun pagerPageMapping_resolvesAdjacentAndAlignedPagesAccurately() {
+        val anchor = LocalDate.of(2026, 11, 16)
+        assertEquals(
+            (0L until 7L).map { anchor.plusDays(it) },
+            visibleDatesForPage(anchor, stepDays = 7, pageOffset = 0),
+        )
+        assertEquals(
+            (0L until 7L).map { anchor.plusDays(7 + it) },
+            visibleDatesForPage(anchor, stepDays = 7, pageOffset = 1),
+        )
+        assertEquals(PAGER_CENTER_PAGE, pageIndexForStartDate(anchor, 7, anchor))
+        assertEquals(PAGER_CENTER_PAGE + 2, pageIndexForStartDate(anchor, 7, anchor.plusDays(14)))
+        assertEquals(PAGER_CENTER_PAGE - 1, pageIndexForStartDate(anchor, 7, anchor.minusDays(7)))
+        // Non-aligned date (e.g. Wednesday in 7-day Monday-anchored pager) returns null to trigger re-anchor
+        assertNull(pageIndexForStartDate(anchor, 7, anchor.plusDays(2)))
+    }
+
+    @Test
+    fun computeAutoScrollTargetPx_scrollsOnlyWhenAllDayEntriesAreOutsideViewport() {
+        val date = LocalDate.of(2026, 11, 19)
+        val hourSlotPx = 120
+        val minHeightPx = 40
+        val totalHeightPx = hourSlotPx * 24
+        val viewportHeightPx = hourSlotPx * 8 // 8 hours visible (08:00..16:00)
+        val maxScrollPx = totalHeightPx - viewportHeightPx
+        val scrollAt8Am = hourSlotPx * 8
+
+        // Empty day -> no scroll
+        assertNull(
+            computeAutoScrollTargetPx(
+                placements = emptyList(),
+                scrollTopPx = scrollAt8Am,
+                viewportHeightPx = viewportHeightPx,
+                hourSlotPx = hourSlotPx,
+                minHeightPx = minHeightPx,
+                maxScrollPx = maxScrollPx,
+            ),
+        )
+
+        // Entry at 10:00..11:00 is already inside [08:00..16:00] -> no scroll
+        val visiblePlacements = calculateAppointmentColumns(
+            listOf(Appointment("v", date.atTime(10, 0), date.atTime(11, 0), "Visible")),
+            date,
+        )
+        assertNull(
+            computeAutoScrollTargetPx(
+                placements = visiblePlacements,
+                scrollTopPx = scrollAt8Am,
+                viewportHeightPx = viewportHeightPx,
+                hourSlotPx = hourSlotPx,
+                minHeightPx = minHeightPx,
+                maxScrollPx = maxScrollPx,
+            ),
+        )
+
+        // Off-screen evening entry at 21:30..22:00 -> scrolls to 21:00 (clamped to maxScrollPx = 16:00)
+        val eveningPlacements = calculateAppointmentColumns(
+            listOf(Appointment("e", date.atTime(21, 30), date.atTime(22, 0), "Evening")),
+            date,
+        )
+        assertEquals(
+            maxScrollPx,
+            computeAutoScrollTargetPx(
+                placements = eveningPlacements,
+                scrollTopPx = scrollAt8Am,
+                viewportHeightPx = viewportHeightPx,
+                hourSlotPx = hourSlotPx,
+                minHeightPx = minHeightPx,
+                maxScrollPx = maxScrollPx,
+            ),
+        )
+
+        // Off-screen early entry at 05:30..06:00 -> scrolls to 05:00 (5 * 120 = 600px)
+        val earlyPlacements = calculateAppointmentColumns(
+            listOf(Appointment("m", date.atTime(5, 30), date.atTime(6, 0), "Early")),
+            date,
+        )
+        assertEquals(
+            hourSlotPx * 5,
+            computeAutoScrollTargetPx(
+                placements = earlyPlacements,
+                scrollTopPx = scrollAt8Am,
+                viewportHeightPx = viewportHeightPx,
+                hourSlotPx = hourSlotPx,
+                minHeightPx = minHeightPx,
+                maxScrollPx = maxScrollPx,
+            ),
+        )
+    }
+
+    @Test
+    fun formatCalendarPeriodTitle_respectsLocaleAndMonthOrYearTransitions() {
+        val singleDay = listOf(LocalDate.of(2026, 11, 19))
+        val deDay = DateFormatters.formatCalendarPeriodTitle(singleDay, Locale.GERMANY)
+        val usDay = DateFormatters.formatCalendarPeriodTitle(singleDay, Locale.US)
+        assertTrue(deDay.contains("19") && deDay.contains("November") && deDay.contains("2026"))
+        assertTrue(usDay.contains("November 19, 2026"))
+
+        val sameMonthWeek = (0L until 7L).map { LocalDate.of(2026, 11, 16).plusDays(it) }
+        assertEquals("November 2026", DateFormatters.formatCalendarPeriodTitle(sameMonthWeek, Locale.GERMANY))
+        assertEquals("November 2026", DateFormatters.formatCalendarPeriodTitle(sameMonthWeek, Locale.US))
+
+        val crossMonthWeek = (0L until 7L).map { LocalDate.of(2026, 11, 30).plusDays(it) }
+        val crossMonthTitle = DateFormatters.formatCalendarPeriodTitle(crossMonthWeek, Locale.US)
+        assertTrue(crossMonthTitle.contains("Nov") && crossMonthTitle.contains("December 2026"))
+
+        val crossYearWeek = (0L until 7L).map { LocalDate.of(2026, 12, 28).plusDays(it) }
+        val crossYearTitle = DateFormatters.formatCalendarPeriodTitle(crossYearWeek, Locale.US)
+        assertTrue(crossYearTitle.contains("2026") && crossYearTitle.contains("2027"))
     }
 }

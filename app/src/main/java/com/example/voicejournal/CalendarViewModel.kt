@@ -68,21 +68,30 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
             initialValue = (0L until 7L).map { initialStartDate.plusDays(it) },
         )
 
+    /**
+     * Preloads a 3-period window (previous + current + next page) so adjacent
+     * [com.example.voicejournal.ui.components.WeekView] pager pages already render
+     * appointments and header dots seamlessly during a swipe.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     val appointments: StateFlow<List<Appointment>> = dateRange.flatMapLatest { (startDate, endDate) ->
-        val (queryStartMillis, queryEndMillis) = TimeZoneUtils.utcQueryBoundsForLocalDates(startDate, endDate)
+        val spanDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1L).coerceAtLeast(1L)
+        val preloadStart = startDate.minusDays(spanDays)
+        val preloadEnd = endDate.plusDays(spanDays)
+        val (queryStartMillis, queryEndMillis) = TimeZoneUtils.utcQueryBoundsForLocalDates(preloadStart, preloadEnd)
+
         repository.getEntriesForCalendar(queryStartMillis, queryEndMillis).map { entriesWithCategories ->
             entriesWithCategories.mapNotNull { (entry, categories) ->
                 val startDateTime = entry.startLocalDateTime()
                 val rawEndDateTime = entry.stopLocalDateTime() ?: startDateTime.plusHours(1)
                 val endDateTime = if (rawEndDateTime.isBefore(startDateTime)) startDateTime else rawEndDateTime
-                if (endDateTime.toLocalDate().isBefore(startDate) || startDateTime.toLocalDate().isAfter(endDate)) {
+                if (endDateTime.toLocalDate().isBefore(preloadStart) || startDateTime.toLocalDate().isAfter(preloadEnd)) {
                     return@mapNotNull null
                 }
                 val appointmentColor = categories
                     .asSequence()
-                    .filter { it.color.isNotBlank() }
-                    .minByOrNull { it.orderIndex }
+                    .filter { category -> category.color.isNotBlank() }
+                    .minByOrNull { category -> category.orderIndex }
                     ?.let { category ->
                         try {
                             Color(category.color.toColorInt())
@@ -128,12 +137,19 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
         _currentDate.value = if (_numberOfDays.value == 7) startOfWeek(today) else today
     }
 
+    fun navigateToPeriodStart(periodStart: LocalDate) {
+        if (_selectedDate.value != null) {
+            _selectedDate.value = periodStart
+            _currentDate.value = if (_numberOfDays.value == 7) startOfWeek(periodStart) else periodStart
+        } else {
+            _currentDate.value = if (_numberOfDays.value == 7) startOfWeek(periodStart) else periodStart
+        }
+    }
+
     fun navigateNext() {
         val selected = _selectedDate.value
         if (selected != null) {
-            val nextDate = selected.plusDays(1)
-            _selectedDate.value = nextDate
-            _currentDate.value = if (_numberOfDays.value == 7) startOfWeek(nextDate) else nextDate
+            navigateToPeriodStart(selected.plusDays(1))
         } else {
             _currentDate.value = _currentDate.value.plusDays(_numberOfDays.value.toLong())
         }
@@ -142,9 +158,7 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
     fun navigatePrevious() {
         val selected = _selectedDate.value
         if (selected != null) {
-            val prevDate = selected.minusDays(1)
-            _selectedDate.value = prevDate
-            _currentDate.value = if (_numberOfDays.value == 7) startOfWeek(prevDate) else prevDate
+            navigateToPeriodStart(selected.minusDays(1))
         } else {
             _currentDate.value = _currentDate.value.minusDays(_numberOfDays.value.toLong())
         }

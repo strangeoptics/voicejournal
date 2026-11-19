@@ -23,14 +23,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.example.voicejournal.ui.components.WeekView
 import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.DateFormatters
+import java.util.Locale
 
 class CalendarActivity : ComponentActivity() {
     private val viewModel: CalendarViewModel by viewModels { CalendarViewModelFactory(this) }
@@ -39,10 +42,9 @@ class CalendarActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             VoicejournalTheme {
-                CalendarScreen(
-                    viewModel = viewModel,
-                    onFinish = { finish() },
-                )
+                CalendarScreen(viewModel = viewModel) {
+                    finish()
+                }
             }
         }
     }
@@ -52,12 +54,17 @@ class CalendarActivity : ComponentActivity() {
 @Composable
 fun CalendarScreen(viewModel: CalendarViewModel, onFinish: () -> Unit) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val locale = configuration.locales[0] ?: Locale.getDefault()
+
     val appointments by viewModel.appointments.collectAsState()
-    val numberOfDays by viewModel.numberOfDays.collectAsState()
-    val currentDate by viewModel.currentDate.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val visibleDates by viewModel.visibleDates.collectAsState()
-    var showMenu by rememberSaveable { mutableStateOf(false) }
+    var showMenu by rememberSaveable { mutableStateOf(value = false) }
+
+    val topBarTitle = remember(visibleDates, locale) {
+        DateFormatters.formatCalendarPeriodTitle(visibleDates, locale)
+    }
 
     BackHandler(enabled = selectedDate != null) {
         viewModel.selectDate(null)
@@ -67,14 +74,7 @@ fun CalendarScreen(viewModel: CalendarViewModel, onFinish: () -> Unit) {
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
-                    Text(
-                        text = selectedDate?.format(DateFormatters.CALENDAR_FULL_DATE_GERMAN)
-                            ?: when (numberOfDays) {
-                                1 -> currentDate.format(DateFormatters.CALENDAR_FULL_DATE_GERMAN)
-                                3, 7 -> currentDate.format(DateFormatters.CALENDAR_MONTH_YEAR_GERMAN)
-                                else -> ""
-                            },
-                    )
+                    Text(text = topBarTitle)
                 },
                 navigationIcon = {
                     IconButton(
@@ -150,6 +150,7 @@ fun CalendarScreen(viewModel: CalendarViewModel, onFinish: () -> Unit) {
                     context.startActivity(EditEntryActivity.newIntent(context, entryId))
                 }
             },
+            onPeriodStartChanged = viewModel::navigateToPeriodStart,
             onNextPeriod = viewModel::navigateNext,
             onPreviousPeriod = viewModel::navigatePrevious,
         )

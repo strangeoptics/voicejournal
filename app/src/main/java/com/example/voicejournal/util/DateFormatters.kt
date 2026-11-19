@@ -1,6 +1,8 @@
 package com.example.voicejournal.util
 
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 
 /**
@@ -20,4 +22,35 @@ object DateFormatters {
 
     fun googlePhotosQuery(locale: Locale = Locale.getDefault()): DateTimeFormatter =
         DateTimeFormatter.ofPattern("d. MMMM yyyy", locale)
+
+    fun calendarFullDate(locale: Locale = Locale.getDefault()): DateTimeFormatter =
+        DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL).withLocale(locale)
+
+    fun calendarMonthYear(locale: Locale = Locale.getDefault()): DateTimeFormatter =
+        DateTimeFormatter.ofPattern("LLLL yyyy", locale)
+
+    fun formatCalendarPeriodTitle(
+        visibleDates: List<LocalDate>,
+        locale: Locale = Locale.getDefault(),
+    ): String {
+        if (visibleDates.isEmpty()) return ""
+        if (visibleDates.size == 1) {
+            return visibleDates.first().format(calendarFullDate(locale))
+        }
+        val first = visibleDates.first()
+        val last = visibleDates.last()
+        return when {
+            first.year == last.year && first.month == last.month -> {
+                first.format(calendarMonthYear(locale))
+            }
+            first.year == last.year -> {
+                val shortStartMonth = first.format(DateTimeFormatter.ofPattern("LLL", locale))
+                "$shortStartMonth – ${last.format(calendarMonthYear(locale))}"
+            }
+            else -> {
+                val shortMonthYear = DateTimeFormatter.ofPattern("LLL yyyy", locale)
+                "${first.format(shortMonthYear)} – ${last.format(shortMonthYear)}"
+            }
+        }
+    }
 }

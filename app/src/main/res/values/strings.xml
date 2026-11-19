@@ -44,4 +44,11 @@
     <string name="fab_create_manual">Create entry manually</string>
     <string name="fab_speak">Speak</string>
     <string name="fab_stop_recording">Stop recording</string>
+
+    <!-- Calendar -->
+    <string name="calendar_more_options">More options</string>
+    <string name="calendar_today">Today</string>
+    <string name="calendar_day_view">Day view</string>
+    <string name="calendar_three_day_view">3-day view</string>
+    <string name="calendar_week_view">Week view</string>
 </resources>

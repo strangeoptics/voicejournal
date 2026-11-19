@@ -1,333 +1,469 @@
 package com.example.voicejournal.ui.components
 
+import android.content.res.Configuration
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.voicejournal.EditEntryActivity
-import com.example.voicejournal.data.JournalEntry
+import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.DateFormatters
+import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.format.TextStyle
+import java.time.temporal.TemporalAdjusters
 import java.time.temporal.WeekFields
-import java.util.*
+import java.util.Locale
+import java.util.UUID
 import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.seconds
 
+private const val MINUTES_PER_DAY = 24 * 60.0
+private val HOURS_OF_DAY: List<LocalTime> = (0..23).map { LocalTime.of(it, 0) }
+private val HOUR_COLUMN_WIDTH: Dp = 52.dp
+private val SWIPE_THRESHOLD: Dp = 56.dp
+private val APPOINTMENT_SHAPE = RoundedCornerShape(4.dp)
+private val DARK_TEXT_ON_LIGHT_TILE = Color(0xFF1C1B1F)
+val MIN_APPOINTMENT_HEIGHT: Dp = 20.dp
 
-// Data class for an appointment
+fun startOfWeek(date: LocalDate, locale: Locale = Locale.getDefault()): LocalDate {
+    val firstDayOfWeek = WeekFields.of(locale).firstDayOfWeek
+    return date.with(TemporalAdjusters.previousOrSame(firstDayOfWeek))
+}
+
+@Immutable
 data class Appointment(
     val id: String,
     val startDateTime: LocalDateTime,
     val endDateTime: LocalDateTime,
     val title: String,
-    val description: String? = null,
-    val color: Color = Color.Blue, // Example color
-    val entry: JournalEntry? = null
+    val color: Color = Color(0xFF1976D2),
+    val entryId: UUID? = null,
 ) {
-    // Helper properties for accessing date and time components
     val startDate: LocalDate get() = startDateTime.toLocalDate()
     val startTime: LocalTime get() = startDateTime.toLocalTime()
     val endDate: LocalDate get() = endDateTime.toLocalDate()
     val endTime: LocalTime get() = endDateTime.toLocalTime()
 }
 
-// New data class to hold layout information for an appointment
-data class AppointmentLayoutInfo(
+@Immutable
+data class AppointmentColumnPlacement(
     val appointment: Appointment,
-    val column: Int, // The horizontal column this appointment occupies
-    val totalColumns: Int, // Total columns needed for this overlap group
-    val offsetX: Dp, // Calculated horizontal offset
-    val width: Dp // Calculated width
+    val column: Int,
+    val totalColumns: Int,
+    val startMinutes: Double,
+    val endMinutes: Double,
 )
 
-// Helper function to calculate layout for overlapping appointments
+@Immutable
+data class AppointmentLayoutInfo(
+    val appointment: Appointment,
+    val column: Int,
+    val totalColumns: Int,
+    val offsetX: Dp,
+    val width: Dp,
+)
+
+private data class EffectiveInterval(
+    val appointment: Appointment,
+    val startMinutes: Double,
+    val displayEndMinutes: Double,
+    val collisionEndMinutes: Double,
+)
+
+/**
+ * Width-independent overlap clustering for appointments on [currentDate].
+ * Groups genuinely overlapping `[start, end)` intervals into independent connected clusters
+ * so non-overlapping times of day always retain full column width.
+ */
+fun calculateAppointmentColumns(
+    dailyAppointments: List<Appointment>,
+    currentDate: LocalDate,
+): List<AppointmentColumnPlacement> {
+    if (dailyAppointments.isEmpty()) return emptyList()
+
+    val intervals = dailyAppointments
+        .asSequence()
+        .map { appointment ->
+            val rawStart = if (appointment.startDate.isBefore(currentDate)) {
+                0.0
+            } else {
+                appointment.startTime.toSecondOfDay() / 60.0
+            }
+            val rawEnd = if (appointment.endDate.isAfter(currentDate)) {
+                MINUTES_PER_DAY
+            } else {
+                appointment.endTime.toSecondOfDay() / 60.0
+            }
+            val displayEnd = rawEnd.coerceAtLeast(rawStart)
+            val collisionEnd = if (displayEnd <= rawStart) {
+                minOf(MINUTES_PER_DAY, rawStart + 1.0)
+            } else {
+                displayEnd
+            }
+            EffectiveInterval(
+                appointment = appointment,
+                startMinutes = rawStart,
+                displayEndMinutes = displayEnd,
+                collisionEndMinutes = collisionEnd,
+            )
+        }
+        .sortedWith(
+            compareBy<EffectiveInterval>({ it.startMinutes })
+                .thenByDescending { it.collisionEndMinutes },
+        )
+        .toList()
+
+    val placements = ArrayList<AppointmentColumnPlacement>(intervals.size)
+    var index = 0
+
+    while (index < intervals.size) {
+        val cluster = mutableListOf(intervals[index])
+        var clusterMaxEnd = intervals[index].collisionEndMinutes
+        index++
+
+        while ((index < intervals.size) && (intervals[index].startMinutes < clusterMaxEnd)) {
+            val next = intervals[index]
+            cluster.add(next)
+            if (next.collisionEndMinutes > clusterMaxEnd) {
+                clusterMaxEnd = next.collisionEndMinutes
+            }
+            index++
+        }
+
+        val columnEndMinutes = mutableListOf<Double>()
+        val assignedColumns = IntArray(cluster.size)
+
+        for (i in cluster.indices) {
+            val item = cluster[i]
+            var targetColumn = -1
+            for (colIdx in columnEndMinutes.indices) {
+                if (columnEndMinutes[colIdx] <= item.startMinutes) {
+                    targetColumn = colIdx
+                    columnEndMinutes[colIdx] = item.collisionEndMinutes
+                    break
+                }
+            }
+            if (targetColumn == -1) {
+                targetColumn = columnEndMinutes.size
+                columnEndMinutes.add(item.collisionEndMinutes)
+            }
+            assignedColumns[i] = targetColumn
+        }
+
+        val totalColumns = columnEndMinutes.size
+        for (i in cluster.indices) {
+            val item = cluster[i]
+            placements.add(
+                AppointmentColumnPlacement(
+                    appointment = item.appointment,
+                    column = assignedColumns[i],
+                    totalColumns = totalColumns,
+                    startMinutes = item.startMinutes,
+                    endMinutes = item.displayEndMinutes,
+                ),
+            )
+        }
+    }
+
+    return placements
+}
+
 fun calculateOverlappingAppointmentLayout(
     dailyAppointments: List<Appointment>,
     dayWidth: Dp,
-    currentDate: LocalDate
+    currentDate: LocalDate,
 ): List<AppointmentLayoutInfo> {
-    if (dailyAppointments.isEmpty()) return emptyList()
-
-    val sortedAppointments = dailyAppointments.sortedBy { it.startDateTime }
-    val layoutInfoList = mutableListOf<AppointmentLayoutInfo>()
-
-    // Simplified collision detection and column assignment
-    val columns = mutableListOf<MutableList<Appointment>>()
-
-    for (appointment in sortedAppointments) {
-        var placed = false
-        for (i in columns.indices) {
-            val column = columns[i]
-            // Check if this appointment overlaps with any appointment already in this column
-            val overlapsWithColumn = column.any { existingAppt ->
-                val existingApptStart = if (existingAppt.startDate.isBefore(currentDate)) LocalTime.MIN else existingAppt.startTime
-                val existingApptEnd = if (existingAppt.endDate.isAfter(currentDate)) LocalTime.MAX else existingAppt.endTime
-                val appointmentStart = if (appointment.startDate.isBefore(currentDate)) LocalTime.MIN else appointment.startTime
-                val appointmentEnd = if (appointment.endDate.isAfter(currentDate)) LocalTime.MAX else appointment.endTime
-
-                !(appointmentEnd.isBefore(existingApptStart) || appointmentStart.isAfter(existingApptEnd))
-            }
-            if (!overlapsWithColumn) {
-                // Place in this column
-                column.add(appointment)
-                placed = true
-                break
-            }
-        }
-        if (!placed) {
-            // Create a new column for this appointment
-            columns.add(mutableListOf(appointment))
-        }
+    val placements = calculateAppointmentColumns(dailyAppointments, currentDate)
+    if (placements.isEmpty()) return emptyList()
+    return placements.map { placement ->
+        val individualWidth = dayWidth / placement.totalColumns.toFloat()
+        AppointmentLayoutInfo(
+            appointment = placement.appointment,
+            column = placement.column,
+            totalColumns = placement.totalColumns,
+            offsetX = individualWidth * placement.column.toFloat(),
+            width = individualWidth,
+        )
     }
-
-    val maxColumnsNeeded = columns.size
-    val individualWidth = dayWidth / maxColumnsNeeded.toFloat()
-
-    // Assign final layout info based on assigned columns
-    for (appointment in sortedAppointments) {
-        var columnIndex = -1
-        for (i in columns.indices) {
-            if (columns[i].contains(appointment)) {
-                columnIndex = i
-                break
-            }
-        }
-        if (columnIndex != -1) {
-            layoutInfoList.add(
-                AppointmentLayoutInfo(
-                    appointment = appointment,
-                    column = columnIndex,
-                    totalColumns = maxColumnsNeeded,
-                    offsetX = individualWidth * columnIndex.toFloat(),
-                    width = individualWidth
-                )
-            )
-        } else {
-            // Fallback for appointments not placed (should not happen with this algorithm if all are processed)
-            layoutInfoList.add(
-                AppointmentLayoutInfo(
-                    appointment = appointment,
-                    column = 0,
-                    totalColumns = 1,
-                    offsetX = 0.dp,
-                    width = dayWidth
-                )
-            )
-        }
-    }
-
-    return layoutInfoList
 }
 
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WeekView(
+    visibleDates: List<LocalDate>,
     modifier: Modifier = Modifier,
     appointments: List<Appointment> = emptyList(),
-    hourHeight: Dp = 60.dp, // Height for one hour slot content
-    numberOfDays: Int,
-    currentDate: LocalDate, // New parameter for current week's date
-    selectedDate: LocalDate? = null, // Changed from selectedDay: DayOfWeek?
-    onDayClick: (LocalDate?) -> Unit, // Changed to pass LocalDate?
-    onNextWeek: () -> Unit,
-    onPreviousWeek: () -> Unit
+    selectedDate: LocalDate? = null,
+    today: LocalDate = LocalDate.now(),
+    currentTime: LocalTime? = null,
+    hourHeight: Dp = 60.dp,
+    minAppointmentHeight: Dp = MIN_APPOINTMENT_HEIGHT,
+    onDayClick: (LocalDate) -> Unit = {},
+    onAppointmentClick: (Appointment) -> Unit = {},
+    onNextPeriod: () -> Unit = {},
+    onPreviousPeriod: () -> Unit = {},
 ) {
-    // This logic now ensures the week view always starts on the correct day of the week
-    val daysInWeek = (0L until numberOfDays).map {
-        if (numberOfDays == 7) {
-            val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
-            currentDate.with(firstDayOfWeek).plusDays(it)
-        } else {
-            currentDate.plusDays(it)
-        }
-    }
-    val daysToDisplay = selectedDate?.let { listOf(it) } ?: daysInWeek
+    if (visibleDates.isEmpty()) return
 
-    val hoursOfDay = (0..23).map { LocalTime.of(it, 0) }
-    val scrollState = rememberScrollState()
-    val context = LocalContext.current
     val density = LocalDensity.current
 
-    val slotHeight = hourHeight + 1.dp // Total height of an hour slot (content + divider)
+    val hourSlotPx = with(density) { hourHeight.roundToPx().coerceAtLeast(1) }
+    val scrollState = rememberScrollState(initial = hourSlotPx * 8)
+    val exactHourHeight = with(density) { hourSlotPx.toDp() }
+    val totalDayHeightPx = hourSlotPx * HOURS_OF_DAY.size
+    val totalDayHeight = with(density) { totalDayHeightPx.toDp() }
+    val minAppointmentHeightPx = with(density) { minAppointmentHeight.roundToPx().coerceAtLeast(1) }
+    val swipeThresholdPx = with(density) { SWIPE_THRESHOLD.toPx() }
+    val horizontalTileGapPx = with(density) { 1.dp.roundToPx() }
+    val verticalTileGapPx = with(density) { 1.dp.roundToPx() }
 
-    LaunchedEffect(daysToDisplay) {
-        val slotHeightPx = with(density) { slotHeight.toPx() }
-        val scrollToPosition = (slotHeightPx * 8).toInt() // Scroll to 8 AM
-        scrollState.scrollTo(scrollToPosition)
+    val todayIndex = remember(visibleDates, today) { visibleDates.indexOf(today) }
+    val selectedIndex = remember(visibleDates, selectedDate) {
+        selectedDate?.let { visibleDates.indexOf(it) } ?: -1
+    }
+
+    val liveTime by produceState(initialValue = LocalTime.now(), key1 = todayIndex >= 0, key2 = currentTime) {
+        if (currentTime != null || todayIndex < 0) return@produceState
+        while (true) {
+            value = LocalTime.now()
+            delay((60 - value.second).seconds)
+        }
+    }
+    val effectiveCurrentTime = currentTime ?: liveTime
+
+    val placementsByDate = remember(appointments, visibleDates) {
+        visibleDates.associateWith { date ->
+            val daily = appointments.filter {
+                !it.startDate.isAfter(date) && !it.endDate.isBefore(date)
+            }
+            calculateAppointmentColumns(daily, date)
+        }
     }
 
     var totalDrag by remember { mutableFloatStateOf(0f) }
 
-    val totalDayHeight = slotHeight * 24 // Total height for a full 24-hour day
+    val colorScheme = MaterialTheme.colorScheme
+    val surfaceColor = colorScheme.surface
+    val gridLineColor = colorScheme.outlineVariant.copy(alpha = 0.55f)
+    val halfHourLineColor = colorScheme.outlineVariant.copy(alpha = 0.22f)
+    val todayColumnTint = colorScheme.primaryContainer.copy(alpha = 0.18f)
+    val selectedColumnTint = colorScheme.secondaryContainer.copy(alpha = 0.16f)
+    val nowIndicatorColor = colorScheme.error
 
-    Column(modifier = modifier.fillMaxSize()) {
-        // Weekday Header
-        Row(modifier = Modifier.fillMaxWidth()) {
-            // Spacer for hour column alignment
-            Spacer(modifier = Modifier.width(50.dp))
-
-            daysToDisplay.forEach { dateInWeek -> // Iterate over LocalDate now
-                val dayOfWeek = dateInWeek.dayOfWeek // Get DayOfWeek from LocalDate
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable { onDayClick(dateInWeek) }, // Pass LocalDate
-                    contentAlignment = androidx.compose.ui.Alignment.Center
-                ) {
-                    Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-                        Text(
-                            text = dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault()),
-                            fontSize = 12.sp
-                        )
-                        Text(
-                            text = dateInWeek.dayOfMonth.toString(), // Display day of month
-                            fontSize = 10.sp,
-                            color = Color.Gray
-                        )
-                    }
-                }
-            }
-        }
-
-        HorizontalDivider(thickness = 1.dp)
-
-        // Main Content Area: Hours + Days (now with synchronized scrolling)
-        Row(modifier = Modifier
+    Column(
+        modifier = modifier
             .fillMaxSize()
-            .draggable(
-                orientation = Orientation.Horizontal,
-                state = rememberDraggableState { delta ->
-                    totalDrag += delta
-                },
-                onDragStarted = {
-                    totalDrag = 0f
-                },
-                onDragStopped = {
-                    if (abs(totalDrag) > 100f) { // Swipe threshold in pixels
-                        if (totalDrag < 0) {
-                            onNextWeek()
-                        } else {
-                            onPreviousWeek()
+            .background(surfaceColor),
+    ) {
+        WeekHeaderRow(
+            visibleDates = visibleDates,
+            today = today,
+            selectedDate = selectedDate,
+            onDayClick = onDayClick,
+        )
+
+        HorizontalDivider(color = colorScheme.outlineVariant)
+
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .draggable(
+                    orientation = Orientation.Horizontal,
+                    state = rememberDraggableState { delta ->
+                        totalDrag += delta
+                    },
+                    onDragStarted = {
+                        totalDrag = 0f
+                    },
+                    onDragStopped = {
+                        if (abs(totalDrag) > swipeThresholdPx) {
+                            if (totalDrag < 0f) {
+                                onNextPeriod()
+                            } else {
+                                onPreviousPeriod()
+                            }
                         }
-                    }
-                }
-            )
+                    },
+                ),
         ) {
-            // Hour Column (always visible)
-            Column(modifier = Modifier
-                .width(50.dp)
-                .verticalScroll(scrollState)) {
-                hoursOfDay.forEach { hour ->
+            // Synchronized Hour Labels Column
+            Column(
+                modifier = Modifier
+                    .width(HOUR_COLUMN_WIDTH)
+                    .verticalScroll(scrollState),
+            ) {
+                HOURS_OF_DAY.forEach { hour ->
                     Box(
                         modifier = Modifier
-                            .height(hourHeight) // Height of the text content area
+                            .height(exactHourHeight)
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp),
-                        contentAlignment = androidx.compose.ui.Alignment.TopEnd // Align hour text to top right
+                            .padding(top = 2.dp, end = 6.dp),
+                        contentAlignment = Alignment.TopEnd,
                     ) {
                         Text(
                             text = hour.format(DateFormatters.TIME_HM),
-                            fontSize = 10.sp
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colorScheme.onSurfaceVariant,
                         )
                     }
-                    HorizontalDivider(thickness = 1.dp) // Explicit thickness
                 }
             }
 
-            // Appointment Grid (for each day)
-            Box(modifier = Modifier
-                .weight(1f)
-                .verticalScroll(scrollState)) {
-                // This box will contain the entire grid for appointments
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    // Background grid lines for hours
-                    repeat(hoursOfDay.size) { // repeat for each hour
-                        Spacer(modifier = Modifier.height(hourHeight)) // Spacer for content area
-                        HorizontalDivider(thickness = 1.dp) // Explicit thickness
-                    }
-                }
+            // Synchronized Multi-Day Time Grid
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(scrollState),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(totalDayHeight)
+                        .drawBehind {
+                            val dayCount = visibleDates.size
+                            val colWidth = size.width / dayCount
+                            val strokePx = 1.dp.toPx()
 
-                // Overlay appointments for each day
-                Row(modifier = Modifier
-                    .fillMaxWidth()
-                    .height(totalDayHeight)) { // Explicitly set height
-                    daysToDisplay.forEach { dateInWeek -> // Use dateInWeek here
-                        BoxWithConstraints( // Use BoxWithConstraints to get the width of the day slot
+                            if (todayIndex in 0 until dayCount) {
+                                drawRect(
+                                    color = todayColumnTint,
+                                    topLeft = Offset(todayIndex * colWidth, 0f),
+                                    size = Size(colWidth, size.height),
+                                )
+                            }
+                            if (selectedIndex in 0 until dayCount && selectedIndex != todayIndex) {
+                                drawRect(
+                                    color = selectedColumnTint,
+                                    topLeft = Offset(selectedIndex * colWidth, 0f),
+                                    size = Size(colWidth, size.height),
+                                )
+                            }
+
+                            // Vertical column dividers
+                            for (i in 0 until dayCount) {
+                                val x = i * colWidth
+                                drawLine(
+                                    color = gridLineColor,
+                                    start = Offset(x, 0f),
+                                    end = Offset(x, size.height),
+                                    strokeWidth = strokePx,
+                                )
+                            }
+
+                            // Horizontal hour and half-hour grid lines (pixel-aligned with hourSlotPx)
+                            for (h in HOURS_OF_DAY.indices) {
+                                val hourY = (h * hourSlotPx).toFloat()
+                                if (h > 0) {
+                                    drawLine(
+                                        color = gridLineColor,
+                                        start = Offset(0f, hourY),
+                                        end = Offset(size.width, hourY),
+                                        strokeWidth = strokePx,
+                                    )
+                                }
+                                val halfHourY = hourY + hourSlotPx * 0.5f
+                                drawLine(
+                                    color = halfHourLineColor,
+                                    start = Offset(0f, halfHourY),
+                                    end = Offset(size.width, halfHourY),
+                                    strokeWidth = strokePx,
+                                )
+                            }
+                        }
+                        .drawWithContent {
+                            drawContent()
+                            val dayCount = visibleDates.size
+                            if (todayIndex in 0 until dayCount) {
+                                val colWidth = size.width / dayCount
+                                val colStart = todayIndex * colWidth
+                                val colEnd = colStart + colWidth
+                                val nowY = ((effectiveCurrentTime.toSecondOfDay() / 3600f) * hourSlotPx)
+                                    .coerceIn(0f, size.height)
+                                val lineStrokePx = 2.dp.toPx()
+                                val dotRadiusPx = 4.dp.toPx()
+
+                                drawLine(
+                                    color = nowIndicatorColor,
+                                    start = Offset(colStart, nowY),
+                                    end = Offset(colEnd, nowY),
+                                    strokeWidth = lineStrokePx,
+                                )
+                                drawCircle(
+                                    color = nowIndicatorColor,
+                                    radius = dotRadiusPx,
+                                    center = Offset(colStart + dotRadiusPx, nowY),
+                                )
+                            }
+                        },
+                ) {
+                    visibleDates.forEach { dateInWeek ->
+                        val placements = placementsByDate[dateInWeek].orEmpty()
+                        DayColumnAppointmentsLayout(
+                            placements = placements,
+                            hourSlotPx = hourSlotPx,
+                            totalDayHeightPx = totalDayHeightPx,
+                            minHeightPx = minAppointmentHeightPx,
+                            horizontalGapPx = horizontalTileGapPx,
+                            verticalGapPx = verticalTileGapPx,
+                            surfaceColor = surfaceColor,
+                            outlineColor = colorScheme.outline,
+                            onAppointmentClick = onAppointmentClick,
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
-                                .background(Color.LightGray.copy(alpha = 0.1f)) // Visual separation for days
-                                .padding(horizontal = 2.dp)
-                        ) {
-                            val dayWidth = this.maxWidth // Get the width of the current day slot
-
-                            // Filter appointments for the current date
-                            val dailyAppointments = appointments.filter {
-                                !it.startDateTime.toLocalDate().isAfter(dateInWeek) && !it.endDateTime.toLocalDate().isBefore(dateInWeek)
-                            }
-
-                            val appointmentLayoutInfos = remember(dailyAppointments, dayWidth) { // Re-calculate when appointments or dayWidth changes
-                                calculateOverlappingAppointmentLayout(dailyAppointments, dayWidth, dateInWeek)
-                            }
-
-                            appointmentLayoutInfos.forEach { layoutInfo ->
-                                val appointment = layoutInfo.appointment
-
-                                val effectiveStartTime = if (appointment.startDate.isBefore(dateInWeek)) LocalTime.MIN else appointment.startTime
-                                val effectiveEndTime = if (appointment.endDate.isAfter(dateInWeek)) LocalTime.MAX else appointment.endTime
-
-                                val startMinuteOfDay = effectiveStartTime.toSecondOfDay() / 60.0
-                                val endMinuteOfDay = effectiveEndTime.toSecondOfDay() / 60.0 + if (effectiveEndTime == LocalTime.MAX) 1 else 0 // Add a minute to fill the day
-                                val durationMinutes = endMinuteOfDay - startMinuteOfDay
-
-                                val topOffset = (startMinuteOfDay / 60.0 * slotHeight.value).dp
-                                val appointmentHeight = (durationMinutes / 60.0 * slotHeight.value).dp
-
-                                Box(
-                                    modifier = Modifier
-                                        .offset(x = layoutInfo.offsetX, y = topOffset)
-                                        .width(layoutInfo.width)
-                                        .height(appointmentHeight)
-                                        .background(appointment.color.copy(alpha = 0.6f))
-                                        .padding(4.dp)
-                                        .clickable { // Make appointment clickable
-                                            appointment.entry?.let {
-                                                val intent = EditEntryActivity.newIntent(context, it.id)
-                                                context.startActivity(intent)
-                                            }
-                                        }
-                                ) {
-                                    Text(
-                                        text = appointment.title,
-                                        fontSize = 12.sp,
-                                        color = Color.White
-                                    )
-                                }
-                            }
-                        }
+                                .padding(horizontal = 2.dp),
+                        )
                     }
                 }
             }
@@ -335,74 +471,270 @@ fun WeekView(
     }
 }
 
-@Preview(showBackground = true, widthDp = 700, heightDp = 500)
 @Composable
-fun WeekViewWithAppointmentsPreview() {
-    val previewDate = LocalDate.now()
-    val firstDayOfWeek = WeekFields.of(Locale.getDefault()).firstDayOfWeek
+private fun WeekHeaderRow(
+    visibleDates: List<LocalDate>,
+    today: LocalDate,
+    selectedDate: LocalDate?,
+    onDayClick: (LocalDate) -> Unit,
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val locale = Locale.getDefault()
 
-    // Calculate dates for the week based on previewDate
-    val mondayDate = previewDate.with(firstDayOfWeek)
-    val tuesdayDate = mondayDate.plusDays(1)
-    val wednesdayDate = mondayDate.plusDays(2)
-    val thursdayDate = mondayDate.plusDays(3)
-    val fridayDate = mondayDate.plusDays(4)
-    val saturdayDate = mondayDate.plusDays(5)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colorScheme.surface),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Spacer(modifier = Modifier.width(HOUR_COLUMN_WIDTH))
+
+        visibleDates.forEach { dateInWeek ->
+            val isToday = dateInWeek == today
+            val isSelected = dateInWeek == selectedDate
+
+            val weekdayColor = when {
+                isToday -> colorScheme.primary
+                isSelected -> colorScheme.onSurface
+                else -> colorScheme.onSurfaceVariant
+            }
+            val badgeContainerColor = when {
+                isToday -> colorScheme.primary
+                isSelected -> colorScheme.secondaryContainer
+                else -> Color.Transparent
+            }
+            val badgeContentColor = when {
+                isToday -> colorScheme.onPrimary
+                isSelected -> colorScheme.onSecondaryContainer
+                else -> colorScheme.onSurface
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = 52.dp)
+                    .clickable { onDayClick(dateInWeek) }
+                    .padding(vertical = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    text = dateInWeek.dayOfWeek.getDisplayName(TextStyle.SHORT, locale),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (isToday || isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = weekdayColor,
+                    maxLines = 1,
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Box(
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .background(badgeContainerColor),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = dateInWeek.dayOfMonth.toString(),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = badgeContentColor,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DayColumnAppointmentsLayout(
+    placements: List<AppointmentColumnPlacement>,
+    hourSlotPx: Int,
+    totalDayHeightPx: Int,
+    minHeightPx: Int,
+    horizontalGapPx: Int,
+    verticalGapPx: Int,
+    surfaceColor: Color,
+    outlineColor: Color,
+    onAppointmentClick: (Appointment) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Layout(
+        modifier = modifier,
+        content = {
+            placements.forEach { placement ->
+                AppointmentTile(
+                    appointment = placement.appointment,
+                    surfaceColor = surfaceColor,
+                    outlineColor = outlineColor,
+                    onClick = { onAppointmentClick(placement.appointment) },
+                )
+            }
+        },
+    ) { measurables, constraints ->
+        val dayWidthPx = constraints.maxWidth.coerceAtLeast(1)
+        val placeables = ArrayList<androidx.compose.ui.layout.Placeable>(measurables.size)
+        val positionsX = IntArray(measurables.size)
+        val positionsY = IntArray(measurables.size)
+
+        for (i in measurables.indices) {
+            val placement = placements[i]
+            val colStartX = (dayWidthPx * placement.column) / placement.totalColumns
+            val colEndX = (dayWidthPx * (placement.column + 1)) / placement.totalColumns
+            val gapRight = if (placement.column < placement.totalColumns - 1) horizontalGapPx else 0
+            val itemWidthPx = (colEndX - colStartX - gapRight).coerceAtLeast(1)
+
+            val durationMinutes = (placement.endMinutes - placement.startMinutes).coerceAtLeast(0.0)
+            val rawHeightPx = ((durationMinutes / 60.0) * hourSlotPx).roundToInt() - verticalGapPx
+            val itemHeightPx = rawHeightPx
+                .coerceAtLeast(minHeightPx)
+                .coerceAtMost(totalDayHeightPx)
+
+            val rawTopY = ((placement.startMinutes / 60.0) * hourSlotPx).roundToInt()
+            val topY = rawTopY.coerceIn(0, (totalDayHeightPx - itemHeightPx).coerceAtLeast(0))
+
+            placeables.add(measurables[i].measure(Constraints.fixed(itemWidthPx, itemHeightPx)))
+            positionsX[i] = colStartX
+            positionsY[i] = topY
+        }
+
+        layout(dayWidthPx, totalDayHeightPx) {
+            for (i in placeables.indices) {
+                placeables[i].placeRelative(positionsX[i], positionsY[i])
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppointmentTile(
+    appointment: Appointment,
+    surfaceColor: Color,
+    outlineColor: Color,
+    onClick: () -> Unit,
+) {
+    val containerColor = appointment.color.copy(alpha = 0.84f).compositeOver(surfaceColor)
+    val contentColor = if (containerColor.luminance() > 0.45f) {
+        DARK_TEXT_ON_LIGHT_TILE
+    } else {
+        Color.White
+    }
+    val lowContrastAgainstSurface = abs(containerColor.luminance() - surfaceColor.luminance()) < 0.08f
+    val accentColor = if (lowContrastAgainstSurface) outlineColor else appointment.color
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clip(APPOINTMENT_SHAPE)
+            .background(containerColor)
+            .border(
+                width = 0.5.dp,
+                color = accentColor.copy(alpha = if (lowContrastAgainstSurface) 0.65f else 0.35f),
+                shape = APPOINTMENT_SHAPE,
+            )
+            .drawBehind {
+                val stripeWidth = 3.dp.toPx()
+                drawRect(
+                    color = accentColor,
+                    topLeft = Offset.Zero,
+                    size = Size(stripeWidth, size.height),
+                )
+            }
+            .clickable(onClick = onClick)
+            .padding(start = 6.dp, end = 3.dp, top = 2.dp, bottom = 2.dp),
+    ) {
+        Text(
+            text = appointment.title,
+            fontSize = 11.sp,
+            lineHeight = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = contentColor,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun SampleWeekViewPreviewContent() {
+    val weekStartDate = startOfWeek(LocalDate.of(2026, 11, 19))
+    val visibleDates = (0L until 7L).map { weekStartDate.plusDays(it) }
+    val tuesdayDate = weekStartDate.plusDays(1)
+    val wednesdayDate = weekStartDate.plusDays(2)
+    val thursdayDate = weekStartDate.plusDays(3)
+    val fridayDate = weekStartDate.plusDays(4)
+    val saturdayDate = weekStartDate.plusDays(5)
 
     val sampleAppointments = listOf(
         Appointment(
             id = "1",
-            startDateTime = mondayDate.atTime(9, 30),
-            endDateTime = mondayDate.atTime(10, 30),
+            startDateTime = weekStartDate.atTime(9, 30),
+            endDateTime = weekStartDate.atTime(10, 30),
             title = "Meeting with John",
-            description = "Project discussion",
-            color = Color(0xFFE57373) // Light Red
+            color = Color(0xFFE57373),
         ),
         Appointment(
             id = "2",
             startDateTime = tuesdayDate.atTime(14, 0),
             endDateTime = tuesdayDate.atTime(15, 0),
             title = "Team Standup",
-            color = Color(0xFF81C784) // Light Green
+            color = Color(0xFF81C784),
         ),
         Appointment(
             id = "3",
             startDateTime = wednesdayDate.atTime(11, 0),
             endDateTime = wednesdayDate.atTime(12, 30),
             title = "Client Call",
-            description = "Review new features",
-            color = Color(0xFF64B5F6) // Light Blue
+            color = Color(0xFF64B5F6),
         ),
         Appointment(
             id = "4",
-            startDateTime = thursdayDate.atTime(11, 0),
-            endDateTime = thursdayDate.atTime(11, 45),
-            title = "Quick Sync",
-            color = Color(0xFFFFF176) // Light Yellow
+            startDateTime = thursdayDate.atTime(9, 0),
+            endDateTime = thursdayDate.atTime(9, 45),
+            title = "Quick Sync (Light Yellow)",
+            color = Color(0xFFFFF176),
         ),
         Appointment(
             id = "5",
-            startDateTime = thursdayDate.atTime(16, 0),
-            endDateTime = thursdayDate.atTime(17, 0),
-            title = "Gym Session",
-            color = Color(0xFFFFB74D) // Light Orange
+            startDateTime = thursdayDate.atTime(9, 15),
+            endDateTime = thursdayDate.atTime(10, 15),
+            title = "White Category Note",
+            color = Color(0xFFFFFFFF),
         ),
-        // Multi-day appointment
         Appointment(
             id = "6",
             startDateTime = fridayDate.atTime(10, 0),
             endDateTime = saturdayDate.atTime(16, 0),
             title = "All Day Workshop",
-            color = Color(0xFFBA68C8) // Light Purple
-        )
+            color = Color(0xFFBA68C8),
+        ),
     )
-    WeekView(
-        appointments = sampleAppointments,
-        onDayClick = {},
-        currentDate = LocalDate.now().with(WeekFields.of(Locale.getDefault()).firstDayOfWeek),
-        selectedDate = null,
-        onNextWeek = {},
-        onPreviousWeek = {},
-        numberOfDays = 7
-    ) // Updated preview
+
+    Surface {
+        WeekView(
+            visibleDates = visibleDates,
+            appointments = sampleAppointments,
+            today = thursdayDate,
+            currentTime = LocalTime.of(10, 20),
+        )
+    }
+}
+
+@Preview(name = "WeekView (Light)", widthDp = 700, heightDp = 500)
+@Composable
+fun WeekViewWithAppointmentsPreview() {
+    VoicejournalTheme(darkTheme = false, dynamicColor = false) {
+        SampleWeekViewPreviewContent()
+    }
+}
+
+@Preview(
+    name = "WeekView (Dark)",
+    widthDp = 700,
+    heightDp = 500,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+fun WeekViewDarkPreview() {
+    VoicejournalTheme(darkTheme = true, dynamicColor = false) {
+        SampleWeekViewPreviewContent()
+    }
 }

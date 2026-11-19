@@ -44,4 +44,11 @@
     <string name="fab_create_manual">Eintrag manuell erstellen</string>
     <string name="fab_speak">Sprechen</string>
     <string name="fab_stop_recording">Aufnahme stoppen</string>
+
+    <!-- Calendar -->
+    <string name="calendar_more_options">Weitere Optionen</string>
+    <string name="calendar_today">Heute</string>
+    <string name="calendar_day_view">Tagesansicht</string>
+    <string name="calendar_three_day_view">3-Tages-Ansicht</string>
+    <string name="calendar_week_view">Wochenansicht</string>
 </resources>

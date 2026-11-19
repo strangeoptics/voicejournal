@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice Journal – Interaktives Datenbank- &amp; Entity-Diagramm (Room v18)</title>
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --grid-dot: #d5dce8;
+      --surface: #ffffff;
+      --surface-alt: #eef2f9;
+      --surface-hover: #e3eaf6;
+      --text: #181c24;
+      --text-muted: #586376;
+      --border: #d0d8e6;
+      --primary: #3358b8;
+      --primary-soft: #dce5ff;
+      --entity-header: #24428e;
+      --junction-header: #6b3fa0;
+      --junction-soft: #f0e6ff;
+      --standalone-header: #1d6f58;
+      --standalone-soft: #d6f5eb;
+      --pojo-header: #9a5b13;
+      --pojo-soft: #ffedd5;
+      --danger: #c62828;
+      --danger-soft: #ffdad6;
+      --warn: #8a5a00;
+      --warn-soft: #ffecb3;
+      --pk-bg: #fff3cd;
+      --pk-text: #7a5200;
+      --fk-bg: #e1ebff;
+      --fk-text: #1c3f94;
+      --idx-bg: #e4f6ec;
+      --idx-text: #155d36;
+      --code-bg: #ebeff7;
+      --shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+      --radius: 14px;
+    }
+
+    [data-theme="dark"] {
+      --bg: #0f1218;
+      --grid-dot: #262c3a;
+      --surface: #191d27;
+      --surface-alt: #222836;
+      --surface-hover: #2b3345;
+      --text: #e4e7ef;
+      --text-muted: #98a2b6;
+      --border: #31394d;
+      --primary: #9cb8ff;
+      --primary-soft: #1f3468;
+      --entity-header: #294a9c;
+      --junction-header: #6b3fa0;
+      --junction-soft: #33204d;
+      --standalone-header: #1c6b54;
+      --standalone-soft: #153c31;
+      --pojo-header: #8d5210;
+      --pojo-soft: #3c260d;
+      --danger: #ff8a80;
+      --danger-soft: #4a1818;
+      --warn: #ffd54f;
+      --warn-soft: #3d2e05;
+      --pk-bg: #423207;
+      --pk-text: #ffd666;
+      --fk-bg: #1b3163;
+      --fk-text: #adc6ff;
+      --idx-bg: #123b26;
+      --idx-text: #85e0ae;
+      --code-bg: #252b3b;
+      --shadow: 0 8px 26px rgba(0, 0, 0, 0.42);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #0f1218;
+        --grid-dot: #262c3a;
+        --surface: #191d27;
+        --surface-alt: #222836;
+        --surface-hover: #2b3345;
+        --text: #e4e7ef;
+        --text-muted: #98a2b6;
+        --border: #31394d;
+        --primary: #9cb8ff;
+        --primary-soft: #1f3468;
+        --entity-header: #294a9c;
+        --junction-header: #6b3fa0;
+        --junction-soft: #33204d;
+        --standalone-header: #1c6b54;
+        --standalone-soft: #153c31;
+        --pojo-header: #8d5210;
+        --pojo-soft: #3c260d;
+        --danger: #ff8a80;
+        --danger-soft: #4a1818;
+        --warn: #ffd54f;
+        --warn-soft: #3d2e05;
+        --pk-bg: #423207;
+        --pk-text: #ffd666;
+        --fk-bg: #1b3163;
+        --fk-text: #adc6ff;
+        --idx-bg: #123b26;
+        --idx-text: #85e0ae;
+        --code-bg: #252b3b;
+        --shadow: 0 8px 26px rgba(0, 0, 0, 0.42);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      z-index: 50;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .title-group h1 {
+      margin: 0;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .schema-pill {
+      font-size: 0.74rem;
+      padding: 2px 9px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .title-group p {
+      margin: 2px 0 0;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn {
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--text);
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.14s;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .btn:hover {
+      background: var(--surface-hover);
+    }
+
+    .btn.active {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* Workspace Layout */
+    .workspace {
+      display: grid;
+      grid-template-columns: 1fr 410px;
+      min-height: 680px;
+      flex: 1;
+      border-bottom: 1px solid var(--border);
+    }
+
+    @media (max-width: 1120px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Interactive Diagram Canvas */
+    .canvas-shell {
+      position: relative;
+      overflow: hidden;
+      background-color: var(--bg);
+      background-image: radial-gradient(var(--grid-dot) 1.25px, transparent 1.25px);
+      background-size: 22px 22px;
+      user-select: none;
+      min-height: 650px;
+      cursor: grab;
+    }
+
+    .canvas-shell.panning {
+      cursor: grabbing;
+    }
+
+    .canvas-stage {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1500px;
+      height: 920px;
+      transform-origin: 0 0;
+    }
+
+    svg#edgesSvg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1500px;
+      height: 920px;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    .edge-path {
+      fill: none;
+      stroke-width: 2.5px;
+      pointer-events: stroke;
+      cursor: pointer;
+      transition: stroke-width 0.15s, opacity 0.15s;
+    }
+
+    .edge-path:hover,
+    .edge-path.highlighted {
+      stroke-width: 4.2px;
+      filter: drop-shadow(0 0 5px rgba(80, 130, 255, 0.55));
+    }
+
+    .edge-fk {
+      stroke: var(--primary);
+    }
+
+    .edge-pojo {
+      stroke: #d97706;
+      stroke-dasharray: 7 5;
+    }
+
+    .edge-temporal {
+      stroke: #1d9a78;
+      stroke-dasharray: 4 6;
+    }
+
+    .edge-path.cascade-pulse {
+      stroke: var(--danger) !important;
+      stroke-width: 4.5px !important;
+      stroke-dasharray: 8 6;
+      animation: dashFlow 0.7s linear infinite;
+    }
+
+    @keyframes dashFlow {
+      to {
+        stroke-dashoffset: -28;
+      }
+    }
+
+    .edge-label-bg {
+      fill: var(--surface);
+      stroke: var(--border);
+      stroke-width: 1px;
+      rx: 6px;
+      ry: 6px;
+    }
+
+    .edge-label-text {
+      font-size: 11px;
+      font-weight: 600;
+      fill: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      pointer-events: none;
+    }
+
+    /* Draggable Entity Nodes */
+    .entity-node {
+      position: absolute;
+      width: 300px;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      transition: border-color 0.15s, box-shadow 0.15s;
+      overflow: hidden;
+    }
+
+    .entity-node.selected {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(51, 88, 184, 0.28), var(--shadow);
+    }
+
+    .entity-node.sim-deleted {
+      border-color: var(--danger) !important;
+      box-shadow: 0 0 0 4px rgba(198, 40, 40, 0.32) !important;
+    }
+
+    .entity-node.sim-soft {
+      border-color: var(--warn) !important;
+      box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.32) !important;
+    }
+
+    .node-header {
+      padding: 10px 13px;
+      color: #ffffff;
+      cursor: move;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .node-header.type-entity { background: var(--entity-header); }
+    .node-header.type-junction { background: var(--junction-header); }
+    .node-header.type-standalone { background: var(--standalone-header); }
+    .node-header.type-pojo { background: var(--pojo-header); }
+
+    .node-title {
+      font-weight: 700;
+      font-size: 0.9rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .node-subtitle {
+      font-size: 0.72rem;
+      opacity: 0.88;
+    }
+
+    .node-kind-badge {
+      font-size: 0.68rem;
+      padding: 2px 6px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.2);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .node-columns {
+      list-style: none;
+      margin: 0;
+      padding: 4px 0;
+    }
+
+    .node-col {
+      padding: 5px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.8rem;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+
+    .node-col:last-child {
+      border-bottom: none;
+    }
+
+    .node-col:hover,
+    .node-col.col-highlight {
+      background: var(--surface-hover);
+    }
+
+    .col-left {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .col-name {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-weight: 600;
+    }
+
+    .col-type {
+      font-size: 0.73rem;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: nowrap;
+    }
+
+    .badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      letter-spacing: 0.02em;
+    }
+
+    .badge-pk { background: var(--pk-bg); color: var(--pk-text); }
+    .badge-fk { background: var(--fk-bg); color: var(--fk-text); }
+    .badge-idx { background: var(--idx-bg); color: var(--idx-text); }
+    .badge-null { background: var(--surface-alt); color: var(--text-muted); }
+
+    .node-sim-banner {
+      display: none;
+      padding: 6px 12px;
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+
+    .node-sim-banner.danger {
+      display: block;
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    .node-sim-banner.warn {
+      display: block;
+      background: var(--warn-soft);
+      color: var(--warn);
+    }
+
+    .node-sim-banner.safe {
+      display: block;
+      background: var(--idx-bg);
+      color: var(--idx-text);
+    }
+
+    /* Floating Canvas Controls & Legend */
+    .canvas-hud {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      font-size: 0.76rem;
+    }
+
+    .legend-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    .zoom-controls {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      display: flex;
+      gap: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 5px;
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+    }
+
+    /* Simulator Bar inside Canvas */
+    .sim-bar {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 7px 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      box-shadow: var(--shadow);
+      font-size: 0.78rem;
+      max-width: calc(100% - 210px);
+    }
+
+    .sim-bar strong {
+      margin-right: 4px;
+    }
+
+    /* Right Inspector Panel */
+    .inspector {
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      padding: 20px;
+      overflow-y: auto;
+      max-height: 760px;
+    }
+
+    .inspector h2 {
+      margin: 0 0 4px;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .inspector .file-ref {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      margin-bottom: 12px;
+    }
+
+    .inspector p.desc {
+      font-size: 0.86rem;
+      line-height: 1.5;
+      margin: 0 0 16px;
+    }
+
+    .inspector h3 {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin: 18px 0 8px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+    }
+
+    .col-detail-card {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 11px;
+      margin-bottom: 8px;
+      font-size: 0.82rem;
+    }
+
+    .col-detail-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .col-detail-note {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    pre.sql-box {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 0.76rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      margin: 0;
+    }
+
+    code.copyable {
+      cursor: pointer;
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.8rem;
+    }
+
+    code.copyable:hover {
+      outline: 1px solid var(--primary);
+    }
+
+    /* Bottom Section: Migrations & Virtual Specials */
+    .bottom-panel {
+      max-width: 1440px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 980px) {
+      .bottom-panel {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: var(--shadow);
+    }
+
+    .card h2 {
+      margin: 0 0 6px;
+      font-size: 1.02rem;
+    }
+
+    .card p.sub {
+      margin: 0 0 14px;
+      font-size: 0.83rem;
+      color: var(--text-muted);
+    }
+
+    .migration-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .mig-btn {
+      padding: 4px 9px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--text);
+      font-size: 0.76rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      cursor: pointer;
+    }
+
+    .mig-btn.active {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .mig-detail {
+      background: var(--surface-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 0.84rem;
+    }
+
+    .special-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 0.84rem;
+    }
+
+    .special-list li {
+      margin-bottom: 9px;
+    }
+
+    #toast {
+      position: fixed;
+      bottom: 22px;
+      right: 22px;
+      background: var(--text);
+      color: var(--surface);
+      padding: 9px 15px;
+      border-radius: 999px;
+      font-size: 0.83rem;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity 0.18s, transform 0.18s;
+      z-index: 200;
+    }
+
+    #toast.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="title-group">
+    <h1>
+      🗄️ Voice Journal – Datenbank-Entities &amp; Verknüpfungen
+      <span class="schema-pill">Room Schema v18</span>
+    </h1>
+    <p>Ziehe Tabellen per Drag &amp; Drop · Klicke auf eine Entity oder Beziehungslinie für SQL-, FK-, Index- und DAO-Details.</p>
+  </div>
+  <div class="toolbar">
+    <button type="button" class="btn active" id="togglePojoBtn">🧩 @Relation POJOs anzeigen</button>
+    <button type="button" class="btn active" id="toggleTemporalBtn">📍 Tages-Bezug (GPS) anzeigen</button>
+    <button type="button" class="btn" id="resetLayoutBtn">↺ Layout zurücksetzen</button>
+    <button type="button" class="btn" id="themeBtn">🌗 Design</button>
+  </div>
+</header>
+
+<div class="workspace">
+  <!-- Interactive Diagram Canvas -->
+  <div class="canvas-shell" id="canvasShell">
+    <div class="canvas-stage" id="canvasStage">
+      <svg id="edgesSvg">
+        <defs>
+          <marker id="arrowPrimary" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+            <path d="M0,1 L9,5 L0,9 Z" fill="#3358b8" />
+          </marker>
+          <marker id="arrowDanger" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+            <path d="M0,1 L9,5 L0,9 Z" fill="#c62828" />
+          </marker>
+          <marker id="arrowPojo" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+            <path d="M0,1 L9,5 L0,9 Z" fill="#d97706" />
+          </marker>
+        </defs>
+      </svg>
+      <!-- Nodes injected by JS -->
+    </div>
+
+    <!-- Delete / Cascade Simulator -->
+    <div class="sim-bar">
+      <strong>🧪 Lösch-Simulator:</strong>
+      <button type="button" class="btn active" data-sim="none">Normalansicht</button>
+      <button type="button" class="btn" data-sim="soft-entry">Soft-Delete Eintrag</button>
+      <button type="button" class="btn" data-sim="hard-entry">Hard-Delete Eintrag</button>
+      <button type="button" class="btn" data-sim="delete-category">Kategorie löschen</button>
+    </div>
+
+    <!-- Zoom Controls -->
+    <div class="zoom-controls">
+      <button type="button" class="btn" id="zoomOutBtn" title="Verkleinern">−</button>
+      <button type="button" class="btn" id="zoomLabel" title="100%">100%</button>
+      <button type="button" class="btn" id="zoomInBtn" title="Vergrößern">＋</button>
+    </div>
+
+    <!-- Legend -->
+    <div class="canvas-hud">
+      <span><span class="legend-dot" style="background: var(--entity-header);"></span>Kern-Entity (<code>@Entity</code>)</span>
+      <span><span class="legend-dot" style="background: var(--junction-header);"></span>N:M CrossRef-Tabelle</span>
+      <span><span class="legend-dot" style="background: var(--standalone-header);"></span>Eigenständige Tabelle</span>
+      <span><span class="legend-dot" style="background: var(--pojo-header);"></span>Read-Model (<code>@Relation</code>)</span>
+      <span><span class="badge badge-pk">PK</span> Primärschlüssel</span>
+      <span><span class="badge badge-fk">FK</span> Fremdschlüssel (CASCADE)</span>
+      <span><span class="badge badge-idx">IDX</span> Index</span>
+    </div>
+  </div>
+
+  <!-- Right Inspector Sidebar -->
+  <aside class="inspector" id="inspectorPanel">
+    <!-- Populated dynamically -->
+  </aside>
+</div>
+
+<!-- Bottom Info: Migrations & Special Architecture Rules -->
+<section class="bottom-panel">
+  <div class="card">
+    <h2>📜 Zero-Data-Loss Migrations-Historie (<code>v1</code> → <code>v18</code>)</h2>
+    <p class="sub">Klicke auf einen Migrationsschritt aus <code>AppDatabase.kt</code> (<code>fallbackToDestructiveMigration</code> ist strikt verboten).</p>
+    <div class="migration-chips" id="migrationChips"></div>
+    <div class="mig-detail" id="migrationDetail"></div>
+  </div>
+
+  <div class="card">
+    <h2>⚙️ Wichtige Architektur-Besonderheiten</h2>
+    <p class="sub">Nicht-offensichtliche Regeln rund um Room in Voice Journal</p>
+    <ul class="special-list">
+      <li>
+        <strong>Virtueller Papierkorb (<code>id = -1</code>, „Gelöscht“):</strong>
+        Existiert <em>nicht</em> als Datensatz in <code>categories</code>, sondern wird im UI/ViewModel virtuell für alle Einträge mit <code>deletedAt IS NOT NULL</code> eingeblendet.
+      </li>
+      <li>
+        <strong>UUID-Speicherung als <code>TEXT</code>:</strong>
+        <code>UuidConverter</code> konvertiert <code>java.util.UUID</code> transparent in kanonische 36-Zeichen-Strings (seit <code>MIGRATION_11_12</code> für konfliktfreien <code>.vj</code>- und Backup-Import).
+      </li>
+      <li>
+        <strong>Reise-feste Zeitzonen (<code>zoneId</code>):</strong>
+        <code>start_datetime</code> &amp; <code>stop_datetime</code> speichern echte UTC-Epochen-Millisekunden; <code>zoneId</code> (z.&nbsp;B. <code>"Australia/Sydney"</code>, Fallback <code>null</code> → Systemzone) bewahrt das authentische lokale Datum.
+      </li>
+      <li>
+        <strong>Außerhalb von Room gespeichert:</strong>
+        Einstellungen liegen in <code>SharedPreferences</code> (<code>SettingsRepository</code>), der Google-Cloud-API-Key AES-256-GCM-verschlüsselt in <code>SecureApiKeyStore</code> (aus Cloud-Backups ausgeschlossen).
+      </li>
+    </ul>
+  </div>
+</section>
+
+<div id="toast">Kopiert!</div>
+
+<script>
+  (function () {
+    const ENTITIES = {
+      journal_entries: {
+        id: 'journal_entries',
+        tableName: 'journal_entries',
+        kotlinClass: 'JournalEntry',
+        kind: 'entity',
+        kindLabel: '@Entity',
+        file: 'data/JournalEntry.kt',
+        dao: 'JournalEntryDao (data/JournalEntryDao.kt)',
+        x: 60,
+        y: 85,
+        summary: 'Zentrale Tabelle für alle Tagebucheinträge, abhakbaren Aufgaben und Kalendertermine (mit optionaler Endzeit). Nutzt UUIDs als Primärschlüssel, Soft-Delete über deletedAt und speichert optional die lokale IANA-Erstellungszeitzone.',
+        sql: 'CREATE TABLE IF NOT EXISTS `journal_entries` (\n  `id` TEXT NOT NULL,\n  `content` TEXT NOT NULL,\n  `start_datetime` INTEGER NOT NULL,\n  `stop_datetime` INTEGER,\n  `hasImage` INTEGER NOT NULL,\n  `checked` INTEGER NOT NULL,\n  `deletedAt` INTEGER,\n  `zoneId` TEXT,\n  PRIMARY KEY(`id`)\n);',
+        columns: [
+          { name: 'id', kotlinType: 'UUID', sqlType: 'TEXT NOT NULL', pk: true, idx: false, nullable: false, note: 'Primärschlüssel (nicht auto-generiert von SQLite, sondern per UUID.randomUUID() + UuidConverter). Ermöglicht idempotentes Upsert beim Import.' },
+          { name: 'content', kotlinType: 'String', sqlType: 'TEXT NOT NULL', pk: false, idx: false, nullable: false, note: 'Eigentlicher Textinhalt des Eintrags (durchsucht per Volltext-LIKE in SearchViewModel).' },
+          { name: 'start_datetime', kotlinType: 'Long', sqlType: 'INTEGER NOT NULL', pk: false, idx: true, nullable: false, note: 'Startzeitpunkt in UTC Epoch-Millisekunden. Hauptsortierkriterium der Timeline & Kalenderansicht.' },
+          { name: 'stop_datetime', kotlinType: 'Long?', sqlType: 'INTEGER', pk: false, idx: true, nullable: true, note: 'Optionales Ende in UTC Epoch-Millisekunden. Einträge mit stop_datetime != null erscheinen als Zeitspannen im Kalender.' },
+          { name: 'hasImage', kotlinType: 'Boolean', sqlType: 'INTEGER NOT NULL', pk: false, idx: false, nullable: false, note: '0/1-Flag: Blendet auf der Eintrags-Karte das Kamera-Icon zum Öffnen von Google Fotos am Eintragsdatum ein.' },
+          { name: 'checked', kotlinType: 'Boolean', sqlType: 'INTEGER NOT NULL', pk: false, idx: false, nullable: false, note: '0/1-Abhakstatus für Einträge in Checklisten-Kategorien (Category.checkable == true).' },
+          { name: 'deletedAt', kotlinType: 'Long?', sqlType: 'INTEGER', pk: false, idx: true, nullable: true, note: 'Soft-Delete-Zeitstempel (UTC ms). NULL = aktiver Eintrag; NOT NULL = liegt im virtuellen Papierkorb „Gelöscht“.' },
+          { name: 'zoneId', kotlinType: 'String?', sqlType: 'TEXT', pk: false, idx: false, nullable: true, note: 'IANA-Zeitzonen-ID (z. B. "Europe/Berlin"). NULL fällt dynamisch auf ZoneId.systemDefault() zurück.' }
+        ],
+        indices: [
+          'index_journal_entries_deletedAt_start_datetime (deletedAt, start_datetime)',
+          'index_journal_entries_start_datetime (start_datetime)',
+          'index_journal_entries_stop_datetime (stop_datetime)'
+        ],
+        queries: [
+          'getEntriesPagingSource() – Paging 3 für aktive Einträge (deletedAt IS NULL)',
+          'getEntriesPagingSourceForCategory(categoryId) – Gefiltert über Subquery auf CrossRef',
+          'getDeletedEntriesPagingSource() – Papierkorb sortiert nach deletedAt DESC',
+          'getEntriesForCalendar(startTime, endTime) – Zeitfenster-Überlappungsabfrage'
+        ]
+      },
+
+      journal_entry_category_cross_ref: {
+        id: 'journal_entry_category_cross_ref',
+        tableName: 'journal_entry_category_cross_ref',
+        kotlinClass: 'JournalEntryCategoryCrossRef',
+        kind: 'junction',
+        kindLabel: 'N:M Junction',
+        file: 'data/JournalEntryCategoryCrossRef.kt',
+        dao: 'JournalEntryDao (insertEntryCategoryCrossRefs / deleteCategoriesForEntry)',
+        x: 470,
+        y: 120,
+        summary: 'Assoziationstabelle (Many-to-Many) zwischen Einträgen und Kategorien. Besitzt einen zusammengesetzten Primärschlüssel (entryId, categoryId) und beidseitige Fremdschlüssel mit ON DELETE CASCADE.',
+        sql: 'CREATE TABLE IF NOT EXISTS `journal_entry_category_cross_ref` (\n  `entryId` TEXT NOT NULL,\n  `categoryId` INTEGER NOT NULL,\n  PRIMARY KEY(`entryId`, `categoryId`),\n  FOREIGN KEY(`entryId`) REFERENCES `journal_entries`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE,\n  FOREIGN KEY(`categoryId`) REFERENCES `categories`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE\n);',
+        columns: [
+          { name: 'entryId', kotlinType: 'UUID', sqlType: 'TEXT NOT NULL', pk: true, fk: 'journal_entries.id', idx: false, nullable: false, note: 'Teil des zusammengesetzten PK & FK auf journal_entries(id) mit ON DELETE CASCADE.' },
+          { name: 'categoryId', kotlinType: 'Int', sqlType: 'INTEGER NOT NULL', pk: true, fk: 'categories.id', idx: true, nullable: false, note: 'Teil des zusammengesetzten PK & FK auf categories(id) mit ON DELETE CASCADE + eigenem Index für schnelle Kategorie-Filter.' }
+        ],
+        indices: [
+          'PRIMARY KEY (entryId, categoryId) – deckt Abfragen nach entryId ab',
+          'index_journal_entry_category_cross_ref_categoryId (categoryId)'
+        ],
+        queries: [
+          'insertEntryCategoryCrossRefs(refs) – Batch-Zuordnung (OnConflictStrategy.IGNORE)',
+          'deleteCategoriesForEntry(entryId) – Bereinigt Zuordnungen beim Update eines Eintrags'
+        ]
+      },
+
+      categories: {
+        id: 'categories',
+        tableName: 'categories',
+        kotlinClass: 'Category',
+        kind: 'entity',
+        kindLabel: '@Entity',
+        file: 'data/Category.kt',
+        dao: 'CategoryDao (data/CategoryDao.kt)',
+        x: 880,
+        y: 85,
+        summary: 'Definiert benutzerdefinierte Kategorien samt Sprach-Trigger-Aliasen, Sortierreihenfolge, Hex-Farbe (für Kalender & Vorschau), Checklisten-Modus und Datumsanzeige. Der Kategoriename ist per UNIQUE-Index geschützt.',
+        sql: 'CREATE TABLE IF NOT EXISTS `categories` (\n  `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n  `category` TEXT NOT NULL,\n  `aliases` TEXT NOT NULL,\n  `showAll` INTEGER NOT NULL,\n  `orderIndex` INTEGER NOT NULL,\n  `color` TEXT NOT NULL,\n  `checkable` INTEGER NOT NULL,\n  `showDate` INTEGER NOT NULL DEFAULT 1\n);',
+        columns: [
+          { name: 'id', kotlinType: 'Int', sqlType: 'INTEGER AUTOINCREMENT', pk: true, idx: false, nullable: false, note: 'Auto-Increment Primärschlüssel. Hinweis: ID -1 ist für die virtuelle Kategorie „Gelöscht“ reserviert.' },
+          { name: 'category', kotlinType: 'String', sqlType: 'TEXT NOT NULL', pk: false, idx: true, nullable: false, note: 'Kanonischer Kategoriename (UNIQUE-Index). Dient auch als primäres Sprach-Triggerwort.' },
+          { name: 'aliases', kotlinType: 'String', sqlType: 'TEXT NOT NULL', pk: false, idx: false, nullable: false, note: 'Kommagetrennte alternative Sprach-Triggerwörter (case-insensitive abgeglichen beim Diktat).' },
+          { name: 'showAll', kotlinType: 'Boolean', sqlType: 'INTEGER NOT NULL', pk: false, idx: false, nullable: false, note: 'Legacy-Spalte zur Wahrung der Schema-v18- und JSON-Backup-Kompatibilität (Standard: false).' },
+          { name: 'orderIndex', kotlinType: 'Int', sqlType: 'INTEGER NOT NULL', pk: false, idx: false, nullable: false, note: 'Manuelle Sortierposition im Kategorie-Dropdown und in der Kategorieverwaltung.' },
+          { name: 'color', kotlinType: 'String', sqlType: 'TEXT NOT NULL', pk: false, idx: false, nullable: false, note: 'Hex-Farbwert (z. B. "#E57373", Default "#FFFFFF") für Kalender-Kacheln, Monats-Chips und Tagesvorschau.' },
+          { name: 'checkable', kotlinType: 'Boolean', sqlType: 'INTEGER NOT NULL', pk: false, idx: false, nullable: false, note: 'Aktiviert Checkboxen auf Eintrags-Karten dieser Kategorie (To-Do-/Checklisten-Modus).' },
+          { name: 'showDate', kotlinType: 'Boolean', sqlType: 'INTEGER NOT NULL DEFAULT 1', pk: false, idx: false, nullable: false, note: 'Steuert, ob auf Eintrags-Karten die Uhrzeit rechts oben eingeblendet wird.' }
+        ],
+        indices: [
+          'index_categories_category UNIQUE (category)'
+        ],
+        queries: [
+          'getAllCategories() – Flow<List<Category>> sortiert nach orderIndex ASC',
+          'getCategoriesByIds(ids) – Sicheres Chunking ab 900 Parametern (SQLITE_MAX_BIND_PARAMS)',
+          'deleteCategory(categoryId) – Löst CASCADE auf journal_entry_category_cross_ref aus'
+        ]
+      },
+
+      entry_with_categories: {
+        id: 'entry_with_categories',
+        tableName: 'EntryWithCategories',
+        kotlinClass: 'EntryWithCategories',
+        kind: 'pojo',
+        kindLabel: '@Relation POJO',
+        file: 'data/EntryWithCategories.kt',
+        dao: 'JournalEntryDao (@Transaction Leseabfragen)',
+        x: 470,
+        y: 380,
+        summary: 'Kein eigener SQLite-Table, sondern das zentrale Room-Read-Model (@Transaction): bettet JournalEntry per @Embedded ein und lädt alle verknüpften Category-Objekte automatisch über die Junction-Tabelle JournalEntryCategoryCrossRef.',
+        sql: '// Room @Transaction Projektion (keine eigene Tabelle)\n@Serializable\ndata class EntryWithCategories(\n  @Embedded val entry: JournalEntry,\n  @Relation(\n    parentColumn = "id",\n    entityColumn = "id",\n    associateBy = Junction(\n      value = JournalEntryCategoryCrossRef::class,\n      parentColumn = "entryId",\n      entityColumn = "categoryId"\n    )\n  )\n  val categories: List<Category>\n)',
+        columns: [
+          { name: 'entry', kotlinType: 'JournalEntry', sqlType: '@Embedded', pk: false, fk: 'journal_entries.id', idx: false, nullable: false, note: 'Eingebettete Hauptzeile aus journal_entries.' },
+          { name: 'categories', kotlinType: 'List<Category>', sqlType: '@Relation (Junction)', pk: false, fk: 'categories.id', idx: false, nullable: false, note: 'Aufgelöste Liste aller zugeordneten Kategorien über JournalEntryCategoryCrossRef.' }
+        ],
+        indices: [
+          'Nutzt Indizes von journal_entries, journal_entry_category_cross_ref und categories innerhalb einer @Transaction'
+        ],
+        queries: [
+          'Wird direkt an UI (HomeScreen, SearchScreen, CalendarViewModel) und WebServer (konvertiert zu JournalEntryDto) geliefert'
+        ]
+      },
+
+      gps_track_points: {
+        id: 'gps_track_points',
+        tableName: 'gps_track_points',
+        kotlinClass: 'GpsTrackPoint',
+        kind: 'standalone',
+        kindLabel: '@Entity (Eigenständig)',
+        file: 'data/GpsTrackPoint.kt',
+        dao: 'GpsTrackPointDao (data/GpsTrackPointDao.kt)',
+        x: 60,
+        y: 455,
+        summary: 'Speichert periodisch vom LocationWorker (WorkManager) aufgezeichnete GPS-Koordinaten. Besitzt bewusst keinen Fremdschlüssel auf journal_entries, sondern wird über das ausgewählte Tages-Zeitfenster (dayStartMillis .. dayEndMillis) korreliert.',
+        sql: 'CREATE TABLE IF NOT EXISTS `gps_track_points` (\n  `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\n  `latitude` REAL NOT NULL,\n  `longitude` REAL NOT NULL,\n  `timestamp` INTEGER NOT NULL\n);',
+        columns: [
+          { name: 'id', kotlinType: 'Long', sqlType: 'INTEGER AUTOINCREMENT', pk: true, idx: false, nullable: false, note: 'Auto-Increment Primärschlüssel.' },
+          { name: 'latitude', kotlinType: 'Double', sqlType: 'REAL NOT NULL', pk: false, idx: false, nullable: false, note: 'Breitengrad (WGS84).' },
+          { name: 'longitude', kotlinType: 'Double', sqlType: 'REAL NOT NULL', pk: false, idx: false, nullable: false, note: 'Längengrad (WGS84).' },
+          { name: 'timestamp', kotlinType: 'Long', sqlType: 'INTEGER NOT NULL', pk: false, idx: true, nullable: false, note: 'Aufzeichnungszeitpunkt in UTC Epoch-Millisekunden (indiziert für schnelle Tagesbereichsabfragen).' }
+        ],
+        indices: [
+          'index_gps_track_points_timestamp (timestamp)'
+        ],
+        queries: [
+          'insert(point) – Geschrieben durch LocationWorker im Hintergrund',
+          'getTrackPointsForDay(dayStartMillis, dayEndMillis) – Lädt Tagesroute für Google-Maps-Vorschau in MainViewModel'
+        ]
+      }
+    };
+
+    const EDGES = [
+      {
+        id: 'fk_entry',
+        fromNode: 'journal_entry_category_cross_ref',
+        fromCol: 'entryId',
+        toNode: 'journal_entries',
+        toCol: 'id',
+        type: 'fk',
+        label: 'FK (N:1) · ON DELETE CASCADE',
+        detail: 'Fremdschlüssel journal_entry_category_cross_ref.entryId → journal_entries.id. Wird ein JournalEntry endgültig (Hard-Delete) gelöscht, räumt SQLite automatisch alle zugehörigen CrossRef-Zeilen ab. Die Kategorien selbst bleiben unberührt.'
+      },
+      {
+        id: 'fk_category',
+        fromNode: 'journal_entry_category_cross_ref',
+        fromCol: 'categoryId',
+        toNode: 'categories',
+        toCol: 'id',
+        type: 'fk',
+        label: 'FK (N:1) · ON DELETE CASCADE',
+        detail: 'Fremdschlüssel journal_entry_category_cross_ref.categoryId → categories.id. Wird eine Kategorie gelöscht, werden nur die Zuordnungen in der CrossRef-Tabelle per CASCADE entfernt – die Tagebucheinträge in journal_entries bleiben vollständig erhalten!'
+      },
+      {
+        id: 'rel_embedded',
+        fromNode: 'entry_with_categories',
+        fromCol: 'entry',
+        toNode: 'journal_entries',
+        toCol: 'id',
+        type: 'pojo',
+        label: '@Embedded 1:1',
+        detail: 'EntryWithCategories bettet die Spalten von JournalEntry direkt ein (@Embedded).'
+      },
+      {
+        id: 'rel_junction',
+        fromNode: 'entry_with_categories',
+        fromCol: 'categories',
+        toNode: 'categories',
+        toCol: 'id',
+        type: 'pojo',
+        label: '@Relation via CrossRef (N:M)',
+        detail: 'Room lädt innerhalb einer @Transaction alle zugehörigen Category-Datensätze über Junction(JournalEntryCategoryCrossRef::class).'
+      },
+      {
+        id: 'temporal_gps',
+        fromNode: 'gps_track_points',
+        fromCol: 'timestamp',
+        toNode: 'journal_entries',
+        toCol: 'start_datetime',
+        type: 'temporal',
+        label: 'Logischer Tages-Bezug (Zeitfenster)',
+        detail: 'Kein SQL-Foreign-Key: Wählt der Nutzer in der Hauptansicht einen Tages-Header (LocalDate), fragt MainViewModel alle GpsTrackPoints desselben Kalendertages (dayStartMillis ≤ timestamp < dayEndMillis) ab und blendet das Google-Maps-Icon ein.'
+      }
+    ];
+
+    const MIGRATIONS = [
+      { v: '1 → 2', title: 'MIGRATION_1_2', desc: 'Erstellt initiale Tabelle `category_aliases` für Sprach-Trigger-Aliase.' },
+      { v: '2 → 3', title: 'MIGRATION_2_3', desc: 'Fügt optionale Spalte `imageUri` zu `journal_entries` hinzu.' },
+      { v: '3 → 4', title: 'MIGRATION_3_4', desc: 'Wandelt `imageUri` verlustfrei in das kompakte Boolean-Flag `hasImage` um.' },
+      { v: '4 → 5', title: 'MIGRATION_4_5', desc: 'Führt `categories` ein und konsolidiert `category_aliases` per `GROUP_CONCAT` in `categories.aliases`.' },
+      { v: '5 → 6', title: 'MIGRATION_5_6', desc: 'Ergänzt `showAll` auf `categories`.' },
+      { v: '6 → 7', title: 'MIGRATION_6_7', desc: 'Ergänzt `orderIndex` auf `categories` für benutzerdefinierte Sortierung.' },
+      { v: '7 → 8', title: 'MIGRATION_7_8', desc: 'Erstellt die Tabelle `gps_track_points` für Hintergrund-Routenaufzeichnung.' },
+      { v: '8 → 9', title: 'MIGRATION_8_9', desc: 'Großer Architekturwechsel von 1:N (`title`-Spalte) auf echtes N:M mit `journal_entry_category_cross_ref` und Umbenennung `timestamp` → `start_datetime`.' },
+      { v: '9 → 10', title: 'MIGRATION_9_10', desc: 'Stellt `categories` auf numerische Auto-Increment-PKs (`id`) + UNIQUE-Index auf `category` um und migriert `journal_entry_category_cross_ref` auf `categoryId`.' },
+      { v: '10 → 11', title: 'MIGRATION_10_11', desc: 'Ergänzt optionale Endzeit `stop_datetime` auf `journal_entries` für Kalender-Zeitspannen.' },
+      { v: '11 → 12', title: 'MIGRATION_11_12', desc: 'Migriert `journal_entries.id` und `journal_entry_category_cross_ref.entryId` verlustfrei von `INTEGER` auf stabile `UUID`s (`TEXT`).' },
+      { v: '12 → 13', title: 'MIGRATION_12_13', desc: 'Ergänzt Hex-Farbspalte `color` (Default `#FFFFFF`) auf `categories`.' },
+      { v: '13 → 14', title: 'MIGRATION_13_14', desc: 'Führt Checklisten-Modus ein: `categories.checkable` und `journal_entries.checked`.' },
+      { v: '14 → 15', title: 'MIGRATION_14_15', desc: 'Ergänzt `categories.showDate` (Default `1`) zum Ausblenden von Uhrzeiten bei zeitlosen Listen.' },
+      { v: '15 → 16', title: 'MIGRATION_15_16', desc: 'Führt Soft-Delete (`deletedAt INTEGER DEFAULT NULL`) für den Papierkorb ein.' },
+      { v: '16 → 17', title: 'MIGRATION_16_17', desc: 'Erstellt Performance-Indizes auf `(deletedAt, start_datetime)`, `start_datetime`, `stop_datetime` und `gps_track_points(timestamp)`.' },
+      { v: '17 → 18', title: 'MIGRATION_17_18', desc: 'Ergänzt `zoneId TEXT DEFAULT NULL` auf `journal_entries` für reise-feste lokale Zeitzonen.' }
+    ];
+
+    const INITIAL_POSITIONS = {};
+    Object.values(ENTITIES).forEach(e => {
+      INITIAL_POSITIONS[e.id] = { x: e.x, y: e.y };
+    });
+
+    const canvasShell = document.getElementById('canvasShell');
+    const canvasStage = document.getElementById('canvasStage');
+    const edgesSvg = document.getElementById('edgesSvg');
+    const inspectorPanel = document.getElementById('inspectorPanel');
+    const toast = document.getElementById('toast');
+
+    let selectedEntityId = 'journal_entries';
+    let showPojo = true;
+    let showTemporal = true;
+    let activeSim = 'none';
+    let scale = 1;
+    let panX = 16;
+    let panY = 58;
+    let toastTimer = null;
+
+    const nodeElements = {};
+    const simBanners = {};
+
+    function showToast(msg) {
+      toast.textContent = msg;
+      toast.classList.add('visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('visible'), 1700);
+    }
+
+    function copyText(text) {
+      if (!navigator.clipboard) return;
+      navigator.clipboard.writeText(text).then(() => showToast('Kopiert: „' + text + '“'));
+    }
+
+    // Build DOM nodes for each Entity
+    function buildNodes() {
+      Object.values(ENTITIES).forEach(entity => {
+        const el = document.createElement('div');
+        el.className = 'entity-node';
+        el.dataset.entityId = entity.id;
+        el.style.left = entity.x + 'px';
+        el.style.top = entity.y + 'px';
+
+        const header = document.createElement('div');
+        header.className = 'node-header type-' + entity.kind;
+        header.innerHTML = `
+          <div>
+            <div class="node-title">${entity.tableName}</div>
+            <div class="node-subtitle">${entity.kotlinClass}</div>
+          </div>
+          <span class="node-kind-badge">${entity.kindLabel}</span>
+        `;
+
+        const simBanner = document.createElement('div');
+        simBanner.className = 'node-sim-banner';
+        simBanners[entity.id] = simBanner;
+
+        const ul = document.createElement('ul');
+        ul.className = 'node-columns';
+
+        entity.columns.forEach(col => {
+          const li = document.createElement('li');
+          li.className = 'node-col';
+          li.dataset.colName = col.name;
+
+          let badges = '';
+          if (col.pk) badges += '<span class="badge badge-pk">PK</span>';
+          if (col.fk) badges += '<span class="badge badge-fk">FK</span>';
+          if (col.idx) badges += '<span class="badge badge-idx">IDX</span>';
+          if (col.nullable) badges += '<span class="badge badge-null">NULL</span>';
+
+          li.innerHTML = `
+            <span class="col-left">
+              ${badges}
+              <span class="col-name">${col.name}</span>
+            </span>
+            <span class="col-type">${col.kotlinType}</span>
+          `;
+
+          li.addEventListener('mouseenter', () => highlightRelated(entity.id, col.name, true));
+          li.addEventListener('mouseleave', () => highlightRelated(entity.id, col.name, false));
+          li.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            selectEntity(entity.id);
+            copyText(entity.tableName + '.' + col.name);
+          });
+
+          ul.appendChild(li);
+        });
+
+        el.appendChild(header);
+        el.appendChild(simBanner);
+        el.appendChild(ul);
+
+        el.addEventListener('click', () => selectEntity(entity.id));
+
+        // Dragging via header
+        makeNodeDraggable(el, header, entity);
+
+        canvasStage.appendChild(el);
+        nodeElements[entity.id] = el;
+      });
+    }
+
+    function makeNodeDraggable(nodeEl, handleEl, entity) {
+      let dragging = false;
+      let startClientX = 0;
+      let startClientY = 0;
+      let startX = 0;
+      let startY = 0;
+
+      handleEl.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        dragging = true;
+        startClientX = e.clientX;
+        startClientY = e.clientY;
+        startX = entity.x;
+        startY = entity.y;
+        handleEl.setPointerCapture(e.pointerId);
+        selectEntity(entity.id);
+      });
+
+      handleEl.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const dx = (e.clientX - startClientX) / scale;
+        const dy = (e.clientY - startClientY) / scale;
+        entity.x = Math.max(10, Math.min(1180, Math.round(startX + dx)));
+        entity.y = Math.max(10, Math.min(760, Math.round(startY + dy)));
+        nodeEl.style.left = entity.x + 'px';
+        nodeEl.style.top = entity.y + 'px';
+        renderEdges();
+      });
+
+      handleEl.addEventListener('pointerup', (e) => {
+        if (!dragging) return;
+        dragging = false;
+        handleEl.releasePointerCapture(e.pointerId);
+      });
+    }
+
+    // Panning & Zooming on Canvas background
+    (function setupPanZoom() {
+      let panning = false;
+      let startX = 0;
+      let startY = 0;
+      let originPanX = 0;
+      let originPanY = 0;
+
+      canvasShell.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('.entity-node, .sim-bar, .zoom-controls, .canvas-hud')) return;
+        panning = true;
+        canvasShell.classList.add('panning');
+        startX = e.clientX;
+        startY = e.clientY;
+        originPanX = panX;
+        originPanY = panY;
+        canvasShell.setPointerCapture(e.pointerId);
+      });
+
+      canvasShell.addEventListener('pointermove', (e) => {
+        if (!panning) return;
+        panX = originPanX + (e.clientX - startX);
+        panY = originPanY + (e.clientY - startY);
+        applyStageTransform();
+      });
+
+      canvasShell.addEventListener('pointerup', (e) => {
+        if (!panning) return;
+        panning = false;
+        canvasShell.classList.remove('panning');
+        canvasShell.releasePointerCapture(e.pointerId);
+      });
+
+      canvasShell.addEventListener('wheel', (e) => {
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          const factor = e.deltaY < 0 ? 1.08 : 0.92;
+          setZoom(Math.max(0.55, Math.min(1.5, scale * factor)));
+        }
+      }, { passive: false });
+    })();
+
+    function applyStageTransform() {
+      canvasStage.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+      document.getElementById('zoomLabel').textContent = Math.round(scale * 100) + '%';
+    }
+
+    function setZoom(newScale) {
+      scale = newScale;
+      applyStageTransform();
+    }
+
+    // Anchor coordinate computation for exact column-to-column Bezier lines
+    function getColumnAnchor(entityId, colName, targetX) {
+      const entity = ENTITIES[entityId];
+      const nodeEl = nodeElements[entityId];
+      const colEl = nodeEl.querySelector(`[data-col-name="${colName}"]`);
+      const nodeWidth = nodeEl.offsetWidth || 300;
+      const centerX = entity.x + nodeWidth / 2;
+      const attachRight = targetX > centerX;
+      const x = attachRight ? entity.x + nodeWidth : entity.x;
+      const y = colEl
+        ? entity.y + colEl.offsetTop + colEl.offsetHeight / 2
+        : entity.y + 28;
+      return { x, y, side: attachRight ? 1 : -1 };
+    }
+
+    function renderEdges() {
+      // Keep <defs> and remove previous dynamic elements
+      Array.from(edgesSvg.children).forEach(child => {
+        if (child.tagName.toLowerCase() !== 'defs') {
+          edgesSvg.removeChild(child);
+        }
+      });
+
+      EDGES.forEach(edge => {
+        if (edge.type === 'pojo' && !showPojo) return;
+        if (edge.type === 'temporal' && !showTemporal) return;
+
+        const fromEntity = ENTITIES[edge.fromNode];
+        const toEntity = ENTITIES[edge.toNode];
+        const fromAnchor = getColumnAnchor(edge.fromNode, edge.fromCol, toEntity.x + 150);
+        const toAnchor = getColumnAnchor(edge.toNode, edge.toCol, fromEntity.x + 150);
+
+        const dx = Math.max(55, Math.abs(toAnchor.x - fromAnchor.x) * 0.45);
+        const c1x = fromAnchor.x + fromAnchor.side * dx;
+        const c2x = toAnchor.x + toAnchor.side * dx;
+
+        const d = `M ${fromAnchor.x} ${fromAnchor.y} C ${c1x} ${fromAnchor.y}, ${c2x} ${toAnchor.y}, ${toAnchor.x} ${toAnchor.y}`;
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        let cls = 'edge-path edge-' + edge.type;
+        let marker = 'url(#arrowPrimary)';
+        if (edge.type === 'pojo') marker = 'url(#arrowPojo)';
+
+        const isCascadePulsing =
+          (activeSim === 'hard-entry' && edge.id === 'fk_entry') ||
+          (activeSim === 'delete-category' && edge.id === 'fk_category');
+
+        if (isCascadePulsing) {
+          cls += ' cascade-pulse';
+          marker = 'url(#arrowDanger)';
+        }
+
+        path.setAttribute('d', d);
+        path.setAttribute('class', cls);
+        if (edge.type !== 'temporal') {
+          path.setAttribute('marker-end', marker);
+        }
+        path.dataset.edgeId = edge.id;
+
+        path.addEventListener('click', () => {
+          renderEdgeInspector(edge);
+        });
+
+        edgesSvg.appendChild(path);
+
+        // Midpoint badge label on Bezier t=0.5
+        const midX = 0.125 * fromAnchor.x + 0.375 * c1x + 0.375 * c2x + 0.125 * toAnchor.x;
+        const midY = 0.125 * fromAnchor.y + 0.375 * fromAnchor.y + 0.375 * toAnchor.y + 0.125 * toAnchor.y;
+
+        const labelText = edge.label;
+        const approxW = labelText.length * 6.4 + 14;
+
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', String(midX - approxW / 2));
+        rect.setAttribute('y', String(midY - 10));
+        rect.setAttribute('width', String(approxW));
+        rect.setAttribute('height', '20');
+        rect.setAttribute('class', 'edge-label-bg');
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', String(midX));
+        text.setAttribute('y', String(midY + 4));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('class', 'edge-label-text');
+        text.textContent = labelText;
+
+        edgesSvg.appendChild(rect);
+        edgesSvg.appendChild(text);
+      });
+    }
+
+    function highlightRelated(entityId, colName, active) {
+      EDGES.forEach(edge => {
+        const matches =
+          (edge.fromNode === entityId && edge.fromCol === colName) ||
+          (edge.toNode === entityId && edge.toCol === colName);
+        if (!matches) return;
+
+        const svgPath = edgesSvg.querySelector(`[data-edge-id="${edge.id}"]`);
+        if (svgPath) svgPath.classList.toggle('highlighted', active);
+
+        const fromColEl = nodeElements[edge.fromNode]?.querySelector(`[data-col-name="${edge.fromCol}"]`);
+        const toColEl = nodeElements[edge.toNode]?.querySelector(`[data-col-name="${edge.toCol}"]`);
+        fromColEl?.classList.toggle('col-highlight', active);
+        toColEl?.classList.toggle('col-highlight', active);
+      });
+    }
+
+    function selectEntity(entityId) {
+      selectedEntityId = entityId;
+      Object.entries(nodeElements).forEach(([id, el]) => {
+        el.classList.toggle('selected', id === entityId);
+      });
+      renderEntityInspector(ENTITIES[entityId]);
+    }
+
+    function renderEntityInspector(entity) {
+      const colsHtml = entity.columns.map(col => {
+        let badges = '';
+        if (col.pk) badges += '<span class="badge badge-pk">PK</span> ';
+        if (col.fk) badges += `<span class="badge badge-fk">FK → ${col.fk}</span> `;
+        if (col.idx) badges += '<span class="badge badge-idx">INDEX</span> ';
+        return `
+          <div class="col-detail-card">
+            <div class="col-detail-top">
+              <span>${badges}<code class="copyable" data-copy="${col.name}">${col.name}</code></span>
+              <span class="col-type">${col.kotlinType} · ${col.sqlType}</span>
+            </div>
+            <div class="col-detail-note">${col.note}</div>
+          </div>
+        `;
+      }).join('');
+
+      const idxHtml = entity.indices.map(i => `<li><code>${i}</code></li>`).join('');
+      const daoHtml = entity.queries.map(q => `<li>${q}</li>`).join('');
+
+      inspectorPanel.innerHTML = `
+        <h2>
+          <span><code class="copyable" data-copy="${entity.tableName}">${entity.tableName}</code></span>
+          <span class="schema-pill">${entity.kotlinClass}</span>
+        </h2>
+        <div class="file-ref">📄 ${entity.file} · 🛠️ ${entity.dao}</div>
+        <p class="desc">${entity.summary}</p>
+
+        <h3>Spalten &amp; Felder (${entity.columns.length})</h3>
+        ${colsHtml}
+
+        <h3>Indizes &amp; Schlüssel</h3>
+        <ul class="special-list">${idxHtml}</ul>
+
+        <h3>Wichtige DAO-Zugriffe</h3>
+        <ul class="special-list">${daoHtml}</ul>
+
+        <h3>SQL Schema / Definition (v18)</h3>
+        <pre class="sql-box">${entity.sql.replace(/</g, '&lt;')}</pre>
+      `;
+    }
+
+    function renderEdgeInspector(edge) {
+      inspectorPanel.innerHTML = `
+        <h2>
+          <span>🔗 Verknüpfungs-Details</span>
+          <span class="schema-pill">${edge.type.toUpperCase()}</span>
+        </h2>
+        <div class="file-ref">${edge.fromNode}.${edge.fromCol} ➔ ${edge.toNode}.${edge.toCol}</div>
+        <p class="desc">${edge.detail}</p>
+        <h3>Kardinalität &amp; Verhalten</h3>
+        <div class="col-detail-card">
+          <strong>${edge.label}</strong>
+          <div class="col-detail-note" style="margin-top:6px;">
+            Quelle: <code class="copyable" data-copy="${edge.fromNode}.${edge.fromCol}">${edge.fromNode}.${edge.fromCol}</code><br />
+            Ziel: <code class="copyable" data-copy="${edge.toNode}.${edge.toCol}">${edge.toNode}.${edge.toCol}</code>
+          </div>
+        </div>
+      `;
+    }
+
+    // Delete / Cascade Simulation
+    function applySimulation(mode) {
+      activeSim = mode;
+      Object.values(nodeElements).forEach(el => {
+        el.classList.remove('sim-deleted', 'sim-soft');
+      });
+      Object.values(simBanners).forEach(b => {
+        b.className = 'node-sim-banner';
+        b.textContent = '';
+      });
+
+      if (mode === 'soft-entry') {
+        nodeElements.journal_entries.classList.add('sim-soft');
+        simBanners.journal_entries.className = 'node-sim-banner warn';
+        simBanners.journal_entries.textContent = 'UPDATE deletedAt = <epochMillis> (bleibt in DB → Papierkorb)';
+
+        simBanners.journal_entry_category_cross_ref.className = 'node-sim-banner safe';
+        simBanners.journal_entry_category_cross_ref.textContent = '✓ Bleibt erhalten (Kategorien bei Restore sofort wieder da)';
+
+        simBanners.categories.className = 'node-sim-banner safe';
+        simBanners.categories.textContent = '✓ Unverändert';
+      } else if (mode === 'hard-entry') {
+        nodeElements.journal_entries.classList.add('sim-deleted');
+        simBanners.journal_entries.className = 'node-sim-banner danger';
+        simBanners.journal_entries.textContent = 'DELETE FROM journal_entries WHERE id IN (...)';
+
+        nodeElements.journal_entry_category_cross_ref.classList.add('sim-deleted');
+        simBanners.journal_entry_category_cross_ref.className = 'node-sim-banner danger';
+        simBanners.journal_entry_category_cross_ref.textContent = '⚡ ON DELETE CASCADE löscht verknüpfte CrossRef-Zeilen';
+
+        simBanners.categories.className = 'node-sim-banner safe';
+        simBanners.categories.textContent = '✓ Kategorien bleiben vollständig erhalten';
+      } else if (mode === 'delete-category') {
+        nodeElements.categories.classList.add('sim-deleted');
+        simBanners.categories.className = 'node-sim-banner danger';
+        simBanners.categories.textContent = 'DELETE FROM categories WHERE id = :categoryId';
+
+        nodeElements.journal_entry_category_cross_ref.classList.add('sim-deleted');
+        simBanners.journal_entry_category_cross_ref.className = 'node-sim-banner danger';
+        simBanners.journal_entry_category_cross_ref.textContent = '⚡ ON DELETE CASCADE entfernt Zuordnungen dieser Kategorie';
+
+        simBanners.journal_entries.className = 'node-sim-banner safe';
+        simBanners.journal_entries.textContent = '✓ Einträge bleiben erhalten (kein Datenverlust!)';
+      }
+
+      renderEdges();
+    }
+
+    // Migrations UI
+    function buildMigrations() {
+      const container = document.getElementById('migrationChips');
+      const detail = document.getElementById('migrationDetail');
+
+      function selectMig(index) {
+        container.querySelectorAll('.mig-btn').forEach((b, idx) => {
+          b.classList.toggle('active', idx === index);
+        });
+        const m = MIGRATIONS[index];
+        detail.innerHTML = `<strong>${m.title} (${m.v}):</strong> ${m.desc}`;
+      }
+
+      MIGRATIONS.forEach((m, idx) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mig-btn';
+        btn.textContent = 'v' + m.v;
+        btn.addEventListener('click', () => selectMig(idx));
+        container.appendChild(btn);
+      });
+
+      selectMig(MIGRATIONS.length - 1);
+    }
+
+    // Toolbar & Controls
+    document.getElementById('togglePojoBtn').addEventListener('click', (e) => {
+      showPojo = !showPojo;
+      e.currentTarget.classList.toggle('active', showPojo);
+      nodeElements.entry_with_categories.style.display = showPojo ? '' : 'none';
+      if (!showPojo && selectedEntityId === 'entry_with_categories') {
+        selectEntity('journal_entries');
+      }
+      renderEdges();
+    });
+
+    document.getElementById('toggleTemporalBtn').addEventListener('click', (e) => {
+      showTemporal = !showTemporal;
+      e.currentTarget.classList.toggle('active', showTemporal);
+      renderEdges();
+    });
+
+    document.getElementById('resetLayoutBtn').addEventListener('click', () => {
+      Object.entries(INITIAL_POSITIONS).forEach(([id, pos]) => {
+        ENTITIES[id].x = pos.x;
+        ENTITIES[id].y = pos.y;
+        nodeElements[id].style.left = pos.x + 'px';
+        nodeElements[id].style.top = pos.y + 'px';
+      });
+      scale = 1;
+      panX = 16;
+      panY = 58;
+      applyStageTransform();
+      renderEdges();
+    });
+
+    document.getElementById('zoomInBtn').addEventListener('click', () => setZoom(Math.min(1.5, scale + 0.1)));
+    document.getElementById('zoomOutBtn').addEventListener('click', () => setZoom(Math.max(0.55, scale - 0.1)));
+    document.getElementById('zoomLabel').addEventListener('click', () => setZoom(1));
+
+    document.querySelectorAll('[data-sim]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-sim]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        applySimulation(btn.dataset.sim);
+      });
+    });
+
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      const root = document.documentElement;
+      const current = root.getAttribute('data-theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isDark = current === 'dark' || (!current && prefersDark);
+      root.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    });
+
+    inspectorPanel.addEventListener('click', (e) => {
+      const copyEl = e.target.closest('.copyable');
+      if (copyEl) copyText(copyEl.dataset.copy || copyEl.textContent.trim());
+    });
+
+    // Init
+    buildNodes();
+    buildMigrations();
+    applyStageTransform();
+    selectEntity('journal_entries');
+    requestAnimationFrame(renderEdges);
+  })();
+</script>
+</body>
+</html>

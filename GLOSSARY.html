@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice Journal – UI- &amp; App-Glossar für Coding-Prompts</title>
+  <style>
+    :root {
+      --bg: #f8f9fc;
+      --surface: #ffffff;
+      --surface-alt: #f1f4f9;
+      --surface-hover: #e8eef7;
+      --text: #1a1c1e;
+      --text-muted: #535f70;
+      --primary: #3b5ba9;
+      --primary-container: #dae2ff;
+      --on-primary-container: #001848;
+      --secondary-container: #dde2f9;
+      --accent-green: #1b6d3d;
+      --accent-green-bg: #d4f7df;
+      --accent-amber: #7a5900;
+      --accent-amber-bg: #ffdea6;
+      --border: #d8dee9;
+      --code-bg: #eef1f7;
+      --shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+
+    [data-theme="dark"] {
+      --bg: #111318;
+      --surface: #1b1e26;
+      --surface-alt: #242833;
+      --surface-hover: #2d3342;
+      --text: #e2e2e9;
+      --text-muted: #9ca5b4;
+      --primary: #b2c5ff;
+      --primary-container: #20428f;
+      --on-primary-container: #dae2ff;
+      --secondary-container: #33394c;
+      --accent-green: #85d99f;
+      --accent-green-bg: #0f3c22;
+      --accent-amber: #fbbc04;
+      --accent-amber-bg: #3e2e00;
+      --border: #323746;
+      --code-bg: #272c38;
+      --shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #111318;
+        --surface: #1b1e26;
+        --surface-alt: #242833;
+        --surface-hover: #2d3342;
+        --text: #e2e2e9;
+        --text-muted: #9ca5b4;
+        --primary: #b2c5ff;
+        --primary-container: #20428f;
+        --on-primary-container: #dae2ff;
+        --secondary-container: #33394c;
+        --accent-green: #85d99f;
+        --accent-green-bg: #0f3c22;
+        --accent-amber: #fbbc04;
+        --accent-amber-bg: #3e2e00;
+        --border: #323746;
+        --code-bg: #272c38;
+        --shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow);
+    }
+
+    .header-inner {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.35rem;
+      letter-spacing: -0.01em;
+    }
+
+    .brand p {
+      margin: 2px 0 0;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex: 1;
+      max-width: 560px;
+      justify-content: flex-end;
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 220px;
+      padding: 9px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--text);
+      font-size: 0.92rem;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(59, 91, 169, 0.2);
+    }
+
+    .theme-btn {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.86rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .theme-btn:hover {
+      background: var(--surface-hover);
+    }
+
+    main {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* Filter Bar */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .chip {
+      padding: 6px 13px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 0.83rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .chip:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
+
+    .chip.active {
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+      border-color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* Hint Banner */
+    .hint-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--primary);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      box-shadow: var(--shadow);
+    }
+
+    .hint-box h2 {
+      margin: 0 0 6px;
+      font-size: 1rem;
+    }
+
+    .hint-box p {
+      margin: 0;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .prompt-examples {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .prompt-example {
+      background: var(--surface-alt);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-size: 0.85rem;
+    }
+
+    .prompt-example strong {
+      color: var(--primary);
+    }
+
+    /* Visual Wireframes */
+    .wireframe-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .wireframe-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .wireframe-card h3 {
+      margin: 0 0 4px;
+      font-size: 1.02rem;
+    }
+
+    .wireframe-card .subtitle {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    .phone-mock {
+      border: 2px solid var(--border);
+      border-radius: 18px;
+      padding: 10px;
+      background: var(--bg);
+      position: relative;
+      font-size: 0.78rem;
+    }
+
+    .mock-row {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 8px;
+      padding: 7px 10px;
+      margin-bottom: 7px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .mock-row.highlight {
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+      border-color: var(--primary);
+    }
+
+    .mock-tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--secondary-container);
+      color: var(--text);
+    }
+
+    .mock-entry-card {
+      border: 1px solid var(--border);
+      background: var(--surface-alt);
+      border-radius: 10px;
+      padding: 9px 10px;
+      margin-bottom: 7px;
+    }
+
+    .mock-fab-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 5px;
+      margin-top: 6px;
+    }
+
+    .mock-fab {
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+      border: 1px solid var(--primary);
+      border-radius: 12px;
+      padding: 4px 10px;
+      font-weight: 600;
+      font-size: 0.74rem;
+    }
+
+    /* Sections & Tables */
+    .glossary-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .section-header {
+      padding: 16px 20px;
+      background: var(--surface-alt);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .section-header h2 {
+      margin: 0;
+      font-size: 1.12rem;
+    }
+
+    .section-meta {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.89rem;
+    }
+
+    th {
+      padding: 11px 16px;
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background: var(--surface-hover);
+    }
+
+    /* Copyable badges */
+    .term-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 600;
+      color: var(--on-primary-container);
+      background: var(--primary-container);
+      padding: 3px 9px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: border-color 0.15s, transform 0.08s;
+    }
+
+    .term-badge:hover {
+      border-color: var(--primary);
+    }
+
+    .term-badge:active {
+      transform: scale(0.97);
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.82rem;
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 5px;
+      cursor: pointer;
+      word-break: break-word;
+    }
+
+    code:hover {
+      outline: 1px solid var(--primary);
+    }
+
+    .ui-label {
+      display: inline-block;
+      font-size: 0.82rem;
+      padding: 2px 7px;
+      border-radius: 5px;
+      background: var(--accent-green-bg);
+      color: var(--accent-green);
+      font-weight: 500;
+      margin: 1px 2px 1px 0;
+    }
+
+    .gesture-tag {
+      display: inline-block;
+      font-size: 0.75rem;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: var(--accent-amber-bg);
+      color: var(--accent-amber);
+      font-weight: 600;
+      margin-right: 4px;
+    }
+
+    .file-path {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    /* Toast */
+    #copy-toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--text);
+      color: var(--surface);
+      padding: 10px 16px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(10px);
+      transition: opacity 0.18s, transform 0.18s;
+      z-index: 999;
+      box-shadow: var(--shadow);
+    }
+
+    #copy-toast.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .empty-state {
+      display: none;
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--text-muted);
+    }
+
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <h1>🎙️ Voice Journal – Einheitliches UI- &amp; App-Glossar</h1>
+      <p>Klicke auf einen <strong>blauen Prompt-Begriff</strong> oder <code>Code-Namen</code>, um ihn direkt für deinen Prompt zu kopieren.</p>
+    </div>
+    <div class="controls">
+      <input
+        type="search"
+        id="searchInput"
+        class="search-input"
+        placeholder="Begriff, UI-Text, Composable oder Datei suchen …"
+        aria-label="Glossar durchsuchen"
+      />
+      <button type="button" id="themeToggle" class="theme-btn">🌗 Design wechseln</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- Filter Chips -->
+  <div class="filter-bar" id="filterBar">
+    <button class="chip active" data-filter="all">Alle Bereiche</button>
+    <button class="chip" data-filter="home">Hauptansicht &amp; TopBar</button>
+    <button class="chip" data-filter="entry-card">Eintrags-Karte &amp; Liste</button>
+    <button class="chip" data-filter="fab">FAB-Menü &amp; Aufnahme</button>
+    <button class="chip" data-filter="drawer">Navigationsmenü (Drawer)</button>
+    <button class="chip" data-filter="calendar">Kalender (Tag / 3-Tage / Woche / Monat)</button>
+    <button class="chip" data-filter="calendar-overlay">Tagesvorschau-Overlay</button>
+    <button class="chip" data-filter="edit-entry">Eintrag-Editor</button>
+    <button class="chip" data-filter="categories">Kategorien &amp; Farbwahl</button>
+    <button class="chip" data-filter="search-import">Suche &amp; Import</button>
+    <button class="chip" data-filter="settings">Einstellungen</button>
+    <button class="chip" data-filter="dialogs-domain">Dialoge &amp; Fachbegriffe</button>
+  </div>
+
+  <!-- Prompt Cheat Sheet -->
+  <section class="hint-box">
+    <h2>💡 So nutzt du dieses Glossar für Coding-Agent-Prompts</h2>
+    <p>Verwende am besten die <strong>blauen Prompt-Begriffe</strong>. Jeder Begriff verweist eindeutig auf genau eine Stelle im Code – Verwechslungen (z.&nbsp;B. zwischen <em>Tages-Header</em> in der Hauptliste, <em>Spalten-Header</em> in der Wochenansicht und <em>Tagesvorschau-Overlay</em> im Kalender) sind damit ausgeschlossen.</p>
+    <div class="prompt-examples">
+      <div class="prompt-example">
+        <strong>Beispiel 1 (Hauptansicht):</strong><br />
+        „Blende auf der <strong>Eintrags-Karte</strong> die <strong>Kategorie-Chips</strong> kompakter ein und verschiebe das <strong>Foto-Icon</strong> neben das <strong>Uhrzeit-Label</strong>.“
+      </div>
+      <div class="prompt-example">
+        <strong>Beispiel 2 (Kalender):</strong><br />
+        „Ändere im <strong>Tagesvorschau-Overlay</strong> die maximale Zeilenanzahl der <strong>Vorschau-Eintrags-Kachel</strong> und passe in der <strong>Monatsansicht</strong> den <strong>Überlauf-Zähler (+N)</strong> in der <strong>Monats-Tageszelle</strong> an.“
+      </div>
+      <div class="prompt-example">
+        <strong>Beispiel 3 (TopBar):</strong><br />
+        „Füge in der <strong>Mehrfachauswahl-Leiste</strong> links neben dem <strong>Teilen-Menü</strong> ein neues Action-Icon hinzu.“
+      </div>
+    </div>
+  </section>
+
+  <!-- Visual Anatomy Wireframes -->
+  <div class="wireframe-grid" id="wireframes">
+    <!-- Wireframe 1: HomeScreen -->
+    <div class="wireframe-card">
+      <h3>📱 Anatomie: Hauptansicht (<code>MainActivity</code> / <code>HomeScreen</code>)</h3>
+      <div class="subtitle">Aufbau vom oberen Bildschirmrand bis zum FAB-Menü</div>
+      <div class="phone-mock">
+        <div class="mock-row highlight">
+          <span>⋮ <strong>Haupt-TopBar</strong> / <strong>Mehrfachauswahl-Leiste</strong></span>
+          <span>✏️ 🏷️ 🗺️ ↩️ 📋</span>
+        </div>
+        <div class="mock-row">
+          <span><strong>Kategorie-Dropdown</strong> (aktuelle Kategorie / <em>Gelöscht</em>)</span>
+          <span>▾</span>
+        </div>
+        <div class="mock-row" style="background: transparent; border-style: dashed;">
+          <span><strong>Tages-Header</strong> („Donnerstag, 19.11.2026“)</span>
+          <span class="mock-tag">Tap / Long-Press → Fotos</span>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <div style="flex: 1;">
+            <div class="mock-entry-card">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span>☑️ <strong>Eintrags-Checkbox</strong> + <strong>Eintrags-Textvorschau</strong></span>
+                <span><strong>Uhrzeit-Label</strong> (14:30)</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span><span class="mock-tag">Kategorie-Chip</span></span>
+                <span>📷 <strong>Foto-Icon</strong></span>
+              </div>
+            </div>
+          </div>
+          <div style="width: 12px; border-radius: 99px; background: var(--primary-container); border: 1px solid var(--primary);" title="Schnellscroll-Leiste (FastScroller)"></div>
+        </div>
+        <div class="mock-fab-stack">
+          <span class="mock-fab">✏️ Manuell-FAB</span>
+          <span class="mock-fab">🎤 Sprach-FAB</span>
+          <span class="mock-fab">＋ / ✕ / ⏹ <strong>Haupt-FAB</strong> (<code>MainFabMenu</code>)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wireframe 2: Calendar WeekView -->
+    <div class="wireframe-card">
+      <h3>📅 Anatomie: Kalender – Zeitansicht (<code>WeekView</code>)</h3>
+      <div class="subtitle">Wird genutzt für <strong>Tagesansicht</strong> (1 Spalte), <strong>3-Tages-Ansicht</strong> und <strong>Wochenansicht</strong> (7 Spalten)</div>
+      <div class="phone-mock">
+        <div class="mock-row highlight">
+          <span>← <strong>Kalender-TopBar</strong> (Zeitraum-Titel)</span>
+          <span>⋮ <strong>Ansichts-Menü</strong></span>
+        </div>
+        <div class="mock-row">
+          <span>52dp</span>
+          <span><strong>Wochen-Kopfzeile</strong>: Wochentag + <strong>Tages-Badge</strong> + <strong>Header-Punkte (Dots)</strong></span>
+        </div>
+        <div style="display: flex; gap: 6px; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--surface);">
+          <div style="width: 44px; font-size: 0.72rem; color: var(--text-muted); border-right: 1px solid var(--border); padding-right: 4px;">
+            08:00<br />09:00<br />10:00<br /><strong>Stunden-Spalte</strong>
+          </div>
+          <div style="flex: 1; position: relative;">
+            <div style="border-top: 2px solid #e53935; font-size: 0.7rem; color: #e53935; margin-bottom: 6px;">
+              ● <strong>Aktuelle-Uhrzeit-Linie</strong>
+            </div>
+            <div style="background: var(--primary-container); border-left: 4px solid var(--primary); border-radius: 4px; padding: 5px 7px; margin-bottom: 4px;">
+              <strong>Termin-Kachel</strong> (<code>AppointmentTile</code>)<br />
+              <span style="font-size: 0.7rem;">Nebeneinander bei Überlappung</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Wireframe 3: MonthView & DayEntriesPreviewOverlay -->
+    <div class="wireframe-card">
+      <h3>🗓️ Anatomie: Monatsansicht &amp; Tagesvorschau-Overlay</h3>
+      <div class="subtitle"><code>MonthView</code> + Long-Press öffnet <code>DayEntriesPreviewOverlay</code></div>
+      <div class="phone-mock">
+        <div class="mock-row">
+          <span>Mo · Di · Mi · Do · Fr · Sa · So (<strong>Wochentags-Leiste</strong>)</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 8px;">
+          <div style="border: 1px solid var(--border); border-radius: 6px; padding: 5px; background: var(--surface);">
+            <strong>18</strong> <em>(Monats-Tageszelle)</em>
+            <div class="mock-tag" style="display:block; margin-top:3px;">Monats-Termin-Chip</div>
+            <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 2px;"><strong>+2</strong> (Überlauf-Zähler)</div>
+          </div>
+          <div style="border: 2px solid var(--primary); border-radius: 6px; padding: 5px; background: var(--surface);">
+            <span class="mock-tag">19 (Heute-Badge)</span>
+            <div style="font-size: 0.68rem; margin-top: 4px;">Long-Press ↘</div>
+          </div>
+          <div style="border: 1px solid var(--border); border-radius: 6px; padding: 5px; opacity: 0.55;">
+            <span>Nachbarmonat-Zelle</span>
+          </div>
+        </div>
+        <div style="border: 2px solid var(--primary); border-radius: 14px; padding: 8px 10px; background: var(--surface); box-shadow: var(--shadow);">
+          <strong>Tagesvorschau-Overlay</strong> (<code>DayEntriesPreviewCard</code>)
+          <div style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 5px;">Untertitel: „3 Einträge · Tippen zum Bearbeiten“</div>
+          <div style="border-left: 4px solid #e57373; background: var(--surface-alt); padding: 4px 8px; border-radius: 6px; margin-bottom: 5px;">
+            <strong>Vorschau-Eintrags-Kachel</strong> (Farbstreifen + Zeitspanne + Text)
+          </div>
+          <div style="text-align: right; font-size: 0.72rem; color: var(--primary); font-weight: 600;">
+            [Schließen] &nbsp; [Tagesansicht öffnen]
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 1. HAUPTANSICHT & TOPBAR -->
+  <section class="glossary-section" data-category="home">
+    <div class="section-header">
+      <h2>1. Hauptansicht, Haupt-TopBar &amp; Mehrfachauswahl-Leiste</h2>
+      <span class="section-meta">MainActivity.kt · HomeScreen.kt · MainTopAppBar.kt</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Prompt-Begriff (DE)</th>
+            <th>Sichtbares UI / Icon</th>
+            <th>Code-Symbol</th>
+            <th>Funktion &amp; Gesten</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="term-badge">Hauptansicht</span></td>
+            <td>Startbildschirm „Voice Journal“</td>
+            <td><code>MainActivity</code> / <code>HomeScreen</code><span class="file-path">ui/screens/HomeScreen.kt</span></td>
+            <td>Zentraler Bildschirm mit Haupt-TopBar, Kategorie-Dropdown, gruppierter Eintrags-Liste, Schnellscroll-Leiste und FAB-Menü.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Haupt-TopBar</span></td>
+            <td>Obere App-Leiste „Voice Journal“</td>
+            <td><code>MainTopAppBar</code><span class="file-path">ui/components/MainTopAppBar.kt</span></td>
+            <td>Obere Werkzeugleiste im Normalmodus (kein Multi-Select aktiv). Wechselt bei Mehrfachauswahl automatisch in die <strong>Mehrfachauswahl-Leiste</strong>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Menü-Button (Drei-Punkte links)</span></td>
+            <td>Icon <code>MoreVert</code> (⋮ links oben) · <span class="ui-label">Navigationsmenü</span></td>
+            <td><code>navigationIcon</code> in <code>MainTopAppBar</code></td>
+            <td><span class="gesture-tag">Tap</span> Öffnet das seitliche <strong>Navigationsmenü (AppDrawer)</strong>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Einzel-Bearbeiten-Button</span></td>
+            <td>Stift-Icon (✏️ <code>Icons.Filled.Edit</code>)</td>
+            <td><code>onEditSelectedSingleEntry</code> / <code>onEditEntryById</code></td>
+            <td>Erscheint in der Haupt-TopBar, sobald ein einzelner Eintrag per Tap fokussiert (<code>selectedEntry</code>) oder genau 1 Eintrag im Multi-Select markiert ist. Öffnet den <strong>Eintrag-Editor</strong>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Kategorie-Tags-Umschalter</span></td>
+            <td>Label-Icon (🏷️ <code>Label</code> / <code>LabelOff</code>)</td>
+            <td><code>showCategoryTags</code> / <code>toggleShowCategoryTags()</code></td>
+            <td><span class="gesture-tag">Tap</span> Blendet die unteren <strong>Kategorie-Chips</strong> (samt Foto-Icon-Zeile) auf allen Eintrags-Karten global ein oder aus.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Karten-Routen-Button (TopBar)</span></td>
+            <td>Karten-Icon (🗺️ <code>Icons.Filled.Map</code>)</td>
+            <td><code>hasGpsTrackForSelectedDate</code> / <code>openGoogleMapsWithTrack()</code></td>
+            <td>Wird nur eingeblendet, wenn ein <strong>Tages-Header</strong> ausgewählt ist und für diesen Tag mindestens 2 GPS-Punkte vorliegen. Öffnet die Tagesroute in Google Maps.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Rückgängig-Button (Undo)</span></td>
+            <td>Pfeil-Icon (↩️ <code>Icons.AutoMirrored.Filled.Undo</code>)</td>
+            <td><code>canUndo</code> / <code>onUndoDelete()</code></td>
+            <td>Erscheint nach dem Löschen (Soft-Delete) von Einträgen und stellt die zuletzt gelöschten Einträge sofort wieder her.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Zwischenablage-Button</span></td>
+            <td>Klemmbrett-Icon (📋 <code>ContentPaste</code>)</td>
+            <td><code>onCopyToClipboardClicked</code> / <code>getEntriesTextForClipboard()</code></td>
+            <td>Kopiert die Einträge der aktuell gewählten Kategorie formatiert in die Android-Zwischenablage.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Mehrfachauswahl-Leiste</span></td>
+            <td>Farbige TopBar <span class="ui-label">X ausgewählt</span></td>
+            <td><code>MainTopAppBar</code> (<code>isMultiSelectActive == true</code>)</td>
+            <td>Kontextuelle Aktionsleiste (<code>primaryContainer</code>-Hintergrund), aktiv sobald ≥ 1 Eintrag per Long-Press markiert wurde (<code>selectedEntryIds</code>).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Auswahl-Aufheben-Button</span></td>
+            <td>Schließen-Icon (✕ links oben)</td>
+            <td><code>onClearSelection</code> / <code>clearSelection()</code></td>
+            <td>Beendet den Mehrfachauswahl-Modus und leert <code>selectedEntryIds</code>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Zeitzonen-Button (Batch)</span></td>
+            <td>Weltkugel-Icon (🌐 <code>PublicIcon</code>)</td>
+            <td><code>onChangeTimeZoneClicked</code> → <code>TimeZonePickerDialog</code></td>
+            <td>Öffnet im Mehrfachauswahl-Modus den <strong>Zeitzonen-Auswahldialog</strong>, um allen markierten Einträgen gemeinsam eine IANA-Zeitzone zuzuweisen.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Teilen-Menü</span></td>
+            <td>Teilen-Icon (🔗 <code>Share</code>) + Dropdown</td>
+            <td><code>shareMenuExpanded</code> · <code>ShareExportHelper</code></td>
+            <td>Öffnet ein Dropdown mit zwei Optionen: <span class="ui-label">Als Text teilen</span> (Plain-Text) und <span class="ui-label">Als .vj Datei exportieren</span> (JSON-Datei via FileProvider).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Papierkorb-Aktionen (Wiederherstellen / Endgültig löschen)</span></td>
+            <td>Icons <code>Restore</code> &amp; <code>DeleteForever</code></td>
+            <td><code>isRecycleBinSelected</code></td>
+            <td>Nur sichtbar, wenn im Kategorie-Dropdown die virtuelle Kategorie <strong>Papierkorb („Gelöscht“)</strong> aktiv ist: stellt markierte Einträge wieder her oder öffnet den <strong>Endgültig-Löschen-Dialog</strong>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Kategorie-Dropdown</span></td>
+            <td>Auswahlfeld direkt unter der Haupt-TopBar</td>
+            <td><code>ExposedDropdownMenuBox</code> in <code>HomeScreen</code></td>
+            <td>Filtert die Eintrags-Liste nach einer Kategorie (oder dem virtuellen Papierkorb <span class="ui-label">Gelöscht</span>) und bestimmt die Standard-Zielkategorie für neue Einträge.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 2. EINTRAGS-KARTE & LISTE -->
+  <section class="glossary-section" data-category="entry-card">
+    <div class="section-header">
+      <h2>2. Eintrags-Liste, Tages-Header &amp; Eintrags-Karte</h2>
+      <span class="section-meta">HomeScreen.kt · JournalEntryItem.kt · FastScroller.kt</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Prompt-Begriff (DE)</th>
+            <th>Sichtbares UI / Icon</th>
+            <th>Code-Symbol</th>
+            <th>Funktion &amp; Gesten</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="term-badge">Eintrags-Liste (Timeline)</span></td>
+            <td>Vertikal scrollende Liste aller Einträge</td>
+            <td><code>LazyColumn</code> + <code>pagedEntries</code><span class="file-path">ui/screens/HomeScreen.kt</span></td>
+            <td>Paging-3-gestützte chronologische Liste, gruppiert nach lokalem Erstellungsdatum des jeweiligen Eintrags (<code>entry.localDate()</code>).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Tages-Header</span></td>
+            <td>Datumszeile über einer Tagesgruppe (z.&nbsp;B. „Donnerstag, 19.11.2026“)</td>
+            <td><code>DateFormatters.DAY_HEADER_GERMAN</code><span class="file-path">ui/screens/HomeScreen.kt</span></td>
+            <td><span class="gesture-tag">Tap</span> Wählt das Datum aus (<code>selectedDate</code>, hebt Zeile farbig hervor und prüft GPS-Route für diesen Tag).<br /><span class="gesture-tag">Long-Press</span> Öffnet Google Fotos für genau dieses Datum.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Eintrags-Karte</span></td>
+            <td>Abgerundete Material-3-Card eines Eintrags</td>
+            <td><code>JournalEntryItem</code><span class="file-path">ui/components/JournalEntryItem.kt</span></td>
+            <td><span class="gesture-tag">Tap</span> Fokussiert den Eintrag (<code>selectedEntry</code>; Sprachaufnahme hängt Text an diesen Eintrag an!) und klappt gekürzten Text auf/zu.<br /><span class="gesture-tag">Long-Press</span> Startet/erweitert die Mehrfachauswahl (<code>selectedEntryIds</code>).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Eintrags-Checkbox</span></td>
+            <td>Abhak-Kästchen links im Eintrag</td>
+            <td><code>Checkbox</code> (<code>isCheckable</code> / <code>entry.checked</code>)</td>
+            <td>Wird nur angezeigt, wenn mindestens eine zugewiesene Kategorie die Option <strong>Abhakbar (Checkliste)</strong> (<code>Category.checkable == true</code>) aktiviert hat.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Eintrags-Textvorschau</span></td>
+            <td>Inhaltstext (ggf. mit „…“ gekürzt)</td>
+            <td><code>textToShow</code> / <code>truncationLength</code></td>
+            <td>Zeigt den Eintragstext gekürzt auf die in den Einstellungen festgelegte <strong>Vorschau-Textlänge</strong>; klappt bei Tap auf die Karte vollständig auf (<code>isExpanded</code>).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Uhrzeit-Label</span></td>
+            <td>Uhrzeit / Zeitspanne rechts oben in der Karte</td>
+            <td><code>TimeZoneUtils.formatEntryTimeText()</code></td>
+            <td>Zeigt Startzeit bzw. Start–Ende in der gespeicherten Zeitzone des Eintrags (sofern <code>Category.showDate</code> aktiv ist; mit Zonen-Kürzel bei abweichender Reise-Zeitzone).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Kategorie-Chips</span></td>
+            <td>Kleine Badges unten links in der Eintrags-Karte</td>
+            <td><code>secondaryContainer</code>-<code>Card</code>s in <code>JournalEntryItem</code></td>
+            <td>Zeigen alle dem Eintrag zugeordneten Kategorienamen; ein-/ausblendbar über den <strong>Kategorie-Tags-Umschalter</strong> in der Haupt-TopBar.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Foto-Icon (Eintrags-Karte)</span></td>
+            <td>Kamera-Icon unten rechts (📷 <code>PhotoCamera</code>)</td>
+            <td><code>entry.hasImage</code> / <code>onPhotoIconClicked</code></td>
+            <td>Erscheint, wenn beim Eintrag „Hat Bild“ (<code>hasImage</code>) gesetzt ist. <span class="gesture-tag">Tap</span> Öffnet Google Fotos zum Datum des Eintrags.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Zum-Eintrag-Springen-Button</span></td>
+            <td>Pfeil-im-Kreis-Icon (➡️ <code>ArrowCircleRight</code>)</td>
+            <td><code>onGoToEntryClicked</code> in <code>JournalEntryItem</code></td>
+            <td>Wird nur in den <strong>Suchergebnissen</strong> eingeblendet: schließt die Suche und scrollt in der Hauptansicht exakt zu diesem Eintrag (<code>scrollToEntryId</code>).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Schnellscroll-Leiste (FastScroller)</span></td>
+            <td>Halbtransparenter Balken am rechten Bildschirmrand</td>
+            <td><code>FastScroller</code><span class="file-path">ui/components/FastScroller.kt</span></td>
+            <td>Blendet sich beim Scrollen ein und erlaubt per vertikalem Ziehen (Drag) schnelles Springen durch große Eintrags-Listen.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 3. FAB-MENÜ & SPRACHAUFNAHME -->
+  <section class="glossary-section" data-category="fab">
+    <div class="section-header">
+      <h2>3. FAB-Menü, Sprachaufnahme &amp; Schnellaufnahme-Benachrichtigung</h2>
+      <span class="section-meta">MainFabMenu.kt · SpeechRecognitionManager.kt · NotificationHelper.kt</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Prompt-Begriff (DE)</th>
+            <th>Sichtbares UI / Icon</th>
+            <th>Code-Symbol</th>
+            <th>Funktion &amp; Gesten</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="term-badge">FAB-Menü</span></td>
+            <td>Aufklappbare Aktionsbuttons unten rechts</td>
+            <td><code>MainFabMenu</code><span class="file-path">ui/components/MainFabMenu.kt</span></td>
+            <td>Steuert das Erstellen neuer Einträge per Sprache oder Tastatur sowie das Stoppen einer laufenden Aufnahme.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Haupt-FAB</span></td>
+            <td>Unterster Floating Action Button (＋ / ✕ / ⏹)</td>
+            <td>Haupt-<code>FloatingActionButton</code> in <code>MainFabMenu</code></td>
+            <td><span class="gesture-tag">Tap</span> Klappt das FAB-Menü auf/zu – oder stoppt sofort die laufende Aufnahme (Stop-Icon ⏹).<br /><span class="gesture-tag">Long-Press</span> Startet direkt die Sprachaufnahme ohne Aufklappen.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Sprach-FAB</span></td>
+            <td>Mittlerer Mini-/Sub-FAB mit Mikrofon (🎤 <code>Mic</code>)</td>
+            <td><code>onStartVoiceEntryClicked</code> · <span class="ui-label">Sprechen</span></td>
+            <td>Startet im aufgeklappten FAB-Menü die Spracheingabe.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Manuell-FAB</span></td>
+            <td>Oberer Sub-FAB mit Stift (✏️ <code>Create</code>)</td>
+            <td><code>onCreateManualEntryClicked</code> · <span class="ui-label">Eintrag manuell erstellen</span></td>
+            <td>Öffnet den <strong>Eintrag-Editor</strong> (<code>EditEntryActivity</code>) für einen neuen leeren Eintrag (vorbelegt mit der aktuellen Kategorie).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Kategorie-Triggerwort</span></td>
+            <td>Erstes gesprochenes Wort bei Neuaufnahme</td>
+            <td>Smart Categorization in <code>MainViewModel</code></td>
+            <td>Entspricht das erste diktierte Wort einem Kategorienamen oder einem seiner Komma-Aliase, wird der Eintrag dieser Kategorie zugewiesen und das Triggerwort automatisch vom Text entfernt.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Schnellaufnahme-Benachrichtigung</span></td>
+            <td>Dauerhafte Android-Notification „Voice Journal“</td>
+            <td><code>NotificationHelper</code><span class="file-path">util/NotificationHelper.kt</span></td>
+            <td>Persistente Benachrichtigung in der Statusleiste; ein Tap darauf bringt <code>MainActivity</code> in den Vordergrund und startet sofort die Sprachaufnahme.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 4. NAVIGATIONSMENÜ (DRAWER) -->
+  <section class="glossary-section" data-category="drawer">
+    <div class="section-header">
+      <h2>4. Navigationsmenü (Seitenmenü / AppDrawer)</h2>
+      <span class="section-meta">ui/components/AppDrawer.kt</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Prompt-Begriff (DE)</th>
+            <th>Sichtbares UI / Icon</th>
+            <th>Code-Symbol</th>
+            <th>Funktion &amp; Gesten</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="term-badge">Navigationsmenü (AppDrawer)</span></td>
+            <td>Seitliches Modal-Menü von links</td>
+            <td><code>ModalNavigationDrawer</code> + <code>AppDrawer</code></td>
+            <td>Enthält alle Hauptnavigationseinträge, Backup-Funktionen und (optional) Entwickler-Aktionen.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Drawer: Suche</span></td>
+            <td>🔍 <span class="ui-label">Suche</span></td>
+            <td><code>onSearchClicked</code> → <code>SearchActivity</code></td>
+            <td>Öffnet die <strong>Suchansicht</strong>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Drawer: Einstellungen</span></td>
+            <td>⚙️ <span class="ui-label">Einstellungen</span></td>
+            <td><code>onSettingsClicked</code> → <code>SettingsActivity</code></td>
+            <td>Öffnet die <strong>Einstellungen-Ansicht</strong>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Drawer: Kategorien verwalten</span></td>
+            <td>🗂️ <span class="ui-label">Kategorien verwalten</span></td>
+            <td><code>onManageCategoriesClicked</code> → <code>CategoryManagerActivity</code></td>
+            <td>Öffnet die <strong>Kategorieverwaltung</strong>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Drawer: Kalender</span></td>
+            <td>📅 <span class="ui-label">Kalender</span></td>
+            <td><code>onCalendarClicked</code> → <code>CalendarActivity</code></td>
+            <td>Öffnet die <strong>Kalenderansicht</strong>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Drawer: Tagebuch importieren / exportieren</span></td>
+            <td>⬇️ <span class="ui-label">Tagebuch importieren</span> · ⬆️ <span class="ui-label">Tagebuch exportieren</span></td>
+            <td><code>JournalBackupManager</code></td>
+            <td>Vollständiger Datenbank-Import (V1/V2/V3 JSON &amp; Legacy-Text) bzw. Komplett-Backup als <code>journal_YYYYMMDD_HHMMSS.json</code>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Drawer: Benachrichtigung anzeigen</span></td>
+            <td>🔔 <span class="ui-label">Benachrichtigung anzeigen</span></td>
+            <td><code>NotificationHelper.showNotification()</code></td>
+            <td>Aktiviert die persistente <strong>Schnellaufnahme-Benachrichtigung</strong>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Entwickler-Menüpunkte</span></td>
+            <td>🗺️ <span class="ui-label">GPS-Route anzeigen</span> · ➕ <span class="ui-label">Testdaten einfügen</span> · 🗑️ <span class="ui-label">Alle Einträge löschen</span></td>
+            <td><code>if (isDeveloperModeEnabled)</code> in <code>AppDrawer</code></td>
+            <td>Nur sichtbar, wenn in den Einstellungen der <strong>Developer-Mode</strong> aktiviert ist.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 5. KALENDER (WOCHE & MONAT) -->
+  <section class="glossary-section" data-category="calendar">
+    <div class="section-header">
+      <h2>5. Kalender – Tages-, 3-Tages-, Wochen- &amp; Monatsansicht</h2>
+      <span class="section-meta">CalendarActivity.kt · CalendarViewModel.kt · WeekView.kt · MonthView.kt</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Prompt-Begriff (DE)</th>
+            <th>Sichtbares UI / Icon</th>
+            <th>Code-Symbol</th>
+            <th>Funktion &amp; Gesten</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="term-badge">Kalenderansicht</span></td>
+            <td>Zentrierte TopBar + Monats- oder Zeitraster</td>
+            <td><code>CalendarActivity</code> / <code>CalendarScreen</code><span class="file-path">CalendarActivity.kt</span></td>
+            <td>Interaktiver Kalender mit horizontalem Pager-Wischen (Swipe links/rechts) zwischen Tagen, 3-Tages-Blöcken, Wochen oder Monaten.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Kalender-TopBar</span></td>
+            <td>Zentrierter Monats-/Zeitraumtitel + Zurück + ⋮</td>
+            <td><code>CenterAlignedTopAppBar</code> in <code>CalendarScreenContent</code></td>
+            <td>Zeigt den formatierten Monatsnamen (z.&nbsp;B. „November 2026“) oder den sichtbaren Datumsbereich.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Kalender-Ansichtsmenü</span></td>
+            <td>Menü rechts oben (⋮): <span class="ui-label">Heute</span>, <span class="ui-label">Tagesansicht</span>, <span class="ui-label">3-Tages-Ansicht</span>, <span class="ui-label">Wochenansicht</span>, <span class="ui-label">Monatsansicht</span></td>
+            <td><code>CalendarViewMode</code> (<code>DAY</code>, <code>THREE_DAY</code>, <code>WEEK</code>, <code>MONTH</code>)</td>
+            <td>Springt zum heutigen Datum (<code>jumpToToday()</code>) oder wechselt den Darstellungsmodus des Kalenders.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Zeitansicht (WeekView)</span></td>
+            <td>24-Stunden-Zeitraster mit 1, 3 oder 7 Tagesspalten</td>
+            <td><code>WeekView</code> / <code>WeekPageContent</code><span class="file-path">ui/components/WeekView.kt</span></td>
+            <td>Rendert die <strong>Tagesansicht</strong> (1 Spalte), <strong>3-Tages-Ansicht</strong> (3 Spalten) und <strong>Wochenansicht</strong> (7 Spalten) in einem <code>HorizontalPager</code>. Scrollt beim Öffnen eines Tages automatisch zum frühesten Termin (oder zu 12:00 Uhr).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Wochen-Kopfzeile</span></td>
+            <td>Fixierte Spaltenköpfe über dem Stundenraster</td>
+            <td><code>WeekHeaderRow</code></td>
+            <td>Zeigt je sichtbarem Tag das Wochentagskürzel, das runde <strong>Tages-Badge</strong> (hervorgehoben für Heute / ausgewählten Tag) und darunter die farbigen <strong>Header-Punkte (Dots)</strong>.<br /><span class="gesture-tag">Tap</span> Fokussiert Tag &amp; scrollt zu Einträgen.<br /><span class="gesture-tag">Long-Press</span> Öffnet das <strong>Tagesvorschau-Overlay</strong>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Header-Punkte (Dots)</span></td>
+            <td>Bis zu 3 farbige Punkte (+ kleiner Plus-Indikator) unter der Tageszahl</td>
+            <td><code>DayHeaderSummary</code> / <code>MAX_HEADER_DOTS</code></td>
+            <td>Signalisieren in der <strong>Wochen-Kopfzeile</strong> auf einen Blick, ob und in welchen Kategoriefarben an diesem Tag Einträge liegen.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Stunden-Spalte</span></td>
+            <td>Linke Zeitachse <code>00:00</code> – <code>23:00</code> (52&nbsp;dp breit)</td>
+            <td><code>HOUR_COLUMN_WIDTH</code> / <code>HOURS_OF_DAY</code></td>
+            <td>Vertikale Uhrzeitskala links neben den Tagesspalten in <code>WeekView</code>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Aktuelle-Uhrzeit-Linie</span></td>
+            <td>Horizontale Linie mit Punkt auf der heutigen Tagesspalte</td>
+            <td><code>currentTime</code>-Indikator in <code>WeekPageContent</code></td>
+            <td>Markiert die aktuelle Tageszeit minutengenau in der Spalte des heutigen Tages.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Termin-Kachel</span></td>
+            <td>Farbiger Block im 24h-Zeitraster</td>
+            <td><code>AppointmentTile</code> / <code>DayColumnAppointmentsLayout</code></td>
+            <td>Stellt einen <code>JournalEntry</code> im Zeitraster dar (Mindesthöhe <code>20.dp</code>, automatische Nebeneinander-Spalten bei Zeitüberlappung).<br /><span class="gesture-tag">Tap</span> Öffnet den Eintrag im <strong>Eintrag-Editor</strong>.<br /><span class="gesture-tag">Long-Press</span> Öffnet das <strong>Tagesvorschau-Overlay</strong> des Tages.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Monatsansicht</span></td>
+            <td>Monatsgitter mit Wochentags-Leiste und Wochenzeilen</td>
+            <td><code>MonthView</code> / <code>MonthPageGrid</code><span class="file-path">ui/components/MonthView.kt</span></td>
+            <td>Horizontal wischbares Monatsgitter (<code>HorizontalPager</code>).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Wochentags-Leiste (Monat)</span></td>
+            <td>Kopfzeile „Mo Di Mi Do Fr Sa So“</td>
+            <td><code>MonthWeekdayHeaderRow</code></td>
+            <td>Lokalisierte Wochentagskürzel oberhalb des Monatsgitters.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Monats-Tageszelle</span></td>
+            <td>Einzelnes Kästchen eines Kalendertages im Monat</td>
+            <td><code>MonthDayCell</code></td>
+            <td>Enthält die Tageszahl (heute als farbiges <strong>Heute-Badge</strong>), so viele <strong>Monats-Termin-Chips</strong> wie vertikal passen (<code>computeVisibleChipBudget</code>) und ggf. den <strong>Überlauf-Zähler (+N)</strong>.<br /><span class="gesture-tag">Tap</span> Öffnet diesen Tag in der detaillierten Tages-Zeitansicht.<br /><span class="gesture-tag">Long-Press</span> Öffnet das <strong>Tagesvorschau-Overlay</strong>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Monats-Termin-Chip</span></td>
+            <td>Kompakter farbiger Balken mit Eintragstitel in der Monats-Tageszelle</td>
+            <td><code>MonthAppointmentChip</code></td>
+            <td>Einzeiliger Farb-Chip mit linkem Akzentstreifen in der Monatsansicht.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Überlauf-Zähler (+N)</span></td>
+            <td>Kleines Label wie <code>+3</code> am unteren Rand einer Monats-Tageszelle</td>
+            <td>Overflow-<code>Text</code> in <code>MonthDayCell</code></td>
+            <td>Zeigt an, wie viele weitere Einträge an diesem Tag aus Platzgründen nicht mehr als Chip in die Zelle passen.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 6. TAGESVORSCHAU-OVERLAY -->
+  <section class="glossary-section" data-category="calendar-overlay">
+    <div class="section-header">
+      <h2>6. Kalender – Tagesvorschau-Overlay</h2>
+      <span class="section-meta">ui/components/DayEntriesPreviewOverlay.kt</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Prompt-Begriff (DE)</th>
+            <th>Sichtbares UI / Icon</th>
+            <th>Code-Symbol</th>
+            <th>Funktion &amp; Gesten</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="term-badge">Tagesvorschau-Overlay</span></td>
+            <td>Abgedunkelter Hintergrund + aufspringende Karte über dem Kalender</td>
+            <td><code>DayEntriesPreviewOverlay</code> / <code>DayEntriesPreviewCard</code></td>
+            <td>Erscheint per Long-Press auf einen Tag (in Monats- oder Wochenansicht) mit Feder-Zoom-Animation vom gedrückten Punkt (<code>pivotFractionX/Y</code>) und listet alle Einträge dieses Tages übersichtlich auf.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Vorschau-Kopfzeile &amp; Untertitel</span></td>
+            <td>Vollständiges Datum + <span class="ui-label">X Einträge · Tippen zum Bearbeiten</span></td>
+            <td>Header in <code>DayEntriesPreviewCard</code></td>
+            <td>Zeigt das ausgeschriebene Tagesdatum sowie die Gesamtanzahl der Einträge an diesem Tag.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Vorschau-Eintrags-Kachel</span></td>
+            <td>Farbig getönte Karte mit linkem 4dp-Farbstreifen, Uhrzeit &amp; mehrzeiligem Text</td>
+            <td><code>DayPreviewEntryItem</code></td>
+            <td>Dynamische maximale Zeilenanzahl je nach Eintragsanzahl (<code>computePreviewMaxLines</code>: 6 Zeilen bei 1 Eintrag, 4 bei 2 Einträgen, sonst 3 Zeilen).<br /><span class="gesture-tag">Tap</span> Öffnet den Eintrag direkt im <strong>Eintrag-Editor</strong>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Vorschau-Fußzeile (Aktionen)</span></td>
+            <td>Buttons <span class="ui-label">Schließen</span> und <span class="ui-label">Tagesansicht öffnen</span></td>
+            <td><code>FlowRow</code> am Ende von <code>DayEntriesPreviewCard</code></td>
+            <td>Schließt das Overlay bzw. wechselt direkt in die 1-Spalten-<strong>Tagesansicht</strong> für dieses Datum (ausgeblendet, wenn man bereits genau diesen einzelnen Tag betrachtet).</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 7. EINTRAG-EDITOR -->
+  <section class="glossary-section" data-category="edit-entry">
+    <div class="section-header">
+      <h2>7. Eintrag-Editor (Eintrag erstellen / bearbeiten)</h2>
+      <span class="section-meta">EditEntryActivity.kt · EditEntryViewModel.kt</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Prompt-Begriff (DE)</th>
+            <th>Sichtbares UI / Icon</th>
+            <th>Code-Symbol</th>
+            <th>Funktion &amp; Gesten</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="term-badge">Eintrag-Editor</span></td>
+            <td>Maske <span class="ui-label">New Entry</span> / <span class="ui-label">Edit Entry</span></td>
+            <td><code>EditEntryActivity</code> / <code>EditEntryScreen</code></td>
+            <td>Formular zum Erstellen oder Bearbeiten eines Eintrags inkl. Cursor-Erhalt (<code>TextFieldValue</code>) und Speicherschutz (<code>NonCancellable</code>).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Editor-TopBar (Diktat &amp; Speichern)</span></td>
+            <td>Zurück-Pfeil + Mikrofon/Stop (🎤/⏹) + Häkchen (✓ <code>Done</code>)</td>
+            <td><code>TopAppBar</code> in <code>EditEntryScreen</code></td>
+            <td>Erlaubt direktes Diktieren in das Textfeld (an aktueller Cursorposition / ans Ende) sowie das Speichern des Eintrags.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Inhalts-Textfeld</span></td>
+            <td>Großes mehrzeiliges Feld <span class="ui-label">Content</span> (1/3 Bildschirmhöhe)</td>
+            <td><code>entryContent</code> (<code>TextFieldValue</code>)</td>
+            <td>Haupttextfeld für den Tagebuch-/Aufgaben-/Termintext.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Startdatum- &amp; Startzeit-Felder</span></td>
+            <td><span class="ui-label">Start Date</span> &amp; <span class="ui-label">Start Time</span></td>
+            <td><code>startDateTime</code> + <code>DatePickerDialog</code> / <code>TimePicker</code></td>
+            <td>Read-only-Felder, die bei Tap den Datums- bzw. 24h-Uhrzeit-Dialog öffnen.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Enddatum- &amp; Endzeit-Felder + Löschen-X</span></td>
+            <td><span class="ui-label">Stop Date</span>, <span class="ui-label">Stop Time</span> + ✕ (<code>Clear</code>)</td>
+            <td><code>stopDateTime</code> / <code>updateStopDateTime(null)</code></td>
+            <td>Optionale Endzeit für Kalendereinträge mit Dauer; das ✕-Icon setzt die Endzeit wieder auf leer (<code>null</code>).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Zeitzonen-Feld</span></td>
+            <td>Feld <span class="ui-label">Time Zone</span> mit Weltkugel-Icon</td>
+            <td><code>zoneId</code> → <code>TimeZonePickerDialog</code></td>
+            <td>Zeigt die IANA-Zeitzone des Eintrags (oder <code>System (...)</code>) und öffnet bei Tap den <strong>Zeitzonen-Auswahldialog</strong>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Hat-Bild-Checkbox</span></td>
+            <td>Checkbox <span class="ui-label">Has Image</span></td>
+            <td><code>hasImage</code> / <code>updateHasImage()</code></td>
+            <td>Steuert, ob auf der <strong>Eintrags-Karte</strong> das <strong>Foto-Icon</strong> für den Google-Fotos-Absprung angezeigt wird.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Kategorien-Auswahlliste (Editor)</span></td>
+            <td>Abschnitt <span class="ui-label">Categories:</span> mit Checkbox pro Kategorie</td>
+            <td><code>selectedCategories</code> / <code>toggleCategory()</code></td>
+            <td>Mehrfachzuordnung des Eintrags zu beliebig vielen echten Kategorien.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 8. KATEGORIEN & FARBWAHL -->
+  <section class="glossary-section" data-category="categories">
+    <div class="section-header">
+      <h2>8. Kategorieverwaltung &amp; Kategorie-Editor</h2>
+      <span class="section-meta">CategoryManagerActivity.kt · EditCategoryActivity.kt</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Prompt-Begriff (DE)</th>
+            <th>Sichtbares UI / Icon</th>
+            <th>Code-Symbol</th>
+            <th>Funktion &amp; Gesten</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="term-badge">Kategorieverwaltung</span></td>
+            <td>Screen <span class="ui-label">Manage Categories</span> + ＋-FAB</td>
+            <td><code>CategoryManagerActivity</code> / <code>CategoryManagerScreen</code></td>
+            <td>Listet alle Kategorien in ihrer aktuellen Anzeigereihenfolge (<code>orderIndex</code>) auf. Der ＋-FAB unten rechts erstellt eine neue Kategorie.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Kategorie-Zeile (Karte)</span></td>
+            <td>Card mit Kategoriename, Aliasen und Hoch/Runter-Pfeilen (↑ / ↓)</td>
+            <td><code>SwipeToDismissBox</code> + <code>Card</code> in <code>CategoryManagerScreen</code></td>
+            <td><span class="gesture-tag">Long-Press</span> Öffnet die Kategorie im <strong>Kategorie-Editor</strong>.<br /><span class="gesture-tag">Swipe nach rechts</span> Löscht die Kategorie (mit erhöhter Touch-Slop-Schwelle gegen versehentliches Wischen; gesperrt für <em>Gelöscht</em>).<br /><span class="gesture-tag">↑ / ↓ Buttons</span> Ändert die Reihenfolge (<code>moveCategory</code>).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Kategorie-Editor</span></td>
+            <td>Screen <span class="ui-label">Add Category</span> / <span class="ui-label">Edit Category</span> + ✓-FAB</td>
+            <td><code>EditCategoryActivity</code> / <code>EditCategoryScreen</code></td>
+            <td>Bearbeitet Name (nur bei Neuerstellung editierbar), Sprach-Aliase (<span class="ui-label">Aliases (comma-separated)</span>), Hex-Farbe, <span class="ui-label">Checkable (Checklist mode)</span> und <span class="ui-label">Show Date</span>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Farbwahl-Zeile &amp; Farbauswahl-Dialog</span></td>
+            <td>Hex-Textfeld + Farbvorschau-Quadrat + 🎨-Icon → Dialog <span class="ui-label">Wähle eine Farbe</span></td>
+            <td><code>ColorPickerDialog</code> in <code>EditCategoryActivity.kt</code></td>
+            <td>5×-Farbraster zum schnellen Auswählen einer Kategoriefarbe (wird im Kalender für Termin-Kacheln, Monats-Chips, Header-Punkte und Tagesvorschau verwendet).</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 9. SUCHE & IMPORT -->
+  <section class="glossary-section" data-category="search-import">
+    <div class="section-header">
+      <h2>9. Volltextsuche &amp; .vj-Direktimport</h2>
+      <span class="section-meta">SearchScreen.kt · ImportActivity.kt</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Prompt-Begriff (DE)</th>
+            <th>Sichtbares UI / Icon</th>
+            <th>Code-Symbol</th>
+            <th>Funktion &amp; Gesten</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="term-badge">Suchansicht</span></td>
+            <td>Screen <span class="ui-label">Suche</span> mit Suchfeld &amp; Lupe</td>
+            <td><code>SearchActivity</code> / <code>SearchScreen</code><span class="file-path">ui/screens/search/SearchScreen.kt</span></td>
+            <td>Durchsucht alle aktiven Einträge per Volltextabfrage und zeigt Treffer nach Tagen gruppiert in der <code>SearchResultsList</code> an. Tap/Long-Press auf einen Treffer öffnet den <strong>Eintrag-Editor</strong>; das Pfeil-Icon springt zur Position in der <strong>Hauptansicht</strong>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Import-Ansicht (.vj-Import)</span></td>
+            <td>Screen <span class="ui-label">Einträge importieren (X)</span> mit ✕ und ✓</td>
+            <td><code>ImportActivity</code> / <code>ImportScreen</code><span class="file-path">ui/screens/importexport/ImportActivity.kt</span></td>
+            <td>Öffnet sich beim Antippen oder Teilen einer <code>.vj</code>-Datei aus Dateimanagern oder Messengern (max. 10&nbsp;MB).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Ziel-Kategorie-Dropdown (Import)</span></td>
+            <td>Auswahlfeld <span class="ui-label">Ziel-Kategorie wählen...</span></td>
+            <td><code>CategorySelectionDropdown</code></td>
+            <td>Wählt die Kategorie, der die zu importierenden Einträge hinzugefügt werden (bestehende Kategorien bereits vorhandener UUIDs bleiben erhalten).</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Import-Vorschau-Karte (wegwischbar)</span></td>
+            <td>Eintrags-Vorschau in der Importliste</td>
+            <td><code>SwipeableEntryItem</code></td>
+            <td><span class="gesture-tag">Swipe links/rechts</span> Entfernt einzelne Einträge vor dem Speichern aus der Import-Auswahl.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 10. EINSTELLUNGEN -->
+  <section class="glossary-section" data-category="settings">
+    <div class="section-header">
+      <h2>10. Einstellungen</h2>
+      <span class="section-meta">SettingsActivity.kt · SettingsViewModel.kt · ui/screens/SettingsScreen.kt</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Prompt-Begriff (DE)</th>
+            <th>Sichtbares UI / Icon</th>
+            <th>Code-Symbol</th>
+            <th>Funktion &amp; Gesten</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="term-badge">Einstellungen-Ansicht</span></td>
+            <td>Screen <span class="ui-label">Einstellungen</span></td>
+            <td><code>SettingsActivity</code> / <code>SettingsScreen</code></td>
+            <td>Zentrale Konfiguration der App, gespeichert über <code>SettingsRepository</code>.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Vorschau-Textlänge</span></td>
+            <td>Zahlenfeld <span class="ui-label">Textlänge für Vorschau</span></td>
+            <td><code>truncationLength</code></td>
+            <td>Maximale Zeichenanzahl auf einer <strong>Eintrags-Karte</strong> vor dem Aufklappen.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">GPS-Tracking-Schalter &amp; Intervall-Regler</span></td>
+            <td>Switch <span class="ui-label">GPS-Tracking aktivieren</span> + Slider (15–60 Min.)</td>
+            <td><code>isGpsTrackingEnabled</code> / <code>gpsInterval</code> / <code>LocationWorker</code></td>
+            <td>Plant oder stoppt den periodischen Hintergrund-<code>WorkManager</code>-Job zur Standortaufzeichnung.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Webserver-Schalter &amp; Server-URL-Anzeige</span></td>
+            <td>Switch <span class="ui-label">Webserver aktivieren</span> + <code>http://&lt;ip&gt;:8080</code></td>
+            <td><code>isWebServerEnabled</code> / <code>WebServerService</code> / <code>WebServer</code></td>
+            <td>Startet/stoppt den eingebetteten lokalen Ktor-REST-Server im WLAN als Foreground-Service und zeigt IP- sowie Hostnamen-URL an.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Developer-Mode-Schalter</span></td>
+            <td>Switch <span class="ui-label">Developer-Mode aktivieren</span></td>
+            <td><code>isDeveloperModeEnabled</code></td>
+            <td>Schaltet die <strong>Entwickler-Menüpunkte</strong> im Navigationsmenü frei.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Spracherkennungs-Auswahl</span></td>
+            <td>RadioButtons unter <span class="ui-label">Spracherkennung Dienst</span></td>
+            <td><code>SpeechService</code> (<code>ANDROID</code>, <code>GOOGLE_CLOUD</code>)</td>
+            <td>Wechselt zwischen Androids integriertem <code>SpeechRecognizer</code> und der Google Cloud Speech-to-Text REST API.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Cloud-Sprachparameter (API-Key &amp; Stille-Slider)</span></td>
+            <td>Passwortfeld <span class="ui-label">Google Cloud API Key</span> (<span class="ui-label">Anzeigen/Verbergen</span>) + 3 Slider</td>
+            <td><code>SecureApiKeyStore</code> · <code>maxRecordingTime</code> · <code>silenceThreshold</code> · <code>silenceTimeRequired</code></td>
+            <td>Nur sichtbar bei gewählter Google-Cloud-Engine: verschlüsselter API-Key sowie Regler für maximale Aufnahmedauer (5–60&nbsp;s), Stille-Schwellenwert (100–2000) und benötigte Stille (500–5000&nbsp;ms).</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 11. DIALOGE & FACHBEGRIFFE -->
+  <section class="glossary-section" data-category="dialogs-domain">
+    <div class="section-header">
+      <h2>11. Übergreifende Dialoge &amp; Datenmodell-Fachbegriffe</h2>
+      <span class="section-meta">TimeZonePickerDialog.kt · AppDatabase.kt · JournalConstants</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Prompt-Begriff (DE)</th>
+            <th>Sichtbares UI / Konzept</th>
+            <th>Code-Symbol</th>
+            <th>Bedeutung</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="term-badge">Zeitzonen-Auswahldialog</span></td>
+            <td>Dialog <span class="ui-label">Zeitzone auswählen</span> mit Suchfeld</td>
+            <td><code>TimeZonePickerDialog</code><span class="file-path">ui/components/TimeZonePickerDialog.kt</span></td>
+            <td>Durchsuchbarer Dialog für IANA-Zeitzonen inkl. Schnelloptionen <span class="ui-label">Geräte-Zeitzone</span> (fixiert aktuelle Zone) und <span class="ui-label">Dynamischer Systemstandard</span> (<code>zoneId = null</code>). Genutzt im Eintrag-Editor und in der Mehrfachauswahl-Leiste.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Endgültig-Löschen-Dialog</span></td>
+            <td>AlertDialog <span class="ui-label">Auswahl endgültig löschen</span></td>
+            <td><code>showHardDeleteSelectionDialog</code> in <code>MainActivity</code></td>
+            <td>Sicherheitsabfrage vor dem unwiderruflichen Datenbank-Löschen (Hard-Delete) im Papierkorb.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Alle-Löschen-Dialog</span></td>
+            <td>AlertDialog <span class="ui-label">Alle Einträge löschen</span></td>
+            <td><code>showDeleteConfirmationDialog</code> in <code>MainActivity</code></td>
+            <td>Bestätigungsdialog (Developer-Mode), der alle aktiven Einträge per Soft-Delete in den Papierkorb verschiebt.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Papierkorb („Gelöscht“)</span></td>
+            <td>Virtuelle Kategorie <span class="ui-label">Gelöscht</span></td>
+            <td><code>JournalConstants</code> (ID <code>-1</code>, <code>deletedAt != null</code>)</td>
+            <td>Virtuelle Nur-Lese-Kategorie für soft-gelöschte Einträge. Wird niemals als Sprach-Triggerwort oder Import-Ziel verwendet.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">Soft-Delete vs. Hard-Delete</span></td>
+            <td>In Papierkorb verschieben vs. unwiderruflich entfernen</td>
+            <td><code>softDeleteEntries()</code> vs. <code>hardDeleteEntries()</code></td>
+            <td><strong>Soft-Delete</strong> setzt den Zeitstempel <code>deletedAt</code> (jederzeit wiederherstellbar); <strong>Hard-Delete</strong> entfernt den Datensatz endgültig aus Room.</td>
+          </tr>
+          <tr>
+            <td><span class="term-badge">.vj-Datei vs. Voll-Backup</span></td>
+            <td>Einzel-/Auswahl-Export vs. Komplettsicherung</td>
+            <td><code>ShareExportHelper</code> vs. <code>JournalBackupManager</code></td>
+            <td>Eine <strong>.vj-Datei</strong> enthält ausgewählte Einträge zum Teilen/Direktimport; ein <strong>Voll-Backup</strong> (<code>journal_*.json</code>, Schema V3) sichert das gesamte Tagebuch inklusive aller Kategorien.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="empty-state" id="emptyState">
+    Keine Einträge für diesen Suchbegriff gefunden.
+  </div>
+</main>
+
+<div id="copy-toast" role="status" aria-live="polite">Kopiert!</div>
+
+<footer>
+  Voice Journal Glossar · Stand: Room Schema v18 · <code>GLOSSARY.html</code> im Projekt-Root
+</footer>
+
+<script>
+  (function () {
+    const searchInput = document.getElementById('searchInput');
+    const filterButtons = document.querySelectorAll('.chip');
+    const sections = document.querySelectorAll('.glossary-section');
+    const wireframes = document.getElementById('wireframes');
+    const emptyState = document.getElementById('emptyState');
+    const themeToggle = document.getElementById('themeToggle');
+    const toast = document.getElementById('copy-toast');
+
+    let activeCategory = 'all';
+    let toastTimer = null;
+
+    function applyFilters() {
+      const query = searchInput.value.trim().toLowerCase();
+      let totalVisibleRows = 0;
+
+      // Hide wireframes when actively filtering/searching to jump straight to matches
+      wireframes.style.display = (activeCategory === 'all' && query === '') ? '' : 'none';
+
+      sections.forEach(section => {
+        const categoryMatch = activeCategory === 'all' || section.dataset.category === activeCategory;
+        if (!categoryMatch) {
+          section.style.display = 'none';
+          return;
+        }
+
+        const rows = section.querySelectorAll('tbody tr');
+        let sectionVisibleCount = 0;
+
+        rows.forEach(row => {
+          const text = row.textContent.toLowerCase();
+          const matchesQuery = query === '' || text.includes(query);
+          row.style.display = matchesQuery ? '' : 'none';
+          if (matchesQuery) {
+            sectionVisibleCount++;
+            totalVisibleRows++;
+          }
+        });
+
+        section.style.display = sectionVisibleCount > 0 ? '' : 'none';
+      });
+
+      emptyState.style.display = totalVisibleRows === 0 ? 'block' : 'none';
+    }
+
+    searchInput.addEventListener('input', applyFilters);
+
+    filterButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeCategory = btn.dataset.filter;
+        applyFilters();
+      });
+    });
+
+    // Click-to-copy on prompt badges and inline code
+    document.addEventListener('click', (event) => {
+      const target = event.target.closest('.term-badge, td code');
+      if (!target) return;
+      const textToCopy = target.textContent.trim();
+      if (!navigator.clipboard) return;
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        toast.textContent = 'Kopiert: „' + textToCopy + '“';
+        toast.classList.add('visible');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.remove('visible'), 1800);
+      });
+    });
+
+    // Light / Dark mode toggle
+    themeToggle.addEventListener('click', () => {
+      const root = document.documentElement;
+      const current = root.getAttribute('data-theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const isCurrentlyDark = current === 'dark' || (!current && prefersDark);
+      root.setAttribute('data-theme', isCurrentlyDark ? 'light' : 'dark');
+    });
+  })();
+</script>
+</body>
+</html>

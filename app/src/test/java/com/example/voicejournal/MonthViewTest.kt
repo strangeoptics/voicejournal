@@ -230,4 +230,13 @@ class MonthViewTest {
             com.example.voicejournal.ui.components.formatAppointmentPreviewTime(multiDayEntry),
         )
     }
+
+    @Test
+    fun dayEntriesPreviewHelpers_computeDynamicMaxLines() {
+        assertEquals(6, com.example.voicejournal.ui.components.computePreviewMaxLines(0))
+        assertEquals(6, com.example.voicejournal.ui.components.computePreviewMaxLines(1))
+        assertEquals(4, com.example.voicejournal.ui.components.computePreviewMaxLines(2))
+        assertEquals(3, com.example.voicejournal.ui.components.computePreviewMaxLines(3))
+        assertEquals(3, com.example.voicejournal.ui.components.computePreviewMaxLines(10))
+    }
 }

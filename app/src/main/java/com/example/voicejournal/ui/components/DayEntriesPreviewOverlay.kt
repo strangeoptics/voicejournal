@@ -16,7 +16,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -54,6 +53,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.voicejournal.R
@@ -97,6 +97,12 @@ fun formatAppointmentPreviewTime(appointment: Appointment): String {
     } else {
         "${appointment.startDateTime.format(DateFormatters.ENTRY_DATE_TIME)} – ${appointment.endDateTime.format(DateFormatters.ENTRY_DATE_TIME)}"
     }
+}
+
+fun computePreviewMaxLines(totalEntriesCount: Int): Int = when {
+    totalEntriesCount <= 1 -> 6
+    totalEntriesCount == 2 -> 4
+    else -> 3
 }
 
 @Composable
@@ -191,7 +197,6 @@ fun DayEntriesPreviewOverlay(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DayEntriesPreviewCard(
     date: LocalDate,
@@ -240,6 +245,8 @@ fun DayEntriesPreviewCard(
             Spacer(modifier = Modifier.height(12.dp))
             HorizontalDivider(color = colorScheme.outlineVariant)
 
+            val maxLines = remember(entries.size) { computePreviewMaxLines(entries.size) }
+
             LazyColumn(
                 modifier = Modifier
                     .weight(1f, fill = false)
@@ -255,6 +262,7 @@ fun DayEntriesPreviewCard(
                         appointment = appointment,
                         surfaceColor = colorScheme.surface,
                         outlineColor = colorScheme.outline,
+                        maxLines = maxLines,
                         onClick = { onAppointmentClick(appointment) },
                     )
                 }
@@ -285,6 +293,7 @@ private fun DayPreviewEntryItem(
     appointment: Appointment,
     surfaceColor: Color,
     outlineColor: Color,
+    maxLines: Int,
     onClick: () -> Unit,
 ) {
     val isLightSurface = surfaceColor.luminance() > 0.5f
@@ -335,6 +344,8 @@ private fun DayPreviewEntryItem(
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
             color = primaryTextColor,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -348,7 +359,7 @@ private fun SampleDayEntriesPreviewOverlayContent() {
             startDateTime = today.atTime(8, 30),
             endDateTime = today.atTime(9, 15),
             title = "Morgenreflexion",
-            fullText = "Morgenreflexion: Ruhiger Start mit Kaffee auf dem Balkon und Planung der wichtigsten Aufgaben.",
+            fullText = "Morgenreflexion: Ruhiger Start mit Kaffee auf dem Balkon und Planung der wichtigsten Aufgaben für das gesamte Quartal. Gedanken zur Strukturierung der anstehenden Releases gesammelt, Prioritäten für die Team-Absprachen notiert und den ersten Entwurf für die Roadmap fertiggestellt.",
             color = Color(0xFFE57373),
             hasExplicitEndTime = true,
         ),

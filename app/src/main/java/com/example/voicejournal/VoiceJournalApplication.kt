@@ -13,15 +13,19 @@ import java.util.concurrent.TimeUnit
 
 class VoiceJournalApplication : Application() {
 
+    override fun onCreate() {
+        super.onCreate()
+        setupLocationWorker(this, replaceExisting = false)
+    }
+
     companion object {
-        fun setupLocationWorker(context: Context) {
-            val settingsRepository = Injector.provideSettingsRepository(context)
+        fun setupLocationWorker(context: Context, replaceExisting: Boolean = true) {
+            val appContext = context.applicationContext
+            val settingsRepository = Injector.provideSettingsRepository(appContext)
             val isGpsTrackingEnabled = settingsRepository.isGpsTrackingEnabled.value
             val interval = settingsRepository.gpsIntervalMinutes.value
                 .coerceAtLeast(LocationWorker.MIN_INTERVAL_MINUTES)
                 .toLong()
-
-            val workManager = WorkManager.getInstance(context)
 
             if (isGpsTrackingEnabled) {
                 val constraints = Constraints.Builder()
@@ -32,13 +36,19 @@ class VoiceJournalApplication : Application() {
                     .setConstraints(constraints)
                     .build()
 
-                workManager.enqueueUniquePeriodicWork(
+                val policy = if (replaceExisting) {
+                    ExistingPeriodicWorkPolicy.UPDATE
+                } else {
+                    ExistingPeriodicWorkPolicy.KEEP
+                }
+
+                WorkManager.getInstance(appContext).enqueueUniquePeriodicWork(
                     LocationWorker.WORK_NAME,
-                    ExistingPeriodicWorkPolicy.UPDATE,
+                    policy,
                     periodicWorkRequest
                 )
-            } else {
-                workManager.cancelUniqueWork(LocationWorker.WORK_NAME)
+            } else if (replaceExisting) {
+                WorkManager.getInstance(appContext).cancelUniqueWork(LocationWorker.WORK_NAME)
             }
         }
     }

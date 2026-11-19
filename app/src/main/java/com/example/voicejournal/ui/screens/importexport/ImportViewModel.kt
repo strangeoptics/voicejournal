@@ -25,11 +25,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromStream
 import java.io.File
 import java.io.IOException
+import java.io.PushbackInputStream
 
 class ImportViewModel(
     private val repository: JournalRepository,
@@ -69,8 +71,7 @@ class ImportViewModel(
             _error.value = null
             try {
                 val parsedEntries = withContext(Dispatchers.IO) {
-                    val content = validateAndReadBoundedUtf8(uri)
-                    jsonFormat.decodeFromString<List<JournalEntry>>(content)
+                    validateAndDecodeStream(uri)
                 }
                 _entries.value = parsedEntries
             } catch (e: CancellationException) {
@@ -98,7 +99,8 @@ class ImportViewModel(
         }
     }
 
-    private fun validateAndReadBoundedUtf8(uri: Uri): String {
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun validateAndDecodeStream(uri: Uri): List<JournalEntry> {
         if (uri.scheme != ContentResolver.SCHEME_CONTENT) {
             throw SecurityException("Only content:// URIs are permitted for import.")
         }
@@ -122,8 +124,24 @@ class ImportViewModel(
                 )
             }
 
-            descriptor.createInputStream().use { inputStream ->
-                JournalBackupManager.readBoundedUtf8(inputStream, maxBytes = MAX_IMPORT_BYTES)
+            descriptor.createInputStream().use { rawStream ->
+                val bounded = JournalBackupManager.BoundedInputStream(rawStream, maxBytes = MAX_IMPORT_BYTES)
+                val pushback = PushbackInputStream(bounded, 3)
+                val bom = ByteArray(3)
+                var bomRead = 0
+                while (bomRead < 3) {
+                    val r = pushback.read(bom, bomRead, 3 - bomRead)
+                    if (r == -1) break
+                    bomRead += r
+                }
+                val isUtf8Bom = bomRead == 3 &&
+                    bom[0] == 0xEF.toByte() &&
+                    bom[1] == 0xBB.toByte() &&
+                    bom[2] == 0xBF.toByte()
+                if (!isUtf8Bom && bomRead > 0) {
+                    pushback.unread(bom, 0, bomRead)
+                }
+                jsonFormat.decodeFromStream<List<JournalEntry>>(pushback)
             }
         }
     }

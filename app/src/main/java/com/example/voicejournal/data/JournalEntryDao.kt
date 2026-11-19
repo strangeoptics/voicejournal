@@ -83,13 +83,30 @@ interface JournalEntryDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertOrIgnore(entry: JournalEntry): Long
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertEntriesOrIgnore(entries: List<JournalEntry>): List<Long>
+
     @Update
     suspend fun update(entry: JournalEntry)
+
+    @Update
+    suspend fun updateEntries(entries: List<JournalEntry>)
 
     @Transaction
     suspend fun insert(entry: JournalEntry) {
         if (insertOrIgnore(entry) == -1L) {
             update(entry)
+        }
+    }
+
+    @Transaction
+    suspend fun upsertEntries(entries: List<JournalEntry>) {
+        if (entries.isEmpty()) return
+        val deduplicated = entries.associateBy { it.id }.values.toList()
+        val rowIds = insertEntriesOrIgnore(deduplicated)
+        val existingToUpdate = deduplicated.filterIndexed { index, _ -> rowIds[index] == -1L }
+        if (existingToUpdate.isNotEmpty()) {
+            updateEntries(existingToUpdate)
         }
     }
 
@@ -127,24 +144,58 @@ interface JournalEntryDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertJournalEntryCategoryCrossRef(crossRef: JournalEntryCategoryCrossRef)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertJournalEntryCategoryCrossRefs(crossRefs: List<JournalEntryCategoryCrossRef>)
+
     @Query("DELETE FROM journal_entry_category_cross_ref WHERE entryId = :entryId")
     suspend fun deleteCrossRefsForEntry(entryId: UUID)
+
+    @Query("DELETE FROM journal_entry_category_cross_ref WHERE entryId IN (:entryIds)")
+    suspend fun deleteCrossRefsForEntries(entryIds: Collection<UUID>)
+
+    suspend fun resolveCategories(
+        categories: List<Category>,
+        categoryDao: CategoryDao,
+        categoryCache: MutableMap<String, Category>
+    ): List<Category> {
+        if (categories.isEmpty()) return emptyList()
+        val resolvedList = ArrayList<Category>(categories.size)
+        for (category in categories) {
+            if (JournalConstants.isVirtualDeletedCategory(category) || category.category.isBlank()) {
+                continue
+            }
+            val existing = categoryCache[category.category]
+            if (existing != null) {
+                resolvedList.add(existing)
+            } else {
+                val safeOrderIndex = category.orderIndex.coerceIn(0, Int.MAX_VALUE - 2)
+                val newId = categoryDao.insertCategory(category.copy(id = 0, orderIndex = safeOrderIndex))
+                val resolved = if (newId != -1L) {
+                    category.copy(id = newId.toInt(), orderIndex = safeOrderIndex)
+                } else {
+                    categoryDao.getCategoryByName(category.category)
+                        ?: category.copy(id = newId.toInt(), orderIndex = safeOrderIndex)
+                }
+                categoryCache[resolved.category] = resolved
+                resolvedList.add(resolved)
+            }
+        }
+        return resolvedList.distinctBy { it.id }
+    }
 
     @Transaction
     suspend fun insertWithCategories(entry: JournalEntry, categories: List<Category>, categoryDao: CategoryDao) {
         insert(entry)
-        categories.forEach { category ->
-            if (category.id == JournalConstants.CATEGORY_DELETED_ID || category.category == "Gelöscht") {
-                return@forEach
-            }
-            var cat = categoryDao.getCategoryByName(category.category)
-            if (cat == null) {
-                val newId = categoryDao.insertCategory(category.copy(id = 0))
-                cat = categoryDao.getCategoryByName(category.category)
-                    ?: category.copy(id = newId.toInt())
-            }
-            insertJournalEntryCategoryCrossRef(
-                JournalEntryCategoryCrossRef(entry.id, cat.id)
+        val filtered = categories.filterNot {
+            JournalConstants.isVirtualDeletedCategory(it) || it.category.isBlank()
+        }
+        if (filtered.isEmpty()) return
+        val categoryCache = categoryDao.getAllCategoriesList()
+            .associateByTo(LinkedHashMap()) { it.category }
+        val resolved = resolveCategories(filtered, categoryDao, categoryCache)
+        if (resolved.isNotEmpty()) {
+            insertJournalEntryCategoryCrossRefs(
+                resolved.map { cat -> JournalEntryCategoryCrossRef(entry.id, cat.id) }
             )
         }
     }
@@ -153,18 +204,16 @@ interface JournalEntryDao {
     suspend fun updateWithCategories(entry: JournalEntry, categories: List<Category>, categoryDao: CategoryDao) {
         update(entry)
         deleteCrossRefsForEntry(entry.id)
-        categories.forEach { category ->
-            if (category.id == JournalConstants.CATEGORY_DELETED_ID || category.category == "Gelöscht") {
-                return@forEach
-            }
-            var cat = categoryDao.getCategoryByName(category.category)
-            if (cat == null) {
-                val newId = categoryDao.insertCategory(category.copy(id = 0))
-                cat = categoryDao.getCategoryByName(category.category)
-                    ?: category.copy(id = newId.toInt())
-            }
-            insertJournalEntryCategoryCrossRef(
-                JournalEntryCategoryCrossRef(entry.id, cat.id)
+        val filtered = categories.filterNot {
+            JournalConstants.isVirtualDeletedCategory(it) || it.category.isBlank()
+        }
+        if (filtered.isEmpty()) return
+        val categoryCache = categoryDao.getAllCategoriesList()
+            .associateByTo(LinkedHashMap()) { it.category }
+        val resolved = resolveCategories(filtered, categoryDao, categoryCache)
+        if (resolved.isNotEmpty()) {
+            insertJournalEntryCategoryCrossRefs(
+                resolved.map { cat -> JournalEntryCategoryCrossRef(entry.id, cat.id) }
             )
         }
     }

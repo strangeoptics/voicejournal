@@ -115,4 +115,73 @@ class MonthViewTest {
         assertEquals("März 2026", DateFormatters.formatCalendarMonthTitle(mar2026, Locale.GERMANY))
         assertEquals("March 2026", DateFormatters.formatCalendarMonthTitle(mar2026, Locale.US))
     }
+
+    @Test
+    fun computeDayOpenScrollTargetPx_centersNoonWhenEmptyAndScrollsToEntriesWhenPresent() {
+        val date = LocalDate.of(2026, 11, 19)
+        val hourSlotPx = 120
+        val viewportHeightPx = hourSlotPx * 10 // 10 hours visible
+        val maxScrollPx = (hourSlotPx * 24) - viewportHeightPx // 14 * 120 = 1680
+
+        // Empty day -> centers 12:00 in viewport (12 * 120 - 5 * 120 = 7 * 120 = 840 = maxScrollPx / 2)
+        assertEquals(
+            hourSlotPx * 7,
+            com.example.voicejournal.ui.components.computeDayOpenScrollTargetPx(
+                placements = emptyList(),
+                viewportHeightPx = viewportHeightPx,
+                hourSlotPx = hourSlotPx,
+                maxScrollPx = maxScrollPx,
+            ),
+        )
+
+        // Day with entry at 15:30 -> scrolls to 15:00 (15 * 120 = 1800 -> clamped to maxScrollPx = 1680)
+        val afternoonPlacements = com.example.voicejournal.ui.components.calculateAppointmentColumns(
+            listOf(
+                com.example.voicejournal.ui.components.Appointment(
+                    id = "1",
+                    startDateTime = date.atTime(15, 30),
+                    endDateTime = date.atTime(16, 30),
+                    title = "Nachmittag",
+                ),
+            ),
+            date,
+        )
+        assertEquals(
+            maxScrollPx,
+            com.example.voicejournal.ui.components.computeDayOpenScrollTargetPx(
+                placements = afternoonPlacements,
+                viewportHeightPx = viewportHeightPx,
+                hourSlotPx = hourSlotPx,
+                maxScrollPx = maxScrollPx,
+            ),
+        )
+
+        // Day with entry at 09:00 and 18:00 -> scrolls to earliest entry with 30 min context (08:30 = 1020px)
+        val multiEntryPlacements = com.example.voicejournal.ui.components.calculateAppointmentColumns(
+            listOf(
+                com.example.voicejournal.ui.components.Appointment(
+                    id = "1",
+                    startDateTime = date.atTime(9, 0),
+                    endDateTime = date.atTime(10, 0),
+                    title = "Morgens",
+                ),
+                com.example.voicejournal.ui.components.Appointment(
+                    id = "2",
+                    startDateTime = date.atTime(18, 0),
+                    endDateTime = date.atTime(19, 0),
+                    title = "Abends",
+                ),
+            ),
+            date,
+        )
+        assertEquals(
+            (8.5 * hourSlotPx).toInt(),
+            com.example.voicejournal.ui.components.computeDayOpenScrollTargetPx(
+                placements = multiEntryPlacements,
+                viewportHeightPx = viewportHeightPx,
+                hourSlotPx = hourSlotPx,
+                maxScrollPx = maxScrollPx,
+            ),
+        )
+    }
 }

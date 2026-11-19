@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -64,6 +65,7 @@ import com.example.voicejournal.ui.theme.VoicejournalTheme
 import com.example.voicejournal.util.DateFormatters
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -148,6 +150,28 @@ fun computeAutoScrollTargetPx(
     }
     if (anyEntryVisible) return null
 
+    val earliestStartMinutes = placements.minOf { it.startMinutes }
+    val earliestTopPx = ((earliestStartMinutes / 60.0) * hourSlotPx).roundToInt()
+    val topContextPaddingPx = hourSlotPx / 2
+    return (earliestTopPx - topContextPaddingPx).coerceIn(0, maxScrollPx)
+}
+
+/**
+ * Computes the vertical scroll target (in pixels) when opening a day directly (e.g. from MonthView):
+ * scrolls to the earliest entry on that day if entries exist, or centers 12:00 (middle of the day)
+ * in the viewport when no entries exist.
+ */
+fun computeDayOpenScrollTargetPx(
+    placements: List<AppointmentColumnPlacement>,
+    viewportHeightPx: Int,
+    hourSlotPx: Int,
+    maxScrollPx: Int,
+): Int? {
+    if (viewportHeightPx <= 0 || maxScrollPx <= 0) return null
+    if (placements.isEmpty()) {
+        val noonPx = 12 * hourSlotPx
+        return (noonPx - (viewportHeightPx / 2)).coerceIn(0, maxScrollPx)
+    }
     val earliestStartMinutes = placements.minOf { it.startMinutes }
     val earliestTopPx = ((earliestStartMinutes / 60.0) * hourSlotPx).roundToInt()
     val topContextPaddingPx = hourSlotPx / 2
@@ -367,6 +391,7 @@ fun WeekView(
     modifier: Modifier = Modifier,
     appointments: List<Appointment> = emptyList(),
     selectedDate: LocalDate? = null,
+    initialFocusDate: LocalDate? = null,
     today: LocalDate = LocalDate.now(),
     currentTime: LocalTime? = null,
     hourHeight: Dp = 60.dp,
@@ -380,10 +405,10 @@ fun WeekView(
     if (visibleDates.isEmpty()) return
 
     val density = LocalDensity.current
+    val windowContainerHeightPx = LocalWindowInfo.current.containerSize.height
     val coroutineScope = rememberCoroutineScope()
 
     val hourSlotPx = with(density) { hourHeight.roundToPx().coerceAtLeast(1) }
-    val scrollState = rememberScrollState(initial = hourSlotPx * 8)
     val exactHourHeight = with(density) { hourSlotPx.toDp() }
     val totalDayHeightPx = hourSlotPx * HOURS_OF_DAY.size
     val totalDayHeight = with(density) { totalDayHeightPx.toDp() }
@@ -391,6 +416,62 @@ fun WeekView(
     val horizontalTileGapPx = with(density) { 1.dp.roundToPx() }
     val verticalTileGapPx = with(density) { 1.dp.roundToPx() }
     val headerHeight = with(density) { (22.sp.toDp() + 38.dp).coerceAtLeast(60.dp) }
+
+    val focusDateOnMount = remember { initialFocusDate }
+    val initialScrollPx = remember(hourSlotPx) {
+        if (focusDateOnMount == null) {
+            hourSlotPx * 8
+        } else {
+            val daily = appointments.filter {
+                !it.startDate.isAfter(focusDateOnMount) && !it.endDate.isBefore(focusDateOnMount)
+            }
+            val placements = calculateAppointmentColumns(daily, focusDateOnMount)
+            if (placements.isNotEmpty()) {
+                val earliestStartMinutes = placements.minOf { it.startMinutes }
+                val earliestTopPx = ((earliestStartMinutes / 60.0) * hourSlotPx).roundToInt()
+                (earliestTopPx - (hourSlotPx / 2)).coerceAtLeast(0)
+            } else {
+                val chromeHeightPx = with(density) { (headerHeight + 64.dp).roundToPx() }
+                val estimatedViewportPx = (windowContainerHeightPx - chromeHeightPx).coerceAtLeast(1)
+                (12 * hourSlotPx - (estimatedViewportPx / 2)).coerceAtLeast(0)
+            }
+        }
+    }
+    val scrollState = rememberScrollState(initial = initialScrollPx)
+    val currentAppointments by rememberUpdatedState(appointments)
+
+    LaunchedEffect(focusDateOnMount, hourSlotPx) {
+        val focusDate = focusDateOnMount ?: return@LaunchedEffect
+        val (viewportPx, maxScrollPx) = snapshotFlow { scrollState.viewportSize to scrollState.maxValue }
+            .first { (vp, max) -> vp > 0 && max < Int.MAX_VALUE }
+
+        var didFocusEntries = false
+        var lastAppliedScrollPx = -1
+
+        snapshotFlow { currentAppointments }
+            .collect { latestAppointments ->
+                if (didFocusEntries || scrollState.isScrollInProgress) return@collect
+                if (lastAppliedScrollPx != -1 && scrollState.value != lastAppliedScrollPx) {
+                    didFocusEntries = true
+                    return@collect
+                }
+                val daily = latestAppointments.filter {
+                    !it.startDate.isAfter(focusDate) && !it.endDate.isBefore(focusDate)
+                }
+                val placements = calculateAppointmentColumns(daily, focusDate)
+                val targetPx = computeDayOpenScrollTargetPx(
+                    placements = placements,
+                    viewportHeightPx = viewportPx,
+                    hourSlotPx = hourSlotPx,
+                    maxScrollPx = maxScrollPx,
+                ) ?: return@collect
+                scrollState.scrollTo(targetPx)
+                lastAppliedScrollPx = targetPx
+                if (placements.isNotEmpty()) {
+                    didFocusEntries = true
+                }
+            }
+    }
 
     val requestedStartDate = visibleDates.first()
     val stepDays = visibleDates.size

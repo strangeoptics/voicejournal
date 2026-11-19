@@ -217,6 +217,7 @@ fun CalendarScreenContent(
                 modifier = Modifier.padding(innerPadding),
                 appointments = appointments,
                 selectedDate = selectedDate,
+                initialFocusDate = if (viewMode == CalendarViewMode.MONTH) selectedDate else null,
                 today = today,
                 onDayClick = onDayClick,
                 onAppointmentClick = onAppointmentClick,

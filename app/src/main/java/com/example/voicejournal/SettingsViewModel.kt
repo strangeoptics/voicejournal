@@ -26,7 +26,11 @@ class SettingsViewModel(
 
     fun saveGpsTrackingEnabled(isEnabled: Boolean) {
         settingsRepository.setGpsTrackingEnabled(isEnabled)
-        VoiceJournalApplication.setupLocationWorker(applicationContext)
+        VoiceJournalApplication.setupLocationWorker(
+            context = applicationContext,
+            replaceExisting = true,
+            isAppInForeground = true
+        )
     }
 
     fun saveWebServerEnabled(isEnabled: Boolean) {
@@ -40,7 +44,11 @@ class SettingsViewModel(
 
     fun saveGpsInterval(interval: Int) {
         settingsRepository.setGpsIntervalMinutes(interval)
-        VoiceJournalApplication.setupLocationWorker(applicationContext)
+        VoiceJournalApplication.setupLocationWorker(
+            context = applicationContext,
+            replaceExisting = true,
+            isAppInForeground = true
+        )
     }
 
     fun saveSpeechService(service: SpeechService) {

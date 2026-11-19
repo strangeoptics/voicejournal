@@ -61,4 +61,12 @@
     <string name="category_delete_line_on_double_tap">Zeile bei Doppeltipp löschen (Einkaufslisten-Modus, ungekürzt)</string>
     <string name="snackbar_line_deleted">Zeile gelöscht</string>
     <string name="snackbar_entry_deleted">Eintrag gelöscht</string>
+
+    <!-- Settings: Hybrid GPS Tracking -->
+    <string name="gps_interval_label">GPS Abrufintervall: %1$d Minuten</string>
+    <string name="gps_mode_badge_intensive">Akku-intensiv (&lt; 15 Min.)</string>
+    <string name="gps_mode_badge_eco">Akkuschonend</string>
+    <string name="gps_battery_warning_title">Erhöhter Akkuverbrauch</string>
+    <string name="gps_battery_warning_body">Unter 15 Minuten (5–14 Min.) läuft ein dauerhafter Standort-Dienst mit leiser Status-Benachrichtigung. Ab 15 Minuten wechselt die App automatisch in den akkuschonenden Modus.</string>
+    <string name="gps_eco_mode_hint">15–60 Min.: Akkuschonender Modus ohne dauerhaften Hintergrunddienst.</string>
 </resources>

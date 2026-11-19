@@ -66,6 +66,11 @@ class MainActivity : ComponentActivity() {
         if (viewModel.isWebServerEnabled.value) {
             WebServerService.start(this)
         }
+        VoiceJournalApplication.setupLocationWorker(
+            context = this,
+            replaceExisting = false,
+            isAppInForeground = true
+        )
         speechRecognitionManager = SpeechRecognitionManager(
             context = applicationContext,
             onTextRecognized = viewModel::processRecognizedText,

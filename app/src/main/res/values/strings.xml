@@ -61,4 +61,12 @@
     <string name="category_delete_line_on_double_tap">Delete line on double-tap (Shopping list mode, untruncated)</string>
     <string name="snackbar_line_deleted">Line deleted</string>
     <string name="snackbar_entry_deleted">Entry deleted</string>
+
+    <!-- Settings: Hybrid GPS Tracking -->
+    <string name="gps_interval_label">GPS interval: %1$d min</string>
+    <string name="gps_mode_badge_intensive">Intensive (&lt; 15 min)</string>
+    <string name="gps_mode_badge_eco">Battery-saving</string>
+    <string name="gps_battery_warning_title">Increased battery usage</string>
+    <string name="gps_battery_warning_body">Below 15 minutes (5–14 min), a persistent location foreground service runs with a status notification. From 15 minutes upwards, the app automatically switches to the battery-saving mode.</string>
+    <string name="gps_eco_mode_hint">15–60 min: Battery-saving background mode without persistent service.</string>
 </resources>

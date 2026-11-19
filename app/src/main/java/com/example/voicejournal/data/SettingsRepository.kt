@@ -3,6 +3,7 @@ package com.example.voicejournal.data
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import com.example.voicejournal.LocationTrackingService
 import com.example.voicejournal.util.SecureApiKeyStore
 import com.example.voicejournal.worker.LocationWorker
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,9 @@ class SettingsRepository(
         const val KEY_DEVELOPER_MODE_ENABLED = "developer_mode_enabled"
         const val KEY_SHOW_CATEGORY_TAGS = "show_category_tags"
 
+        const val DEFAULT_GPS_INTERVAL_MINUTES = LocationWorker.MIN_INTERVAL_MINUTES
+        const val MIN_GPS_INTERVAL_MINUTES = LocationTrackingService.MIN_SERVICE_INTERVAL_MINUTES
+        const val MAX_GPS_INTERVAL_MINUTES = 60
         const val DEFAULT_MAX_RECORDING_TIME_SECONDS = 15
         const val DEFAULT_SILENCE_THRESHOLD = 500
         const val DEFAULT_SILENCE_TIME_REQUIRED_MS = 2000
@@ -48,8 +52,8 @@ class SettingsRepository(
     val isWebServerEnabled: StateFlow<Boolean> = _isWebServerEnabled.asStateFlow()
 
     private val _gpsIntervalMinutes = MutableStateFlow(
-        sharedPreferences.getInt(KEY_GPS_INTERVAL_MINUTES, LocationWorker.MIN_INTERVAL_MINUTES)
-            .coerceAtLeast(LocationWorker.MIN_INTERVAL_MINUTES)
+        sharedPreferences.getInt(KEY_GPS_INTERVAL_MINUTES, DEFAULT_GPS_INTERVAL_MINUTES)
+            .coerceIn(MIN_GPS_INTERVAL_MINUTES, MAX_GPS_INTERVAL_MINUTES)
     )
     val gpsIntervalMinutes: StateFlow<Int> = _gpsIntervalMinutes.asStateFlow()
 
@@ -96,8 +100,8 @@ class SettingsRepository(
             KEY_GPS_TRACKING_ENABLED -> _isGpsTrackingEnabled.value = prefs.getBoolean(key, false)
             KEY_WEBSERVER_ENABLED -> _isWebServerEnabled.value = prefs.getBoolean(key, false)
             KEY_GPS_INTERVAL_MINUTES -> {
-                _gpsIntervalMinutes.value = prefs.getInt(key, LocationWorker.MIN_INTERVAL_MINUTES)
-                    .coerceAtLeast(LocationWorker.MIN_INTERVAL_MINUTES)
+                _gpsIntervalMinutes.value = prefs.getInt(key, DEFAULT_GPS_INTERVAL_MINUTES)
+                    .coerceIn(MIN_GPS_INTERVAL_MINUTES, MAX_GPS_INTERVAL_MINUTES)
             }
             KEY_SPEECH_SERVICE -> {
                 _speechService.value = SpeechService.fromPrefValue(
@@ -149,7 +153,7 @@ class SettingsRepository(
     }
 
     fun setGpsIntervalMinutes(minutes: Int): Int {
-        val clamped = minutes.coerceAtLeast(LocationWorker.MIN_INTERVAL_MINUTES)
+        val clamped = minutes.coerceIn(MIN_GPS_INTERVAL_MINUTES, MAX_GPS_INTERVAL_MINUTES)
         _gpsIntervalMinutes.value = clamped
         sharedPreferences.edit { putInt(KEY_GPS_INTERVAL_MINUTES, clamped) }
         return clamped

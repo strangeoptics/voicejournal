@@ -36,7 +36,9 @@ A persistent notification (`NotificationHelper`) provides a quick shortcut to tr
 User preferences, GPS worker scheduling, and encrypted Google Cloud API key access are centralized in `SettingsRepository` (`app/src/main/java/com/example/voicejournal/data/SettingsRepository.kt`).
 
 ### Background GPS Track Logging
-Optional periodic GPS track logging via `WorkManager` (`LocationWorker`, minimum 15-minute `PeriodicWorkRequest` interval, restored after reboot by `BootReceiver`) using `FusedLocationProviderClient` and Google Maps route preview (with automatic waypoint downsampling to respect Google Maps URL limits).
+Optional hybrid periodic GPS track logging (5–60 minute interval, restored after reboot by `BootReceiver`) using `FusedLocationProviderClient` and Google Maps route preview (with automatic waypoint downsampling to respect Google Maps URL limits):
+- **15–60 minutes (Battery-Saving Mode):** Scheduled via `WorkManager` (`LocationWorker` `PeriodicWorkRequest`) without a persistent service.
+- **5–14 minutes (High-Frequency Mode):** Runs `LocationTrackingService` (`foregroundServiceType="location"`, `PRIORITY_BALANCED_POWER_ACCURACY`, silent `IMPORTANCE_LOW` status notification, and automatic `WorkManager` fallback if started from background without `ACCESS_BACKGROUND_LOCATION`).
 
 ## Project Context: Frameworks and Libraries
 

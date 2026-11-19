@@ -91,7 +91,12 @@ private val DARK_TEXT_ON_LIGHT_TILE = Color(0xFF1C1B1F)
 val MIN_APPOINTMENT_HEIGHT: Dp = 20.dp
 
 fun startOfWeek(date: LocalDate, locale: Locale = Locale.getDefault()): LocalDate {
-    val firstDayOfWeek = WeekFields.of(locale).firstDayOfWeek
+    val effectiveLocale = if (locale.country.isEmpty() && locale.language.equals("de", ignoreCase = true)) {
+        Locale.GERMANY
+    } else {
+        locale
+    }
+    val firstDayOfWeek = WeekFields.of(effectiveLocale).firstDayOfWeek
     return date.with(TemporalAdjusters.previousOrSame(firstDayOfWeek))
 }
 

@@ -1,6 +1,7 @@
 package com.example.voicejournal.util
 
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
@@ -28,6 +29,11 @@ object DateFormatters {
 
     fun calendarMonthYear(locale: Locale = Locale.getDefault()): DateTimeFormatter =
         DateTimeFormatter.ofPattern("LLLL yyyy", locale)
+
+    fun formatCalendarMonthTitle(
+        month: YearMonth,
+        locale: Locale = Locale.getDefault(),
+    ): String = month.atDay(1).format(calendarMonthYear(locale))
 
     fun formatCalendarPeriodTitle(
         visibleDates: List<LocalDate>,

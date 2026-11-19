@@ -25,17 +25,35 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.temporal.ChronoUnit
 
 private const val MAX_CALENDAR_TITLE_LENGTH = 120
 private val DEFAULT_APPOINTMENT_COLOR = Color(0xFF1976D2)
 
-class CalendarViewModel(private val repository: JournalRepository) : ViewModel() {
+enum class CalendarViewMode {
+    DAY,
+    THREE_DAY,
+    WEEK,
+    MONTH,
+}
 
-    private val initialStartDate: LocalDate = startOfWeek(LocalDate.now())
+private data class CalendarQueryWindow(
+    val visibleStart: LocalDate,
+    val visibleEnd: LocalDate,
+    val preloadStart: LocalDate,
+    val preloadEnd: LocalDate,
+)
 
-    private val _numberOfDays = MutableStateFlow(7)
-    val numberOfDays: StateFlow<Int> = _numberOfDays.asStateFlow()
+class CalendarViewModel(
+    private val repository: JournalRepository,
+    private val todayProvider: () -> LocalDate = { LocalDate.now() },
+) : ViewModel() {
+
+    private val initialStartDate: LocalDate = startOfWeek(todayProvider())
+
+    private val _viewMode = MutableStateFlow(CalendarViewMode.WEEK)
+    val viewMode: StateFlow<CalendarViewMode> = _viewMode.asStateFlow()
 
     private val _currentDate = MutableStateFlow(initialStartDate)
     val currentDate: StateFlow<LocalDate> = _currentDate.asStateFlow()
@@ -43,24 +61,60 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
     private val _selectedDate = MutableStateFlow<LocalDate?>(null)
     val selectedDate: StateFlow<LocalDate?> = _selectedDate.asStateFlow()
 
-    private val dateRange: Flow<Pair<LocalDate, LocalDate>> = combine(
+    val currentMonth: StateFlow<YearMonth> = _currentDate
+        .map { date -> YearMonth.from(date) }
+        .distinctUntilChanged()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = YearMonth.from(initialStartDate),
+        )
+
+    private val queryWindow: Flow<CalendarQueryWindow> = combine(
         _currentDate,
-        _numberOfDays,
+        _viewMode,
         _selectedDate,
-    ) { date, days, selected ->
-        if (selected != null) {
-            selected to selected
-        } else {
-            val startDate = if (days == 7) startOfWeek(date) else date
-            val endDate = startDate.plusDays(days.toLong() - 1)
-            startDate to endDate
+    ) { date, mode, selected ->
+        when {
+            selected != null -> CalendarQueryWindow(
+                visibleStart = selected,
+                visibleEnd = selected,
+                preloadStart = selected.minusDays(1),
+                preloadEnd = selected.plusDays(1),
+            )
+            mode == CalendarViewMode.MONTH -> {
+                val month = YearMonth.from(date)
+                val visibleStart = month.atDay(1)
+                val visibleEnd = month.atEndOfMonth()
+                CalendarQueryWindow(
+                    visibleStart = visibleStart,
+                    visibleEnd = visibleEnd,
+                    preloadStart = month.minusMonths(1).atDay(1).minusDays(6),
+                    preloadEnd = month.plusMonths(1).atEndOfMonth().plusDays(13),
+                )
+            }
+            else -> {
+                val days = when (mode) {
+                    CalendarViewMode.DAY -> 1L
+                    CalendarViewMode.THREE_DAY -> 3L
+                    else -> 7L
+                }
+                val startDate = if (mode == CalendarViewMode.WEEK) startOfWeek(date) else date
+                val endDate = startDate.plusDays(days - 1L)
+                CalendarQueryWindow(
+                    visibleStart = startDate,
+                    visibleEnd = endDate,
+                    preloadStart = startDate.minusDays(days),
+                    preloadEnd = endDate.plusDays(days),
+                )
+            }
         }
     }.distinctUntilChanged()
 
-    val visibleDates: StateFlow<List<LocalDate>> = dateRange
-        .map { (startDate, endDate) ->
-            val count = ChronoUnit.DAYS.between(startDate, endDate).toInt() + 1
-            (0 until count).map { offset -> startDate.plusDays(offset.toLong()) }
+    val visibleDates: StateFlow<List<LocalDate>> = queryWindow
+        .map { window ->
+            val count = ChronoUnit.DAYS.between(window.visibleStart, window.visibleEnd).toInt() + 1
+            (0 until count).map { offset -> window.visibleStart.plusDays(offset.toLong()) }
         }
         .stateIn(
             scope = viewModelScope,
@@ -70,14 +124,14 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
 
     /**
      * Preloads a 3-period window (previous + current + next page) so adjacent
-     * [com.example.voicejournal.ui.components.WeekView] pager pages already render
-     * appointments and header dots seamlessly during a swipe.
+     * [com.example.voicejournal.ui.components.WeekView] and
+     * [com.example.voicejournal.ui.components.MonthView] pager pages already render
+     * appointments seamlessly during a swipe.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val appointments: StateFlow<List<Appointment>> = dateRange.flatMapLatest { (startDate, endDate) ->
-        val spanDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1L).coerceAtLeast(1L)
-        val preloadStart = startDate.minusDays(spanDays)
-        val preloadEnd = endDate.plusDays(spanDays)
+    val appointments: StateFlow<List<Appointment>> = queryWindow.flatMapLatest { window ->
+        val preloadStart = window.preloadStart
+        val preloadEnd = window.preloadEnd
         val (queryStartMillis, queryEndMillis) = TimeZoneUtils.utcQueryBoundsForLocalDates(preloadStart, preloadEnd)
 
         repository.getEntriesForCalendar(queryStartMillis, queryEndMillis).map { entriesWithCategories ->
@@ -119,12 +173,26 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun setNumberOfDays(days: Int) {
-        _numberOfDays.value = days
+    fun setViewMode(mode: CalendarViewMode) {
+        val referenceDate = _selectedDate.value ?: _currentDate.value
+        _viewMode.value = mode
         _selectedDate.value = null
-        if (days == 7) {
-            _currentDate.value = startOfWeek(_currentDate.value)
+        _currentDate.value = when (mode) {
+            CalendarViewMode.WEEK -> startOfWeek(referenceDate)
+            CalendarViewMode.DAY,
+            CalendarViewMode.THREE_DAY,
+            CalendarViewMode.MONTH,
+            -> referenceDate
         }
+    }
+
+    fun setNumberOfDays(days: Int) {
+        val mode = when (days) {
+            1 -> CalendarViewMode.DAY
+            3 -> CalendarViewMode.THREE_DAY
+            else -> CalendarViewMode.WEEK
+        }
+        setViewMode(mode)
     }
 
     fun selectDate(date: LocalDate?) {
@@ -132,17 +200,22 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
     }
 
     fun jumpToToday() {
-        val today = LocalDate.now()
+        val today = todayProvider()
         _selectedDate.value = null
-        _currentDate.value = if (_numberOfDays.value == 7) startOfWeek(today) else today
+        _currentDate.value = if (_viewMode.value == CalendarViewMode.WEEK) startOfWeek(today) else today
+    }
+
+    fun navigateToMonth(month: YearMonth) {
+        val today = todayProvider()
+        _currentDate.value = if (YearMonth.from(today) == month) today else month.atDay(1)
     }
 
     fun navigateToPeriodStart(periodStart: LocalDate) {
         if (_selectedDate.value != null) {
             _selectedDate.value = periodStart
-            _currentDate.value = if (_numberOfDays.value == 7) startOfWeek(periodStart) else periodStart
+            _currentDate.value = if (_viewMode.value == CalendarViewMode.WEEK) startOfWeek(periodStart) else periodStart
         } else {
-            _currentDate.value = if (_numberOfDays.value == 7) startOfWeek(periodStart) else periodStart
+            _currentDate.value = if (_viewMode.value == CalendarViewMode.WEEK) startOfWeek(periodStart) else periodStart
         }
     }
 
@@ -150,8 +223,17 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
         val selected = _selectedDate.value
         if (selected != null) {
             navigateToPeriodStart(selected.plusDays(1))
-        } else {
-            _currentDate.value = _currentDate.value.plusDays(_numberOfDays.value.toLong())
+            return
+        }
+        _currentDate.value = when (_viewMode.value) {
+            CalendarViewMode.DAY -> _currentDate.value.plusDays(1)
+            CalendarViewMode.THREE_DAY -> _currentDate.value.plusDays(3)
+            CalendarViewMode.WEEK -> _currentDate.value.plusDays(7)
+            CalendarViewMode.MONTH -> {
+                val nextMonth = YearMonth.from(_currentDate.value).plusMonths(1)
+                val today = todayProvider()
+                if (YearMonth.from(today) == nextMonth) today else nextMonth.atDay(1)
+            }
         }
     }
 
@@ -159,8 +241,17 @@ class CalendarViewModel(private val repository: JournalRepository) : ViewModel()
         val selected = _selectedDate.value
         if (selected != null) {
             navigateToPeriodStart(selected.minusDays(1))
-        } else {
-            _currentDate.value = _currentDate.value.minusDays(_numberOfDays.value.toLong())
+            return
+        }
+        _currentDate.value = when (_viewMode.value) {
+            CalendarViewMode.DAY -> _currentDate.value.minusDays(1)
+            CalendarViewMode.THREE_DAY -> _currentDate.value.minusDays(3)
+            CalendarViewMode.WEEK -> _currentDate.value.minusDays(7)
+            CalendarViewMode.MONTH -> {
+                val prevMonth = YearMonth.from(_currentDate.value).minusMonths(1)
+                val today = todayProvider()
+                if (YearMonth.from(today) == prevMonth) today else prevMonth.atDay(1)
+            }
         }
     }
 }

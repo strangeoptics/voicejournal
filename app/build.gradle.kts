@@ -84,6 +84,7 @@ dependencies {
     implementation(libs.androidx.paging.compose)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
+    testImplementation(libs.ktor.server.test.host.jvm)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

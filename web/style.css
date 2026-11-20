@@ -1,0 +1,128 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: #f4f4f9;
+    background-image: url('voicejounalbackground.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    color: #4a4a4a;
+}
+
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    border-radius: 8px;
+    padding: 20px;
+    position: relative;
+    
+    border: 2px solid transparent;
+    background: linear-gradient(#fff, #fff) padding-box,
+                conic-gradient(from var(--angle), #e0e0e0, #808080, #e0e0e0, #808080, #e0e0e0) border-box;
+    
+    animation: rotate 12s linear infinite;
+}
+
+.container::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    z-index: -1;
+    background: conic-gradient(from var(--angle), #e0e0e0, #808080, #e0e0e0, #808080, #e0e0e0);
+    filter: blur(15px);
+    border-radius: inherit;
+    animation: rotate 12s linear infinite;
+    opacity: 0.5;
+}
+
+@keyframes rotate {
+    to {
+        --angle: 360deg;
+    }
+}
+
+.controls {
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+#category-select {
+    padding: 10px;
+    font-size: 16px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    min-width: 300px;
+}
+
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 10px;
+    border-top: 1px solid #eee;
+}
+
+.journal-entry {
+    background-color: #f0f0f0; /* Leichtes Grau */
+    border-radius: 8px; /* Abgerundete Ecken */
+    padding: 15px;
+    width: 100%; /* Volle Breite */
+    box-sizing: border-box; /* Stellt sicher, dass Padding die Breite nicht beeinflusst */
+    margin-bottom: 0; /* Abstand zwischen den Einträgen */
+}
+
+.journal-entry .timestamp {
+    font-size: 0.8em;
+    color: #666;
+    white-space: nowrap;
+}
+
+.date-header {
+    text-align: center;
+    margin: 20px 0 10px;
+    color: #888;
+    font-size: 0.9em;
+    font-weight: bold;
+    position: relative;
+    clear: both;
+}
+
+.entry-content {
+    white-space: pre-wrap;
+}
+
+.entry-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    gap: 10px;
+}
+
+.entry-categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.entry-category-tag {
+    background-color: #dcdcdc;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 0.75em;
+    color: #555;
+}

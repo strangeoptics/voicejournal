@@ -1,0 +1,19 @@
+.categories-container {
+    max-height: 150px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    background-color: #fff;
+}
+
+.category-checkbox {
+    display: block;
+    margin-bottom: 5px;
+    cursor: pointer;
+}
+
+.category-checkbox input {
+    margin-right: 8px;
+}

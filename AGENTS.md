@@ -59,11 +59,20 @@ Optional hybrid periodic GPS track logging (5–60 minute interval, restored aft
 - **Credential Storage:** `SecureApiKeyStore` encrypts the Google Cloud Speech API key using Android Keystore `AES/GCM/NoPadding` (256-bit) inside excluded `SharedPreferences` (`voice_journal_secure_prefs`), excluded from cloud backup and device transfer in `backup_rules.xml` and `data_extraction_rules.xml`.
 
 ### Networking & Local REST API Server
-- **Embedded REST API Server:** **Ktor Server (`Netty`, port `8080`)** in `WebServer` (`app/src/main/java/com/example/voicejournal/WebServer.kt`), hosted by `WebServerService` (`specialUse` Foreground Service), exposing a CORS-enabled JSON REST API (`/categories`, `/journalentries`, `/journalentries/category/{id}`, `/journalentries/{id}`) with soft-delete and live timeline scroll notification support.
+- **Embedded REST API Server:** **Ktor Server (`Netty`, port `8080`)** in `WebServer` (`app/src/main/java/com/example/voicejournal/WebServer.kt`), hosted by `WebServerService` (`specialUse` Foreground Service), exposing a CORS-enabled JSON REST API (`/categories`, `/journalentries`, `/journalentries/category/{id}`, `/journalentries/{id}`) backed by dedicated DTOs (`CategoryDto`, `JournalEntryDto`, `CreateJournalEntryDto` in `app/src/main/java/com/example/voicejournal/data/JournalEntryDto.kt`), with `pageSize` clamped to `1..500`, soft-delete, and live timeline scroll notification support.
 - **External Speech API:** Direct HTTPS requests via `HttpURLConnection` (with explicit connect/read timeouts) to `speech.googleapis.com` using **kotlinx.serialization** for JSON handling (Retrofit/OkHttp are **not** used).
+
+### Monorepo Web Client & REST API Synchronization
+This repository is a monorepo containing the Android app (`app/`), the shared OpenAPI 3 contract (`api/openapi.yaml`), and the Node.js web frontend (`web/`, served via `live-server` on port `8081` with `web/api-client.js` and `web/script.js`).
+- **Single Source of Truth:** `api/openapi.yaml` defines all REST endpoints, pagination limits (`pageSize` 1..500), and DTO schemas (`CategoryDto`, `JournalEntryDto`, `CreateJournalEntryDto`).
+- **Mandatory Sync Workflow:** Whenever routes, query parameters, or DTO fields change in `WebServer.kt` or `JournalEntryDto.kt`:
+  1. Update `api/openapi.yaml` in the same change.
+  2. Run `./gradlew :app:testDebugUnitTest` so `WebServerContractTest.kt` verifies Kotlin DTO descriptors, pagination limits, and Ktor HTTP responses against `api/openapi.yaml`.
+  3. Run `npm run check` inside `web/` (runs `npm run sync-api` via `openapi-typescript` to regenerate `web/api-types.d.ts`, followed by `npm run typecheck` via `tsc --noEmit` on `web/api-client.js` and `web/script.js`), and update the web client if any types or behaviors changed.
 
 ### Reference Documentation & Tests
 - **Project Reference Docs:**
   - `DATABASE.html`: Interactive Room v18 entity-relationship and schema diagram.
   - `GLOSSARY.html`: UI & domain glossary defining canonical German/English component terms for prompts and UI consistency.
-- **Unit Tests (`app/src/test/`):** JUnit 4 suites covering voice category parsing & target category resolution (`ExampleUnitTest.kt`), travel timezone utilities (`TimeZoneSupportTest.kt`), shopping-list double-tap line deletion & LIFO undo (`LineDeleteAndUndoTest.kt`), week timeline overlap/scroll behavior (`WeekViewBugFixTest.kt`), and month grid / day preview overlay logic (`MonthViewTest.kt`).
+  - `api/openapi.yaml`: Shared OpenAPI 3.0.3 REST API specification for `app/` and `web/`.
+- **Unit Tests (`app/src/test/`):** JUnit 4 suites covering voice category parsing & target category resolution (`ExampleUnitTest.kt`), travel timezone utilities (`TimeZoneSupportTest.kt`), shopping-list double-tap line deletion & LIFO undo (`LineDeleteAndUndoTest.kt`), week timeline overlap/scroll behavior (`WeekViewBugFixTest.kt`), month grid / day preview overlay logic (`MonthViewTest.kt`), and Ktor REST API OpenAPI contract verification (`WebServerContractTest.kt`).

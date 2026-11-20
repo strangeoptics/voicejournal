@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Journal</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="modal.css">
+    <link rel="stylesheet" href="button.css">
+    <link rel="stylesheet" href="categories.css">
+    <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+    <h1>Journal</h1>
+
+    <div class="container" style="position: relative;">
+        <button id="settings-toggle" class="settings-toggle" title="Einstellungen">⚙️</button>
+        <div id="settings-panel" class="settings-panel">
+            <label for="page-size">Page Size:</label>
+            <input type="number" id="page-size" value="5" min="1" max="500" style="width: 55px;">
+            <label for="api-url" style="margin-left: 10px;">API Host:</label>
+            <input type="text" id="api-url" placeholder="localhost">
+            <button id="refresh-api">Verbinden</button>
+        </div>
+
+        <div class="controls">
+            <!--label for="category-select">Kategorie:</label-->
+            <select id="category-select">
+                <option value="">--Kategorie auswählen--</option>
+            </select>
+            <button id="new-entry-button" class="primary-button">Neuer Eintrag</button>
+        </div>
+
+        <div id="journal-entries" class="chat-container">
+            <!-- Journal-Einträge werden hier dynamisch eingefügt -->
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 id="modal-title">Eintrag bearbeiten</h2>
+            <div class="date-row">
+                <div class="date-group">
+                    <label for="edit-date">Startzeit:</label>
+                    <input type="datetime-local" id="edit-date">
+                </div>
+                <div class="date-group">
+                    <label for="edit-end-date">Endzeit:</label>
+                    <input type="datetime-local" id="edit-end-date">
+                </div>
+            </div>
+            
+            <label style="display:block; margin-bottom: 5px;">Kategorien:</label>
+            <div id="edit-categories" class="categories-container">
+                <!-- Checkboxen werden hier dynamisch eingefügt -->
+            </div>
+
+            <textarea id="edit-content" rows="10"></textarea>
+            <div class="modal-actions">
+                <button id="save-button">Speichern</button>
+                <button id="delete-button">Löschen</button>
+                <button id="cancel-button">Abbrechen</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="api-client.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

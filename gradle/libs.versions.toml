@@ -48,6 +48,7 @@ ktor-server-netty-jvm = { group = "io.ktor", name = "ktor-server-netty-jvm", ver
 ktor-server-content-negotiation-jvm = { group = "io.ktor", name = "ktor-server-content-negotiation-jvm", version.ref = "ktor" }
 ktor-serialization-kotlinx-json-jvm = { group = "io.ktor", name = "ktor-serialization-kotlinx-json-jvm", version.ref = "ktor" }
 ktor-server-cors-jvm = { group = "io.ktor", name = "ktor-server-cors-jvm", version.ref = "ktor" }
+ktor-server-test-host-jvm = { group = "io.ktor", name = "ktor-server-test-host-jvm", version.ref = "ktor" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

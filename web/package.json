@@ -1,0 +1,21 @@
+{
+  "name": "voicejournal-frontend",
+  "version": "1.0.0",
+  "description": "A simple web interface to display journal entries from a REST API.",
+  "main": "index.html",
+  "scripts": {
+    "start": "live-server --port=8081",
+    "sync-api": "openapi-typescript ../api/openapi.yaml -o api-types.d.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run sync-api && npm run typecheck"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "live-server": "^1.2.2"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.6.1",
+    "typescript": "^5.8.2"
+  }
+}
